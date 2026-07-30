@@ -3,6 +3,12 @@ hg.achievements.achievements_data = hg.achievements.achievements_data or {}
 hg.achievements.achievements_data.player_achievements = hg.achievements.achievements_data.player_achievements or {}
 hg.achievements.achievements_data.created_achevements = {}
 
+local function syncPlayerHeadshotAchievements(ply)
+    if not IsValid(ply) or not hg.achievements.GetAchievementInfo("gollavo") then return end
+
+    hg.achievements.SetPlayerAchievement(ply, "gollavo", tonumber(ply:GetPData("Headshots", 0)) or 0)
+end
+
 local function updatePlayer(ply)
     local name = ply:Name()
 	local steamID64 = ply:SteamID64()
@@ -25,6 +31,7 @@ local function updatePlayer(ply)
 				updateQuery:Execute()
 
                 hg.achievements.achievements_data.player_achievements[steamID64] = util.JSONToTable(result[1].achievements) or {}
+                syncPlayerHeadshotAchievements(ply)
 
                 --PrintTable(hg.achievements.achievements_data.player_achievements[steamID64])
 			else
@@ -35,6 +42,7 @@ local function updatePlayer(ply)
 				insertQuery:Execute()
 
 				hg.achievements.achievements_data.player_achievements[steamID64] = {}
+				syncPlayerHeadshotAchievements(ply)
 			end
 		end)
 	query:Execute()
@@ -118,6 +126,8 @@ function hg.achievements.CreateAchievementType(key, needed_value, start_value, d
         showpercent = showpercent,
     }
 end
+
+hg.achievements.CreateAchievementType("gollavo", 3333, 0, "Get 3333 headshots.", "Gollavo")
 
 
 function hg.achievements.GetAchievements()

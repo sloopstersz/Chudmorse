@@ -162,6 +162,26 @@ input_list.brainTemporal = function(org, bone, dmg, dmgInfo) return damageBrainL
 input_list.brainOccipital = function(org, bone, dmg, dmgInfo) return damageBrainLobe(org, bone, dmg, dmgInfo, "brainOccipital") end
 input_list.brain = input_list.brainFrontal
 
+local brainLobes = {
+	brainFrontal = true,
+	brainParietal = true,
+	brainTemporal = true,
+	brainOccipital = true,
+	brain = true
+}
+
+hook.Add("PreTraceOrganBulletDamage", "hg_skull_melee_penetration", function(org, bone, dmg, dmgInfo, box, dir, hit, ricochet, organ, hook_info)
+	if not organ or not hook_info then return end
+	if not brainLobes[organ[1]] then return end
+	if not dmgInfo:IsDamageType(DMG_SLASH + DMG_CLUB) then return end
+
+	local skull = org.skull or 0
+	if skull >= 1 then return end
+
+	local chance = math.Clamp(0.04 + skull * 0.18 + dmg * 0.025, 0, 0.28)
+	if math.Rand(0, 1) > chance then hook_info.restricted = true end
+end)
+
 hook.Add("HomigradDamage", "BrainHemorrhageTrauma", function(ply, dmgInfo, hitgroup)
 	local org = ply.organism
 	if not org or hitgroup ~= HITGROUP_HEAD or not org.skull then return end

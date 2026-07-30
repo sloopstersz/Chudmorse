@@ -235,6 +235,7 @@ local function processPosture(rag, postureType, scale)
 	local force = 1800 * pulseScale * (scale or 1)
 	local damp = 120 * pulseScale
 	rag.postureBase = rag.postureBase or {}
+	local shadowparams = {}
 
 	for physBone, offset in pairs(offsets) do
 		local ang = offset.ang
@@ -251,7 +252,20 @@ local function processPosture(rag, postureType, scale)
 		local _, localAng = LocalToWorld(vector_origin, ang, vector_origin, rag.postureBase[physBone])
 		local _, targetAng = LocalToWorld(vector_origin, localAng, vector_origin, referenceAng)
 		targetAng = LerpAngle(fade, baseAng, targetAng)
-		hg.ShadowControl(rag, physBone, 0.01, targetAng, force * fade, damp, vector_origin, 0, 0)
+		if hg.ShadowControl then
+			hg.ShadowControl(rag, physBone, 0.01, targetAng, force * fade, damp, vector_origin, 0, 0)
+		else
+			shadowparams.secondstoarrive = 0.01
+			shadowparams.angle = targetAng
+			shadowparams.maxangular = force * fade * (rag.power or 1)
+			shadowparams.maxangulardamp = damp
+			shadowparams.pos = vector_origin
+			shadowparams.maxspeed = 0
+			shadowparams.maxspeeddamp = 0
+			shadowparams.dampfactor = 0.9
+			phys:Wake()
+			phys:ComputeShadowControl(shadowparams)
+		end
 	end
 end
 

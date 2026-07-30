@@ -1,6 +1,24 @@
 
 if SERVER then
     util.AddNetworkString("bloody_decal_1")
+    util.AddNetworkString("bruise_decal")
+
+    local bruiseDecalCount = 4
+
+    function hg.ApplyBruiseTo(ent, victim, hitPos, hitNormal)
+        if not IsValid(ent) then return end
+        if not IsValid(victim) or not victim:IsPlayer() then return end
+        if math.random() > math.Rand(0.65, 0.75) then return end
+
+        local idx = math.random(bruiseDecalCount)
+        net.Start("bruise_decal")
+        net.WriteEntity(ent)
+        net.WriteEntity(victim)
+        net.WriteUInt(idx, 4)
+        net.WriteVector(hitPos)
+        net.WriteVector(hitNormal)
+        net.SendPVS(hitPos)
+    end
 
     return
 end
@@ -126,6 +144,27 @@ net.Receive("bloody_decal_1", function()
 		else
 			AddDecalToEnt2(mdl, self:EntIndex(), matBlood, false, nil, nil, nil, nil, self.DamageType != DMG_SLASH and 100)
 		end
+	end
+end)
+
+local bruiseSizeCvar = CreateClientConVar("hg_bruise_size", "0.04", true, false, "Bruise decal size (world units)", 0.01, 5)
+net.Receive("bruise_decal", function()
+	local ent = net.ReadEntity()
+	local victim = net.ReadEntity()
+	local idx = net.ReadUInt(4)
+	local pos = net.ReadVector()
+	local normal = net.ReadVector()
+	if not IsValid(ent) or not pos or not normal then return end
+
+	local mat = Material(util.DecalMaterial("Bruise.Add" .. idx))
+	if not mat then return end
+
+	local s = bruiseSizeCvar:GetFloat()
+	local alpha = math.random(80, 180)
+	local col = Color(255, 255, 255, alpha)
+	util.DecalEx(mat, ent, pos + normal, normal, col, s, s)
+	if IsValid(victim) and victim ~= ent then
+		util.DecalEx(mat, victim, pos + normal, normal, col, s, s)
 	end
 end)
 

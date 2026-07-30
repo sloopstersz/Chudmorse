@@ -570,7 +570,7 @@ hook.Add("Think", "Fake", function()
 					local name = ragdoll:GetBoneName(bone)
 
 					if IsValid(physobj) then
-						local bone_impulse = ply.HitBones and ply.HitBones[name] or CurTime()
+						local bone_impulse = (ply.HitBones and ply.HitBones[name]) or CurTime()
 						local amt_impulse = (2 - math.Clamp(bone_impulse - CurTime(),0,2)) / 2
 						
 						local p = {}
@@ -1436,6 +1436,7 @@ hook.Add("Think", "Fake", function()
 					else
 						restoreSlideMaterials(ragdoll)
 						clearSlideState(ragdoll)
+
 						ragdoll.isDropkicking = ply:KeyDown(IN_ATTACK) and ply:KeyDown(IN_ATTACK2) and not onGround
 
 						if ragdoll.isDropkicking then
@@ -1469,6 +1470,8 @@ hook.Add("Think", "Fake", function()
 							shadowControl(ragdoll, 9, 0.001, calfAng2, 600, 200)
 						end
 					end
+
+				end
 
 				if org.lleg >= 1 or org.rleg >= 1 then
 					org.painadd = org.painadd + ragdoll.dtime * 2 * (org.lleg + org.rleg)

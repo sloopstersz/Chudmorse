@@ -45,3 +45,275 @@ COMMANDS.respawn = {
 	end,
 	0
 }
+
+util.AddNetworkString("ZB_AdminStatsRequest")
+util.AddNetworkString("ZB_AdminStatsSend")
+util.AddNetworkString("ZB_AdminStatsSave")
+
+local function AdminStatsAllowed(ply)
+    return IsValid(ply) and ply:IsSuperAdmin()
+end
+
+local function FindPlayerBySteamID64(steamID64)
+    for _, ply in player.Iterator() do
+        if ply:SteamID64() == steamID64 then return ply end
+    end
+end
+
+local function AdminStatsSQLReady()
+    return mysql and (mysql.module == "sqlite" or mysql.connection)
+end
+
+local function GetAchievementValues(data)
+    local values = util.JSONToTable(data or "") or {}
+    local filtered = hg and hg.achievements and hg.achievements.FilterPlayerAchievements and hg.achievements.FilterPlayerAchievements(values) or values
+    local output = {}
+
+    if hg and hg.achievements and hg.achievements.GetAchievements then
+        for key, info in pairs(hg.achievements.GetAchievements() or {}) do
+            output[key] = tonumber(info.start_value) or 0
+        end
+    end
+
+    for key, val in pairs(filtered) do
+        output[key] = tonumber(istable(val) and val.value or val) or 0
+    end
+
+    return output
+end
+
+local function GetActiveAdminStatsRows()
+    local rows = {}
+
+    for _, ply2 in player.Iterator() do
+        local steamID64 = ply2:SteamID64()
+        local exp = zb.Experience and zb.Experience.PlayerInstances and zb.Experience.PlayerInstances[steamID64] or {}
+
+        rows[#rows + 1] = {
+            steamid = steamID64,
+            name = ply2:Name(),
+            active = true,
+            skill = tonumber(exp.skill) or 0,
+            experience = tonumber(exp.experience) or 0,
+            deaths = tonumber(exp.deaths) or 0,
+            kills = tonumber(exp.kills) or 0,
+            suicides = tonumber(exp.suicides) or 0,
+            headshots = tonumber(ply2:GetPData("Headshots", 0)) or 0,
+            karma = ply2.guilt_GetValue and ply2:guilt_GetValue() or ply2.Karma or 100,
+            achievements = GetAchievementValues(util.TableToJSON(hg and hg.achievements and hg.achievements.GetPlayerAchievements and hg.achievements.GetPlayerAchievements(ply2) or {}))
+        }
+    end
+
+    table.sort(rows, function(a, b)
+        return a.name:lower() < b.name:lower()
+    end)
+
+    return rows
+end
+
+local function SendAdminStatsRows(ply, rows)
+    net.Start("ZB_AdminStatsSend")
+        net.WriteTable(rows)
+    net.Send(ply)
+end
+
+local function SendAdminStats(ply)
+    if not AdminStatsAllowed(ply) then return end
+
+    if not AdminStatsSQLReady() then
+        SendAdminStatsRows(ply, GetActiveAdminStatsRows())
+        return
+    end
+
+    local active = {}
+    for _, ply2 in player.Iterator() do
+        active[ply2:SteamID64()] = ply2
+    end
+
+    mysql:RawQuery([[SELECT e.steamid, e.steam_name, e.skill, e.experience, e.deaths, e.kills, e.suicides, g.value AS karma, a.achievements FROM zb_experience e LEFT JOIN zb_guilt g ON g.steamid = e.steamid LEFT JOIN hg_achievements a ON a.steamid = e.steamid]], function(result)
+        if not AdminStatsAllowed(ply) then return end
+
+        local rows = {}
+        local seen = {}
+
+        for _, data in ipairs(result or {}) do
+            local steamID64 = tostring(data.steamid or "")
+            local ply2 = active[steamID64]
+            local exp = IsValid(ply2) and zb.Experience and zb.Experience.PlayerInstances and zb.Experience.PlayerInstances[steamID64] or nil
+            local achievements = IsValid(ply2) and hg and hg.achievements and hg.achievements.GetPlayerAchievements and hg.achievements.GetPlayerAchievements(ply2) or nil
+
+            seen[steamID64] = true
+            rows[#rows + 1] = {
+                steamid = steamID64,
+                name = IsValid(ply2) and ply2:Name() or tostring(data.steam_name or "Unknown"),
+                active = IsValid(ply2),
+                skill = exp and tonumber(exp.skill) or tonumber(data.skill) or 0,
+                experience = exp and tonumber(exp.experience) or tonumber(data.experience) or 0,
+                deaths = exp and tonumber(exp.deaths) or tonumber(data.deaths) or 0,
+                kills = exp and tonumber(exp.kills) or tonumber(data.kills) or 0,
+                suicides = exp and tonumber(exp.suicides) or tonumber(data.suicides) or 0,
+                headshots = IsValid(ply2) and (tonumber(ply2:GetPData("Headshots", 0)) or 0) or 0,
+                karma = tonumber(data.karma) or (IsValid(ply2) and ply2.guilt_GetValue and ply2:guilt_GetValue() or 100),
+                achievements = GetAchievementValues(achievements and util.TableToJSON(achievements) or data.achievements)
+            }
+        end
+
+        for steamID64, ply2 in pairs(active) do
+            if not seen[steamID64] then
+                local exp = zb.Experience and zb.Experience.PlayerInstances and zb.Experience.PlayerInstances[steamID64] or {}
+                rows[#rows + 1] = {
+                    steamid = steamID64,
+                    name = ply2:Name(),
+                    active = true,
+                    skill = tonumber(exp.skill) or 0,
+                    experience = tonumber(exp.experience) or 0,
+                    deaths = tonumber(exp.deaths) or 0,
+                    kills = tonumber(exp.kills) or 0,
+                    suicides = tonumber(exp.suicides) or 0,
+                    headshots = tonumber(ply2:GetPData("Headshots", 0)) or 0,
+                    karma = ply2.guilt_GetValue and ply2:guilt_GetValue() or 100,
+                    achievements = GetAchievementValues(util.TableToJSON(hg and hg.achievements and hg.achievements.GetPlayerAchievements and hg.achievements.GetPlayerAchievements(ply2) or {}))
+                }
+            end
+        end
+
+        table.sort(rows, function(a, b)
+            if a.active ~= b.active then return a.active end
+            return a.name:lower() < b.name:lower()
+        end)
+
+        SendAdminStatsRows(ply, rows)
+    end)
+end
+
+net.Receive("ZB_AdminStatsRequest", function(len, ply)
+    SendAdminStats(ply)
+end)
+
+net.Receive("ZB_AdminStatsSave", function(len, ply)
+    if not AdminStatsAllowed(ply) then return end
+
+    local steamID64 = net.ReadString()
+    local data = net.ReadTable()
+    if steamID64 == "" or not istable(data) then return end
+
+    local target = FindPlayerBySteamID64(steamID64)
+    local name = IsValid(target) and target:Name() or tostring(data.name or "Unknown")
+    local exp = {
+        skill = tonumber(data.skill) or 0,
+        experience = math.max(math.floor(tonumber(data.experience) or 0), 0),
+        deaths = math.max(math.floor(tonumber(data.deaths) or 0), 0),
+        kills = math.max(math.floor(tonumber(data.kills) or 0), 0),
+        suicides = math.max(math.floor(tonumber(data.suicides) or 0), 0)
+    }
+    local karma = tonumber(data.karma) or 100
+    local headshots = math.max(math.floor(tonumber(data.headshots) or 0), 0)
+
+    if zb.Experience and zb.Experience.PlayerInstances then
+        zb.Experience.PlayerInstances[steamID64] = table.Copy(exp)
+    end
+
+    if zb.GuiltSQL and zb.GuiltSQL.PlayerInstances then
+        zb.GuiltSQL.PlayerInstances[steamID64] = zb.GuiltSQL.PlayerInstances[steamID64] or {}
+        zb.GuiltSQL.PlayerInstances[steamID64].value = karma
+    end
+
+    if IsValid(target) then
+        target.Karma = karma
+        target:SetNetVar("Karma", karma)
+        target:SetPData("Headshots", headshots)
+
+        if AdminStatsSQLReady() and target.guilt_SetValue then
+            target:guilt_SetValue(karma)
+        end
+
+        if hg and hg.achievements and hg.achievements.SetPlayerAchievement then
+            hg.achievements.SetPlayerAchievement(target, "gollavo", headshots)
+        end
+    end
+
+    if hg and hg.achievements and istable(data.achievements) then
+        local achievements = {}
+        for key, value in pairs(data.achievements) do
+            achievements[key] = {value = tonumber(value) or 0}
+        end
+
+        achievements.gollavo = {value = headshots}
+
+        achievements = hg.achievements.FilterPlayerAchievements and hg.achievements.FilterPlayerAchievements(achievements) or achievements
+
+        if IsValid(target) then
+            hg.achievements.achievements_data.player_achievements[steamID64] = achievements
+        end
+    end
+
+    if not AdminStatsSQLReady() then
+        SendAdminStatsRows(ply, GetActiveAdminStatsRows())
+        return
+    end
+
+    local insertExp = mysql:InsertIgnore("zb_experience")
+        insertExp:Insert("steamid", steamID64)
+        insertExp:Insert("steam_name", name)
+        insertExp:Insert("skill", exp.skill)
+        insertExp:Insert("experience", exp.experience)
+        insertExp:Insert("deaths", exp.deaths)
+        insertExp:Insert("kills", exp.kills)
+        insertExp:Insert("suicides", exp.suicides)
+    insertExp:Execute()
+
+    local updateExp = mysql:Update("zb_experience")
+        updateExp:Update("steam_name", name)
+        updateExp:Update("skill", exp.skill)
+        updateExp:Update("experience", exp.experience)
+        updateExp:Update("deaths", exp.deaths)
+        updateExp:Update("kills", exp.kills)
+        updateExp:Update("suicides", exp.suicides)
+        updateExp:Where("steamid", steamID64)
+    updateExp:Execute()
+
+    local insertGuilt = mysql:InsertIgnore("zb_guilt")
+        insertGuilt:Insert("steamid", steamID64)
+        insertGuilt:Insert("steam_name", name)
+        insertGuilt:Insert("value", karma)
+    insertGuilt:Execute()
+
+    local updateGuilt = mysql:Update("zb_guilt")
+        updateGuilt:Update("steam_name", name)
+        updateGuilt:Update("value", karma)
+        updateGuilt:Where("steamid", steamID64)
+    updateGuilt:Execute()
+
+    if hg and hg.achievements and istable(data.achievements) then
+        local achievements = {}
+        for key, value in pairs(data.achievements) do
+            achievements[key] = {value = tonumber(value) or 0}
+        end
+
+        achievements.gollavo = {value = headshots}
+
+        achievements = hg.achievements.FilterPlayerAchievements and hg.achievements.FilterPlayerAchievements(achievements) or achievements
+
+        if IsValid(target) then
+            hg.achievements.achievements_data.player_achievements[steamID64] = achievements
+            hg.achievements.SaveToSQL(target, achievements)
+        else
+            local json = util.TableToJSON(achievements)
+            local insertAch = mysql:InsertIgnore("hg_achievements")
+                insertAch:Insert("steamid", steamID64)
+                insertAch:Insert("steam_name", name)
+                insertAch:Insert("achievements", json)
+            insertAch:Execute()
+
+            local updateAch = mysql:Update("hg_achievements")
+                updateAch:Update("steam_name", name)
+                updateAch:Update("achievements", json)
+                updateAch:Where("steamid", steamID64)
+            updateAch:Execute()
+        end
+    end
+
+    timer.Simple(1, function()
+        SendAdminStats(ply)
+    end)
+end)

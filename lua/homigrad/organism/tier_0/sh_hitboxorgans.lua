@@ -38,7 +38,7 @@ function hg.organism.ShootMatrix(ent, organs)
 
 	for nameBone, organs in pairs(organs) do
 		local bone = ent:LookupBone(nameBone)
-		--if not bone then continue end
+		if not bone then continue end
 		matrix = ent:GetBoneMatrix(bone)
 		if not matrix then continue end
 		pos = matrix:GetTranslation()

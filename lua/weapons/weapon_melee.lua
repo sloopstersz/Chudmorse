@@ -1546,6 +1546,41 @@ for i = 1, 4 do
 	bluntDecalsRand = i
 end
 
+local bruiseDecalNames = {}
+do
+	local bruiseMats = { "One", "Two", "Three", "Four" }
+	for i = 1, #bruiseMats do
+		local name = "Bruise.Add" .. i
+		bruiseDecalNames[i] = name
+		game.AddDecal(name, "bruises/bruise" .. bruiseMats[i])
+		list.Add("PaintMaterials", name)
+	end
+end
+
+function SWEP:ApplyBruise(trace)
+	if not SERVER then return end
+	if not self:IsEntSoft(trace.Entity) then return end
+	if self.DamageType ~= DMG_CLUB then return end
+
+	local victim = self:GetHitVictim(trace.Entity)
+	if not IsValid(victim) or not victim:IsPlayer() then return end
+
+	if math.random() > math.Rand(0.65, 0.75) then return end
+
+	local ent = trace.Entity
+	local idx = math.random(#bruiseDecalNames)
+	local pos = trace.HitPos
+	local normal = trace.HitNormal
+
+	net.Start("bruise_decal")
+	net.WriteEntity(ent)
+	net.WriteEntity(victim)
+	net.WriteUInt(idx, 4)
+	net.WriteVector(pos)
+	net.WriteVector(normal)
+	net.SendPVS(pos)
+end
+
 function SWEP:PlayEffects(trace, attacktype)
     local owner = self:GetOwner()
     
@@ -1553,6 +1588,8 @@ function SWEP:PlayEffects(trace, attacktype)
         if self.DamageType == DMG_SLASH then
             util.Decal( "Blood", trace.HitPos + trace.HitNormal * 15, trace.HitPos - trace.HitNormal * 15, owner )
             util.Decal( "Blood", trace.HitPos + trace.HitNormal * 2, owner:GetPos(), trace.Entity )
+        elseif self.DamageType == DMG_CLUB then
+            self:ApplyBruise(trace)
         end
     elseif not self.AttackHitPlayed then
         self.AttackHitPlayed = true

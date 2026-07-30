@@ -211,6 +211,7 @@ end
 
 
 util.AddNetworkString("zb_xp_get")
+util.AddNetworkString("zb_sql_leaderboard")
 
 net.Receive("zb_xp_get",function(len,ply)
 
@@ -234,6 +235,65 @@ net.Receive("zb_xp_get",function(len,ply)
         net.WriteInt( get_ply:GetExp(), 19 )
     net.Send(ply)
 
+end)
+
+net.Receive("zb_sql_leaderboard", function(_, ply)
+    if not zb.Experience.Active then return end
+
+    local limit = math.Clamp(net.ReadUInt(8) or 10, 1, 10)
+
+    local query = mysql:Select("zb_experience")
+        query:Select("steamid")
+        query:Select("steam_name")
+        query:Select("skill")
+        query:Select("experience")
+        query:Select("deaths")
+        query:Select("kills")
+        query:Select("suicides")
+        query:Callback(function(result)
+            if not IsValid(ply) then return end
+
+            local rows = {}
+            for _, data in ipairs(result or {}) do
+                local kills = tonumber(data.kills) or 0
+                local deaths = math.max((tonumber(data.deaths) or 0) - (tonumber(data.suicides) or 0), 0)
+                local xp = math.floor(tonumber(data.experience) or 0)
+
+                rows[#rows + 1] = {
+                    steamid = tostring(data.steamid or ""),
+                    name = tostring(data.steam_name or "Unknown"),
+                    skill = tonumber(data.skill) or 0,
+                    xp = xp,
+                    kills = kills,
+                    deaths = deaths,
+                    kd = kills / math.max(deaths, 1)
+                }
+            end
+
+            table.sort(rows, function(a, b)
+                if a.xp == b.xp then
+                    if a.kd == b.kd then return a.name:lower() < b.name:lower() end
+                    return a.kd > b.kd
+                end
+                return a.xp > b.xp
+            end)
+
+            local count = math.min(#rows, limit)
+            net.Start("zb_sql_leaderboard")
+                net.WriteUInt(count, 8)
+                for i = 1, count do
+                    local row = rows[i]
+                    net.WriteString(row.steamid)
+                    net.WriteString(row.name)
+                    net.WriteFloat(row.skill)
+                    net.WriteUInt(math.Clamp(row.xp, 0, 4294967295), 32)
+                    net.WriteUInt(math.Clamp(row.kills, 0, 65535), 16)
+                    net.WriteUInt(math.Clamp(row.deaths, 0, 65535), 16)
+                    net.WriteFloat(row.kd)
+                end
+            net.Send(ply)
+        end)
+    query:Execute()
 end)
 
 

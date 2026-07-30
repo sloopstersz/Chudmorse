@@ -185,6 +185,7 @@ if SERVER then
 				local headshots = (tonumber(attacker:GetNWInt("Headshots", attacker:GetPData("Headshots", 0))) or 0) + 1
 				attacker:SetPData("Headshots", headshots)
 				attacker:SetNWInt("Headshots", headshots)
+				if hg.achievements then hg.achievements.SetPlayerAchievement(attacker, "gollavo", headshots) end
 			end
 		end
 

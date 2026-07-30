@@ -41,17 +41,17 @@ local function IsDMCounterPlayerTarget(ent)
         return IsValid(target) and target:IsPlayer()
 end
 
-local function PlayPunchSound(pos, level)
+local function PlayPunchSound(pos, level, highPitch)
         local id = math_random(1, 11)
-        sound.Play("punch/Punch-" .. (id < 10 and "0" or "") .. id .. ".wav", pos, level or 70, math_random(110, 125))
+        sound.Play("punch/Punch-" .. (id < 10 and "0" or "") .. id .. ".wav", pos, level or 70, highPitch and math_random(125, 140) or math_random(110, 125))
 end
 
 local function PlayShoveBodyImpact(pos, level)
         sound.Play("physics/body/body_medium_impact_soft" .. math_random(1, 7) .. ".wav", pos, level or 72, math_random(110, 125))
 end
 
-local function PlayKnuckledusterSound(pos, level)
-        sound.Play("knuckledusters/knuckledustershit" .. math_random(1, 4) .. ".mp3", pos, level or 75, math_random(95, 110))
+local function PlayKnuckledusterSound(pos, level, highPitch)
+        sound.Play("knuckledusters/knuckledustershit" .. math_random(1, 4) .. ".mp3", pos, level or 75, highPitch and math_random(110, 125) or math_random(95, 110))
 end
 
 local function SendCoolHandsHitStop(wep, normal, special_attack)
@@ -842,8 +842,13 @@ function SWEP:PrimaryAttack(forcespecial)
 
 	self:UpdateNextIdle()
 
-	self:SetNextPrimaryFire(CurTime() + .55 * math_Clamp((180 - owner.organism.stamina[1]) / 90,1,2) + (special_attack and 0.45 or isfur and 0.35 or 0))
-	self:SetNextSecondaryFire(CurTime() + .55 + (special_attack and 0.45 or isfur and 0.35 or 0))
+	if special_attack then
+		self:SetNextPrimaryFire(CurTime() + .55 * math_Clamp((180 - owner.organism.stamina[1]) / 90,1,2) + 0.45)
+		self:SetNextSecondaryFire(CurTime() + .55 + 0.45)
+	else
+		self:SetNextPrimaryFire(CurTime() + .48 * math_Clamp((180 - owner.organism.stamina[1]) / 90,1,2) + (isfur and 0.3 or 0))
+		self:SetNextSecondaryFire(CurTime() + .48 + (isfur and 0.3 or 0))
+	end
 	self:SetLastShootTime(CurTime())
 
 	if isfur then
@@ -883,7 +888,7 @@ function SWEP:PrimaryAttack(forcespecial)
 			end
 		end
 	else
-		self:PlayAnim(side,isfur and 0.95 or 0.8)
+		self:PlayAnim(side,isfur and 1.05 or 0.9)
 		if SERVER then
 			self:AttackFront(special_attack,rand)
                         if isfur then
@@ -1041,7 +1046,7 @@ function SWEP:AttackFront(special_attack, rand)
                                         sound.Play("weapons/melee/blunt_light"..math_random(8)..".wav", HitPos, 58, math_random(90, 110))
                                         PlayPunchSound(HitPos, 60)
                                 else
-                                        PlayPunchSound(HitPos, 65)
+                                        PlayPunchSound(HitPos, 65, true)
                                 end
                                 if owner:IsBerserk() then
                                         sound.Play("zbattle/berserk/unarmed" .. math_random(1, 9) .. ".wav", HitPos, 90, math_random(90, 110), 0.1 + owner.organism.berserk / 2)
@@ -1049,19 +1054,19 @@ function SWEP:AttackFront(special_attack, rand)
                         else
                                 local snd = special_attack and "weapons/melee/blunt_heavy"..math_random(6)..".wav" or "Flesh.ImpactHard"
                                 if owner.PlayerClassName == "furry" then
-                                        sound.Play("pwb/weapons/knife/hit"..math_random(1,4)..".wav", HitPos, 80, math_random(90, 110))
+                                        sound.Play("pwb/weapons/knife/hit"..math_random(1,4)..".wav", HitPos, 80, math_random(105, 125))
                                 elseif special_attack then
                                         sound.Play(snd, HitPos, 60, math_random(90, 110))
                                         PlayPunchSound(HitPos, 62)
                                 else
-                                        PlayPunchSound(HitPos, 75)
+                                        PlayPunchSound(HitPos, 75, true)
                                 end
                                 if owner:IsBerserk() then
                                         sound.Play("zbattle/berserk/unarmed" .. math_random(1, 9) .. ".wav", HitPos, 90, math_random(90, 110), 0.1 + owner.organism.berserk / 2)
                                 end
                         end
                         if havekastet and owner.PlayerClassName ~= "furry" then
-                                PlayKnuckledusterSound(HitPos, special_attack and 62 or 74)
+                                PlayKnuckledusterSound(HitPos, special_attack and 62 or 74, not special_attack)
                         end
                         if owner.PlayerClassName == "furry" then
                                 util.Decal("Blood",HitPos + owner:EyeAngles():Forward() * -1,HitPos - owner:EyeAngles():Forward() * -1)
@@ -1079,7 +1084,7 @@ function SWEP:AttackFront(special_attack, rand)
                                 owner.organism.painadd = owner.organism.painadd + (math.random(3, 6) * (special_attack and 2.5 or 1.5))
                                 hg.organism.AddWoundManual(owner, math_random(6, 8) * (special_attack and 2 or 1), vector_origin, AngleRand(), owner:LookupBone("ValveBiped.Bip01_"..(rand and "R" or "L").."_Hand"), CurTime())
                         end
-                        sound.Play(owner.PlayerClassName == "furry" and "pwb/weapons/knife/hitwall.wav" or "weapons/melee/blunt_light"..math_random(8)..".wav", HitPos, 65, math_random(90, 110))
+                        sound.Play(owner.PlayerClassName == "furry" and "pwb/weapons/knife/hitwall.wav" or "weapons/melee/blunt_light"..math_random(8)..".wav", HitPos, 65, special_attack and math_random(90, 110) or math_random(105, 125))
                         if owner:IsBerserk() then
                                 sound.Play(table.Random(concrete), HitPos, 90, math_random(90, 110), 0.1 + owner.organism.berserk / 2)
                                 util.Decal("Rollermine.Crater",HitPos + owner:EyeAngles():Forward() * -1,HitPos - owner:EyeAngles():Forward() * -1, Ent)
@@ -1089,7 +1094,7 @@ function SWEP:AttackFront(special_attack, rand)
                 local runningChargeMul = special_attack and (1 + math_Clamp((owner:GetVelocity():Length() - 100) / 200, 0, 1) * (runningSpecialDamageMul - 1)) or 1
                 local incomingSpeed = math.max(Ent:GetVelocity():Dot(-AimVec), 0)
                 local incomingDamageMul = 1 + math_Clamp((incomingSpeed - 150) / 450, 0, 1) * (incomingVelocityDamageMul - 1)
-                local DamageAmt = ((math_random(8, 10) * (special_attack and specialDamageMul * runningChargeMul or 1) * incomingDamageMul) * ((isfur and (owner:IsBerserk() and 10 or 0.85)) or 1)) * (self.DamageMul or 1)
+                local DamageAmt = ((math_random(special_attack and 8 or 6, special_attack and 10 or 8) * (special_attack and specialDamageMul * runningChargeMul or 1) * incomingDamageMul) * ((isfur and (owner:IsBerserk() and 10 or 0.85)) or 1)) * (self.DamageMul or 1)
                 local ent = Ent
                 local vec = AimVec
                 local hitForceVec = AimVec
@@ -1141,6 +1146,17 @@ function SWEP:AttackFront(special_attack, rand)
                 Dam:SetDamagePosition(HitPos)
                 Ent:TakeDamageInfo(Dam)
 
+				if special_attack and Dam:GetDamageType() == DMG_CLUB then
+					if Ent:IsPlayer() then
+						hg.ApplyBruiseTo(Ent, Ent, HitPos, trace.HitNormal)
+					elseif Ent:GetClass() == "prop_ragdoll" then
+						local ragOwner = hg.RagdollOwner(Ent)
+						if IsValid(ragOwner) and ragOwner:IsPlayer() then
+							hg.ApplyBruiseTo(Ent, ragOwner, HitPos, trace.HitNormal)
+						end
+					end
+				end
+
                 SendCoolHandsHitStop(self, trace.HitNormal, special_attack)
 
                 local Phys = Ent:IsPlayer() and Ent:GetPhysicsObject() or Ent:GetPhysicsObjectNum(physbone or 0)
@@ -1157,7 +1173,7 @@ function SWEP:AttackFront(special_attack, rand)
         end
 
         if SERVER then
-                owner.organism.stamina.subadd = owner.organism.stamina.subadd + (special_attack and owner:KeyDown(IN_SPEED) and 13 or 5)
+                owner.organism.stamina.subadd = owner.organism.stamina.subadd + (special_attack and owner:KeyDown(IN_SPEED) and 13 or 3)
         end
 
         owner:LagCompensation(false)
