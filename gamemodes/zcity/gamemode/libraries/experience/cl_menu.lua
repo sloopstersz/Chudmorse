@@ -61,7 +61,7 @@ local needCallback = false
 net.Receive("zb_xp_get",function()
     local ply = net.ReadEntity()
     ply.skill = net.ReadFloat()
-    ply.exp = net.ReadInt(19)
+    ply.exp = net.ReadUInt(32)
     --print(ply.exp,ply.skill)
     if needCallback then
         if IsValid(EXP.OpenedAccount) then

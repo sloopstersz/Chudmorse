@@ -49,6 +49,7 @@ COMMANDS.respawn = {
 util.AddNetworkString("ZB_AdminStatsRequest")
 util.AddNetworkString("ZB_AdminStatsSend")
 util.AddNetworkString("ZB_AdminStatsSave")
+util.AddNetworkString("ZB_AdminStatsSaveResult")
 
 local function AdminStatsAllowed(ply)
     return IsValid(ply) and ply:IsSuperAdmin()
@@ -62,6 +63,19 @@ end
 
 local function AdminStatsSQLReady()
     return mysql and (mysql.module == "sqlite" or mysql.connection)
+end
+
+local function AdminStatsNumber(value, fallback, whole, minimum)
+    if isstring(value) then
+        value = value:gsub(",", ""):gsub("%s+", "")
+    end
+
+    local number = tonumber(value)
+    if number == nil then number = tonumber(fallback) or 0 end
+    if whole then number = math.floor(number) end
+    if minimum then number = math.max(number, minimum) end
+
+    return number
 end
 
 local function GetAchievementValues(data)
@@ -114,6 +128,25 @@ end
 local function SendAdminStatsRows(ply, rows)
     net.Start("ZB_AdminStatsSend")
         net.WriteTable(rows)
+    net.Send(ply)
+end
+
+local function SendAdminStatsSaveResult(ply, ok, message)
+    if not IsValid(ply) then return end
+
+    net.Start("ZB_AdminStatsSaveResult")
+        net.WriteBool(ok)
+        net.WriteString(message or "")
+    net.Send(ply)
+end
+
+local function SendAdminStatsLiveXP(ply, target, exp)
+    if not IsValid(ply) or not IsValid(target) then return end
+
+    net.Start("zb_xp_get")
+        net.WriteEntity(target)
+        net.WriteFloat(exp.skill or 0)
+        net.WriteUInt(math.Clamp(exp.experience or 0, 0, 4294967295), 32)
     net.Send(ply)
 end
 
@@ -191,23 +224,31 @@ net.Receive("ZB_AdminStatsRequest", function(len, ply)
 end)
 
 net.Receive("ZB_AdminStatsSave", function(len, ply)
-    if not AdminStatsAllowed(ply) then return end
+    if not AdminStatsAllowed(ply) then
+        SendAdminStatsSaveResult(ply, false, "Access denied")
+        return
+    end
 
     local steamID64 = net.ReadString()
     local data = net.ReadTable()
-    if steamID64 == "" or not istable(data) then return end
+    if steamID64 == "" or not istable(data) then
+        SendAdminStatsSaveResult(ply, false, "Invalid stats data")
+        return
+    end
 
     local target = FindPlayerBySteamID64(steamID64)
     local name = IsValid(target) and target:Name() or tostring(data.name or "Unknown")
+    local currentExp = zb.Experience and zb.Experience.PlayerInstances and zb.Experience.PlayerInstances[steamID64] or {}
+    local currentGuilt = zb.GuiltSQL and zb.GuiltSQL.PlayerInstances and zb.GuiltSQL.PlayerInstances[steamID64] or {}
     local exp = {
-        skill = tonumber(data.skill) or 0,
-        experience = math.max(math.floor(tonumber(data.experience) or 0), 0),
-        deaths = math.max(math.floor(tonumber(data.deaths) or 0), 0),
-        kills = math.max(math.floor(tonumber(data.kills) or 0), 0),
-        suicides = math.max(math.floor(tonumber(data.suicides) or 0), 0)
+        skill = AdminStatsNumber(data.skill, currentExp.skill),
+        experience = AdminStatsNumber(data.experience, currentExp.experience, true, 0),
+        deaths = AdminStatsNumber(data.deaths, currentExp.deaths, true, 0),
+        kills = AdminStatsNumber(data.kills, currentExp.kills, true, 0),
+        suicides = AdminStatsNumber(data.suicides, currentExp.suicides, true, 0)
     }
-    local karma = tonumber(data.karma) or 100
-    local headshots = math.max(math.floor(tonumber(data.headshots) or 0), 0)
+    local karma = AdminStatsNumber(data.karma, currentGuilt.value or 100)
+    local headshots = AdminStatsNumber(data.headshots, IsValid(target) and target:GetPData("Headshots", 0) or 0, true, 0)
 
     if zb.Experience and zb.Experience.PlayerInstances then
         zb.Experience.PlayerInstances[steamID64] = table.Copy(exp)
@@ -222,6 +263,11 @@ net.Receive("ZB_AdminStatsSave", function(len, ply)
         target.Karma = karma
         target:SetNetVar("Karma", karma)
         target:SetPData("Headshots", headshots)
+        target:SetNWInt("Headshots", headshots)
+        target.exp = nil
+        target.skill = nil
+        SendAdminStatsLiveXP(ply, target, exp)
+        SendAdminStatsLiveXP(target, target, exp)
 
         if AdminStatsSQLReady() and target.guilt_SetValue then
             target:guilt_SetValue(karma)
@@ -232,10 +278,18 @@ net.Receive("ZB_AdminStatsSave", function(len, ply)
         end
     end
 
-    if hg and hg.achievements and istable(data.achievements) then
+    if hg and hg.achievements then
         local achievements = {}
-        for key, value in pairs(data.achievements) do
-            achievements[key] = {value = tonumber(value) or 0}
+        local oldAchievements = hg.achievements.achievements_data and hg.achievements.achievements_data.player_achievements and hg.achievements.achievements_data.player_achievements[steamID64] or {}
+
+        for key, value in pairs(oldAchievements) do
+            achievements[key] = {value = AdminStatsNumber(istable(value) and value.value or value, 0)}
+        end
+
+        if istable(data.achievements) then
+            for key, value in pairs(data.achievements) do
+                achievements[key] = {value = AdminStatsNumber(value, 0)}
+            end
         end
 
         achievements.gollavo = {value = headshots}
@@ -248,6 +302,7 @@ net.Receive("ZB_AdminStatsSave", function(len, ply)
     end
 
     if not AdminStatsSQLReady() then
+        SendAdminStatsSaveResult(ply, true, "Saved in memory")
         SendAdminStatsRows(ply, GetActiveAdminStatsRows())
         return
     end
@@ -284,10 +339,18 @@ net.Receive("ZB_AdminStatsSave", function(len, ply)
         updateGuilt:Where("steamid", steamID64)
     updateGuilt:Execute()
 
-    if hg and hg.achievements and istable(data.achievements) then
+    if hg and hg.achievements then
         local achievements = {}
-        for key, value in pairs(data.achievements) do
-            achievements[key] = {value = tonumber(value) or 0}
+        local oldAchievements = hg.achievements.achievements_data and hg.achievements.achievements_data.player_achievements and hg.achievements.achievements_data.player_achievements[steamID64] or {}
+
+        for key, value in pairs(oldAchievements) do
+            achievements[key] = {value = AdminStatsNumber(istable(value) and value.value or value, 0)}
+        end
+
+        if istable(data.achievements) then
+            for key, value in pairs(data.achievements) do
+                achievements[key] = {value = AdminStatsNumber(value, 0)}
+            end
         end
 
         achievements.gollavo = {value = headshots}
@@ -314,6 +377,7 @@ net.Receive("ZB_AdminStatsSave", function(len, ply)
     end
 
     timer.Simple(1, function()
+        SendAdminStatsSaveResult(ply, true, "Stats saved")
         SendAdminStats(ply)
     end)
 end)

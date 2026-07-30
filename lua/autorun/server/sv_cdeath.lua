@@ -91,7 +91,10 @@ end)
 
 net.Receive("DeathEffect_EnterSpectator", function(len, ply)
     if IsValid(ply) and not ply:Alive() then
+        ply:SetNWBool("DeathEffect_BlockRespawn", false)
+        ply.viewmode = 3
         ply:Spectate(OBS_MODE_ROAMING)
+        ply:SetMoveType(MOVETYPE_NOCLIP)
     end
 end)
 

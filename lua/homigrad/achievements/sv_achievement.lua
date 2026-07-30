@@ -6,7 +6,13 @@ hg.achievements.achievements_data.created_achevements = {}
 local function syncPlayerHeadshotAchievements(ply)
     if not IsValid(ply) or not hg.achievements.GetAchievementInfo("gollavo") then return end
 
-    hg.achievements.SetPlayerAchievement(ply, "gollavo", tonumber(ply:GetPData("Headshots", 0)) or 0)
+    local steamID64 = ply:SteamID64()
+    local achievements = hg.achievements.achievements_data.player_achievements[steamID64] or {}
+    local headshots = math.max(tonumber(ply:GetPData("Headshots", 0)) or 0, tonumber(achievements.gollavo and achievements.gollavo.value) or 0)
+
+    ply:SetPData("Headshots", headshots)
+    ply:SetNWInt("Headshots", headshots)
+    hg.achievements.SetPlayerAchievement(ply, "gollavo", headshots)
 end
 
 local function updatePlayer(ply)
@@ -161,7 +167,7 @@ local function isAchievementCompleted(ply, key, val)
     local playerAchievements = hg.achievements.achievements_data.player_achievements[ply:SteamID64()] or {}
     local playerAchievement = playerAchievements[key] or {}
 
-    return val >= ach.needed_value and (playerAchievement.value or 0) < val
+    return val >= ach.needed_value and (playerAchievement.value or 0) < ach.needed_value
 end
 
 util.AddNetworkString("hg_NewAchievement")

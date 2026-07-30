@@ -486,6 +486,13 @@ if CLIENT then
         end
     end)
 
+    net.Receive("ZB_AdminStatsSaveResult", function()
+        local ok = net.ReadBool()
+        local message = net.ReadString()
+
+        chat.AddText(ok and Color(0, 255, 0) or Color(255, 80, 80), message)
+    end)
+
     local function OpenPlayerStatsMenu()
         if not LocalPlayer():IsSuperAdmin() then return end
         if IsValid(statsPanelInstance) then return end
@@ -612,13 +619,14 @@ if CLIENT then
             saveBtn.DoClick = function()
                 if not selectedRow then return end
 
-                local data = {name = selectedRow.name, achievements = {}}
+                local data = {name = selectedRow.name}
                 for key, entry in pairs(entries) do
-                    data[key] = tonumber(entry:GetText()) or 0
+                    data[key] = entry:GetText()
                 end
 
+                data.achievements = {}
                 for key, entry in pairs(achievementEntries) do
-                    data.achievements[key] = tonumber(entry:GetText()) or 0
+                    data.achievements[key] = entry:GetText()
                 end
 
                 net.Start("ZB_AdminStatsSave")
