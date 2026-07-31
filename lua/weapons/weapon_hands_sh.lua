@@ -1664,17 +1664,6 @@ function SWEP:AttackFront(special_attack, rand)
 		Dam:SetDamagePosition(HitPos)
 		Ent:TakeDamageInfo(Dam)
 
-		if special_attack then
-			if Ent:IsPlayer() then
-				hg.ApplyBruiseTo(Ent, Ent, HitPos, trace.HitNormal)
-			elseif Ent:GetClass() == "prop_ragdoll" then
-				local ragOwner = hg.RagdollOwner(Ent)
-				if IsValid(ragOwner) and ragOwner:IsPlayer() then
-					hg.ApplyBruiseTo(Ent, ragOwner, HitPos, trace.HitNormal)
-				end
-			end
-		end
-
 		if glass and Ent:Health() <= 0 then
 			hg.organism.AddWoundManual(owner, math.Rand(50,75) * 0.5, vector_origin, AngleRand(), owner:LookupBone("ValveBiped.Bip01_"..(rand and "R" or "L").."_Hand"), CurTime())
 		end

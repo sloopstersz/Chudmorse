@@ -83,7 +83,6 @@ hook.Add("PlayerButtonUp", "zcity_keybinds_up", function(ply, button)
     ply.downedbuttons[button] = nil
 
     if CLIENT and ply == LocalPlayer() then return end
-
 end)
 
 if SERVER then
@@ -171,16 +170,12 @@ else
 end
 
 local function RemoveOldBinds()
-    hg.Binds.CurrentBinds.FAKE = nil
     hg.Binds.CurrentBinds.CLOSE_BUTTON = nil
     hg.Binds.CurrentBinds.STRONG_KICK = nil
-    hg.Binds.StandartBinds.FAKE = nil
     hg.Binds.StandartBinds.CLOSE_BUTTON = nil
     hg.Binds.StandartBinds.STRONG_KICK = nil
-    hg.Binds.Names.FAKE = nil
     hg.Binds.Names.CLOSE_BUTTON = nil
     hg.Binds.Names.STRONG_KICK = nil
-    hg.Binds.Commands.FAKE = nil
     hg.Binds.Commands.CLOSE_BUTTON = nil
     hg.Binds.Commands.STRONG_KICK = nil
 end
@@ -188,7 +183,6 @@ end
 RemoveOldBinds()
 
 hg.Binds:CreateBind("hg_kick", KEY_NONE, nil, true, "Kick", "hg_kick")
-hg.Binds:CreateBind("fake", KEY_NONE, nil, true, "Ragdoll", "fake")
 hg.Binds:CreateBind("hmcd_togglelaser", KEY_NONE, nil, true, "Toggle weapon laser", "hmcd_togglelaser")
 hg.Binds:CreateBind("+alt1", KEY_NONE, nil, true, "Lean left", "+alt1")
 hg.Binds:CreateBind("+alt2", KEY_NONE, nil, true, "Lean right", "+alt2")
