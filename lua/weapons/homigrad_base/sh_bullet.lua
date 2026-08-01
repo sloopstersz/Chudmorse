@@ -111,12 +111,28 @@ local function getHeadPos(ent, tr)
 	return tr.HitPos
 end
 
+local function getTraceHitGroup(ent, tr)
+	if tr.HitGroup == HITGROUP_HEAD then return HITGROUP_HEAD end
+	if not IsValid(ent) or not ent:IsRagdoll() then return tr.HitGroup end
+
+	if tr.PhysicsBone ~= nil and ent.TranslatePhysBoneToBone and ent.GetBoneName then
+		local bone = ent:TranslatePhysBoneToBone(tr.PhysicsBone)
+		if bone and bone >= 0 then return hg.bonetohitgroup and hg.bonetohitgroup[ent:GetBoneName(bone)] end
+	end
+
+	if tr.HitBoxBone ~= nil and ent.GetBoneName then
+		return hg.bonetohitgroup and hg.bonetohitgroup[ent:GetBoneName(tr.HitBoxBone)]
+	end
+
+	return tr.HitGroup
+end
+
 local function gollavoHeadshotEffect(attacker, victim, tr)
+	if getTraceHitGroup(victim, tr) ~= HITGROUP_HEAD then return end
 	local pos = getHeadPos(victim, tr)
-	if tr.HitGroup ~= HITGROUP_HEAD and tr.HitPos:DistToSqr(pos) > 900 then return end
 	if not hasGollavo(attacker) then return end
 	if (attacker.GollavoHeadshotEffectNext or 0) > CurTime() then return end
-	attacker.GollavoHeadshotEffectNext = CurTime() + 2
+	attacker.GollavoHeadshotEffectNext = CurTime() + 1
 	net.Start("hg_gollavo_headshot")
 		net.WriteVector(pos)
 	net.Broadcast()

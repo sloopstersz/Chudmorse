@@ -127,6 +127,7 @@ local headpos_male, headpos_female, headang = Vector(0,0,7), Vector(-2,0,6), Ang
 
 util.AddNetworkString("addfountain")
 util.AddNetworkString("hg_gib_bloodspill")
+util.AddNetworkString("hg_fullbody_bloodmist")
 
 hg.fountains = hg.fountains or {}
 local headboom_mdl = Model("models/gleb/zcity/headboom.mdl")
@@ -148,6 +149,28 @@ local zippyHeadGibModels = {
 	Model("models/gore/head_eye02.mdl"),
 	Model("models/gore/head_jawlo.mdl"),
 }
+local fullBodySounds = {
+	Sound("fullbodyexplode/rem_fullbodygib1.wav"),
+	Sound("fullbodyexplode/rem_fullbodygib2.wav"),
+	Sound("fullbodyexplode/rem_fullbodygib3.wav"),
+}
+local fullBodyMainSound = Sound("fullbodyexplode/rem_fullbodygibmain.mp3")
+local fullBodyGibModels = {
+	stomach = {
+		Model("models/gore/pelvis.mdl"),
+		Model("models/gore/uppertorso.mdl"),
+	},
+	rleg = {
+		Model("models/gore/rleg_meatbit001r.mdl"),
+	},
+	lleg = {
+		Model("models/gore/lleg_meatbit001l.mdl"),
+	},
+	larm = {
+		Model("models/gore/larm_armgorehandl.mdl"),
+		Model("models/gore/larm_armgoreupperl.mdl"),
+	},
+}
 
 local sounds = {
 	Sound("player/zombie_head_explode_01.wav"),
@@ -164,10 +187,19 @@ end
 for _, mdl in ipairs(zippyHeadGibModels) do
 	util.PrecacheModel(mdl)
 end
+for _, models in pairs(fullBodyGibModels) do
+	for _, mdl in ipairs(models) do
+		util.PrecacheModel(mdl)
+	end
+end
 
 for _, snd in ipairs(sounds) do
 	util.PrecacheSound(snd)
 end
+for _, snd in ipairs(fullBodySounds) do
+	util.PrecacheSound(snd)
+end
+util.PrecacheSound(fullBodyMainSound)
 
 local function getHeadGoreStage(damage)
 	return math.Clamp(math.ceil(math.max((damage or 0) - 175, 0) / 5), 1, 5)
@@ -366,6 +398,210 @@ end
 local function SpawnIntestineChunks(ent, pos, force)
 	SpawnMeatGore(ent, pos, 6, force or VectorRand(-120, 120), 0.55, intestineChunkModels)
 end
+
+local function getFullBodyPos(ent)
+	local pos, count = vector_origin, 0
+	for _, name in ipairs({"ValveBiped.Bip01_Pelvis", "ValveBiped.Bip01_Spine2", "ValveBiped.Bip01_Head1"}) do
+		local bone = ent:LookupBone(name)
+		local physBone = bone and ent:TranslateBoneToPhysBone(bone)
+		local phys = physBone and physBone >= 0 and ent:GetPhysicsObjectNum(physBone)
+		if IsValid(phys) then
+			pos = pos + phys:GetPos()
+			count = count + 1
+		end
+	end
+
+	if count > 0 then return pos / count end
+	return ent:WorldSpaceCenter()
+end
+
+local function spawnFullBodyGib(mainent, pos, force, model, scale)
+	local ent = ents_Create("prop_physics")
+	ent:SetModel(model)
+	ent:SetPos(pos + VectorRand(-8, 8))
+	ent:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
+	ent:SetModelScale(scale or math.Rand(0.95, 1.15))
+	ent:SetAngles(AngleRand(-180, 180))
+	ent:Activate()
+	ent:Spawn()
+
+	local phys = ent:GetPhysicsObject()
+	if IsValid(phys) then
+		local baseVel = IsValid(mainent) and mainent:GetVelocity() or isvector(mainent) and mainent or vector_origin
+		phys:SetVelocity(baseVel + VectorRand(-260, 260) + (force or vector_origin) / 7)
+		phys:AddAngleVelocity(VectorRand(-320, 320))
+	end
+
+	ent:AddCallback("PhysicsCollide", PhysCallback)
+	SafeRemoveEntityDelayed(ent, gibRemoveTime)
+
+	timer.Simple(0.2, function()
+		if not IsValid(ent) then return end
+		net.Start("hg_gib_bloodspill")
+		net.WriteUInt(ent:EntIndex(), 16)
+		net.WriteFloat(math.Rand(4, 8))
+		net.WriteBool(false)
+		net.Broadcast()
+	end)
+
+	return ent
+end
+
+local function fullBodyBloodMist(pos, force)
+	net.Start("hg_fullbody_bloodmist")
+	net.WriteVector(pos)
+	net.WriteVector(force or vector_origin)
+	net.WriteUInt(70, 8)
+	net.Broadcast()
+end
+
+local function spawnFullBodyGroup(ent, pos, force, models)
+	for _, mdl in ipairs(models) do
+		spawnFullBodyGib(ent, pos, force, mdl)
+	end
+end
+
+local function spawnFullBodyMeat(ent, pos, count, force, scale, models)
+	models = models or meatModels
+	for i = 1, count do
+		local gib = spawnFullBodyGib(ent, pos, force, models[math.random(#models)], scale)
+		if models == meatModels and IsValid(gib) then gib:SetSubMaterial(0, mat) end
+	end
+end
+
+local function fullBodyExplodeAt(pos, force, velocity, org, soundEnt, owner, dmgInfo)
+	force = force or vector_origin
+	velocity = velocity or vector_origin
+
+	if IsValid(soundEnt) then
+		soundEnt:EmitSound(fullBodySounds[math.random(#fullBodySounds)], 85, math.random(95, 105), 1.4)
+		soundEnt:EmitSound(fullBodyMainSound, 90, math.random(96, 104), 1)
+	else
+		sound.Play(fullBodySounds[math.random(#fullBodySounds)], pos, 85, math.random(95, 105), 1.4)
+		sound.Play(fullBodyMainSound, pos, 90, math.random(96, 104), 1)
+	end
+
+	fullBodyBloodMist(pos, force)
+
+	if not (org and org.stomachgibbed) then
+		spawnFullBodyGroup(velocity, pos, force, fullBodyGibModels.stomach)
+		spawnFullBodyMeat(velocity, pos, 6, force, 0.55, intestineChunkModels)
+	end
+
+	for _, limb in ipairs({"lleg", "rleg", "larm"}) do
+		if not (org and org[limb.."amputated"]) then
+			spawnFullBodyGroup(velocity, pos, force, fullBodyGibModels[limb])
+			spawnFullBodyMeat(velocity, pos, 4, force, 0.65)
+		end
+	end
+
+	if not (org and org.rarmamputated) then
+		spawnFullBodyMeat(velocity, pos, 5, force, 0.65)
+	end
+
+	if not (org and org.headamputated) then
+		spawnFullBodyMeat(velocity, pos, 8, force, 0.8, zippyHeadGibModels)
+	end
+
+	if IsValid(owner) then
+		owner.fullbodyexploded = true
+		owner:SetNWEntity("FakeRagdoll", NULL)
+		owner:SetNWEntity("RagdollDeath", NULL)
+		owner.FakeRagdoll = nil
+		if owner:Alive() then owner:Kill() end
+	end
+
+	if org then org.fullbodyexploded = true end
+	hook.Run("OnFullBodyExplode", soundEnt, org, owner, dmgInfo)
+end
+
+function hg.FullBodyExplode(target, force, dmgInfo)
+	if not IsValid(target) or target.fullbodyexploded then return end
+
+	if target:IsPlayer() then
+		local ply = target
+		local rag = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply:GetNWEntity("RagdollDeath")
+		if IsValid(rag) then return hg.FullBodyExplode(rag, force, dmgInfo) end
+		if ply:Alive() then
+			ply.fullbodyexploded = true
+			ply:Kill()
+			timer.Simple(0, function()
+				if not IsValid(ply) then return end
+				local rag = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply:GetNWEntity("RagdollDeath")
+				if IsValid(rag) then hg.FullBodyExplode(rag, force, dmgInfo) end
+			end)
+		end
+		return true
+	end
+
+	local ent = target
+	local org = ent.organism
+	local owner = ent:IsRagdoll() and hg.RagdollOwner(ent) or nil
+	if not org and IsValid(owner) then org = owner.organism end
+	if org and org.godmode then return end
+
+	ent.fullbodyexploded = true
+	if org then org.fullbodyexploded = true end
+
+	local pos = getFullBodyPos(ent)
+	force = force or vector_origin
+	fullBodyExplodeAt(pos, force, ent:GetVelocity(), org, ent, owner, dmgInfo)
+
+	if IsValid(ent.zippyHeadGore) then ent.zippyHeadGore:Remove() end
+	if IsValid(ent.StomachGoreEnt) then ent.StomachGoreEnt:Remove() end
+	ent:Remove()
+	return true
+end
+
+local fullBodyRemoveTrack = {}
+
+function hg.TrackFullBodyRagdollRemove(rag)
+	if not IsValid(rag) or not rag:IsRagdoll() or rag.hg_fullbody_remove_track then return end
+	rag.hg_fullbody_remove_track = true
+	fullBodyRemoveTrack[rag] = {
+		pos = getFullBodyPos(rag),
+		vel = rag:GetVelocity(),
+		org = rag.organism,
+		owner = IsValid(rag.ply) and rag.ply or rag:GetNWEntity("ply"),
+	}
+
+	rag:CallOnRemove("HG_FullBodyRemoveGib", function(ent)
+		local data = fullBodyRemoveTrack[ent]
+		fullBodyRemoveTrack[ent] = nil
+		if ent.fullbodyexploded or ent.override or ent.hg_no_fullbody_remove_gib then return end
+
+		local org = data and data.org or ent.organism
+		if org and (org.godmode or org.fullbodyexploded) then return end
+
+		local pos = data and data.pos or IsValid(ent) and ent:GetPos() or vector_origin
+		local vel = data and data.vel or IsValid(ent) and ent:GetVelocity() or vector_origin
+		local owner = data and data.owner
+		if IsValid(ent) then
+			pos = getFullBodyPos(ent)
+			vel = ent:GetVelocity()
+		end
+
+		fullBodyExplodeAt(pos, vel, vel, org, nil, owner)
+	end)
+end
+
+hook.Add("Ragdoll_Create", "HG_TrackFullBodyRemoveGib", function(ply, rag)
+	hg.TrackFullBodyRagdollRemove(rag)
+end)
+
+hook.Add("RagdollDeath", "HG_TrackFullBodyRemoveDeathGib", function(ply, rag)
+	hg.TrackFullBodyRagdollRemove(rag)
+end)
+
+hook.Add("Think", "HG_UpdateFullBodyRemoveTrack", function()
+	for rag, data in pairs(fullBodyRemoveTrack) do
+		if not IsValid(rag) then fullBodyRemoveTrack[rag] = nil continue end
+		data.pos = getFullBodyPos(rag)
+		data.vel = rag:GetVelocity()
+		data.org = rag.organism or data.org
+		data.owner = IsValid(rag.ply) and rag.ply or data.owner
+	end
+end)
 
 function hg.AttachStomachGore(target, force)
 	if not IsValid(target) then return end
