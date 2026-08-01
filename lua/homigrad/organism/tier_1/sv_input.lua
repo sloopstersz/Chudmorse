@@ -22,8 +22,8 @@ local player_blast_limb_gib_threshold = 80
 local player_fall_head_gib_threshold = 1.2
 local full_body_blast_gib_threshold = 3500
 local full_body_blast_damage_threshold = 1000
-local full_body_physics_speed_threshold = 1600
-local full_body_physics_damage_threshold = 1000
+local full_body_physics_speed_threshold = 2800
+local full_body_physics_damage_threshold = 3000
 local blast_gib_damage_mul = 700
 local melee_gib_damage_mul = 0.35
 local ragdoll_fall_skull_damage_mul = 1.2
@@ -1076,7 +1076,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	--print(damageStack, 3)
 	damageStack = damageStack * (dmgInfo:IsDamageType(DMG_BLAST) and blast_gib_damage_mul / lend * grenadeBlastMul or 1) * (!dmgInfo:IsDamageType(DMG_CLUB+DMG_SLASH+DMG_BULLET+DMG_BUCKSHOT+DMG_BLAST+DMG_SNIPER) and 0 or 1) * (ent:IsNPC() and 3 or 1)
 	--damageStack = damageStack * (bullet and bullet.AmmoType and hg.ammotypeshuy[bullet.AmmoType] and hg.ammotypeshuy[bullet.AmmoType].BulletSettings and hg.ammotypeshuy[bullet.AmmoType].BulletSettings.Mass or 1) / 8
-	if hg.FullBodyExplode and !org.fullbodyexploded and dmgInfo:IsDamageType(DMG_BLAST) and (damageStack >= full_body_blast_gib_threshold or dmg_before >= full_body_blast_damage_threshold) then
+	if hg.FullBodyExplode and !org.fullbodyexploded and dmgInfo:IsDamageType(DMG_BLAST) and hg.CanFullBodyGib and hg.CanFullBodyGib(ent, org, ply) and (damageStack >= full_body_blast_gib_threshold or dmg_before >= full_body_blast_damage_threshold) then
 		return hg.FullBodyExplode(ent, dirCool * len, dmgInfo) or true
 	end
 	
@@ -1595,7 +1595,7 @@ local function velocityDamage(ent, data)
 
 	local org = ent.organism
 	if org.godmode then return end
-	if hg.FullBodyExplode and !org.fullbodyexploded and (speed >= full_body_physics_speed_threshold or rawPhysicsDamage >= full_body_physics_damage_threshold) then
+	if hg.FullBodyExplode and !org.fullbodyexploded and hg.CanFullBodyGib and hg.CanFullBodyGib(ent, org, ply) and (speed >= full_body_physics_speed_threshold or rawPhysicsDamage >= full_body_physics_damage_threshold) then
 		if hg.FullBodyExplode(ent, data.OurOldVelocity - data.TheirOldVelocity, dmgInfo) then return end
 	end
 	org.fearadd = org.fearadd + dmg * 0.5

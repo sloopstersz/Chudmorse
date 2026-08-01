@@ -269,7 +269,7 @@ end
 
 local function processPostureGunfire(ply, ragdoll, org, wep)
 	if not org then return end
-	if not (org.posturing or org.seizureActive) then org.postureGunfireWeapon = nil ragdoll.nextPostureGunFire = nil return end
+	if not org.seizureActive then org.postureGunfireWeapon = nil ragdoll.nextPostureGunFire = nil return end
 	wep = IsValid(org.postureGunfireWeapon) and org.postureGunfireWeapon or wep
 	if not IsValid(wep) then org.postureGunfireWeapon = nil return end
 	if not ishgweapon(wep) or wep.reload or wep.deploy then return end

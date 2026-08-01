@@ -415,6 +415,28 @@ local function getFullBodyPos(ent)
 	return ent:WorldSpaceCenter()
 end
 
+local function getFullBodyOwner(ent)
+	if not IsValid(ent) then return end
+	if ent:IsPlayer() then return ent end
+	return ent:IsRagdoll() and hg.RagdollOwner(ent) or IsValid(ent.ply) and ent.ply or ent:GetNWEntity("ply")
+end
+
+function hg.CanFullBodyGib(target, org, owner, removed)
+	if not IsValid(target) then return false end
+	org = org or target.organism
+	owner = owner or getFullBodyOwner(target)
+	if org and (org.godmode or org.fullbodyexploded) then return false end
+	if org and not org.isPly and not IsValid(owner) then return true end
+
+	if removed then
+		return true
+	end
+
+	if org and (org.otrub or org.alive == false or (org.consciousness or 1) <= 0.1) then return true end
+	if IsValid(owner) and (owner.Removed or not owner:Alive()) then return true end
+	return false
+end
+
 local function spawnFullBodyGib(mainent, pos, force, model, scale)
 	local ent = ents_Create("prop_physics")
 	ent:SetModel(model)
@@ -508,7 +530,14 @@ local function fullBodyExplodeAt(pos, force, velocity, org, soundEnt, owner, dmg
 		owner:SetNWEntity("FakeRagdoll", NULL)
 		owner:SetNWEntity("RagdollDeath", NULL)
 		owner.FakeRagdoll = nil
-		if owner:Alive() then owner:Kill() end
+		if owner:Alive() then
+			local wasRemoved = owner.Removed
+			owner.Removed = true
+			owner:Kill()
+			timer.Simple(0, function()
+				if IsValid(owner) then owner.Removed = wasRemoved end
+			end)
+		end
 	end
 
 	if org then org.fullbodyexploded = true end
@@ -523,8 +552,14 @@ function hg.FullBodyExplode(target, force, dmgInfo)
 		local rag = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply:GetNWEntity("RagdollDeath")
 		if IsValid(rag) then return hg.FullBodyExplode(rag, force, dmgInfo) end
 		if ply:Alive() then
+			if not hg.CanFullBodyGib(ply, ply.organism, ply) then return end
 			ply.fullbodyexploded = true
+			local wasRemoved = ply.Removed
+			ply.Removed = true
 			ply:Kill()
+			timer.Simple(0, function()
+				if IsValid(ply) then ply.Removed = wasRemoved end
+			end)
 			timer.Simple(0, function()
 				if not IsValid(ply) then return end
 				local rag = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply:GetNWEntity("RagdollDeath")
@@ -539,6 +574,7 @@ function hg.FullBodyExplode(target, force, dmgInfo)
 	local owner = ent:IsRagdoll() and hg.RagdollOwner(ent) or nil
 	if not org and IsValid(owner) then org = owner.organism end
 	if org and org.godmode then return end
+	if not hg.CanFullBodyGib(ent, org, owner) then return end
 
 	ent.fullbodyexploded = true
 	if org then org.fullbodyexploded = true end
@@ -555,6 +591,16 @@ end
 
 local fullBodyRemoveTrack = {}
 
+hook.Add("PreCleanupMap", "HG_BlockFullBodyCleanupGib", function()
+	hg.CleaningUpMap = true
+end)
+
+hook.Add("PostCleanupMap", "HG_BlockFullBodyCleanupGib", function()
+	timer.Simple(0, function()
+		hg.CleaningUpMap = nil
+	end)
+end)
+
 function hg.TrackFullBodyRagdollRemove(rag)
 	if not IsValid(rag) or not rag:IsRagdoll() or rag.hg_fullbody_remove_track then return end
 	rag.hg_fullbody_remove_track = true
@@ -568,14 +614,16 @@ function hg.TrackFullBodyRagdollRemove(rag)
 	rag:CallOnRemove("HG_FullBodyRemoveGib", function(ent)
 		local data = fullBodyRemoveTrack[ent]
 		fullBodyRemoveTrack[ent] = nil
+		if hg.CleaningUpMap then return end
 		if ent.fullbodyexploded or ent.override or ent.hg_no_fullbody_remove_gib then return end
 
 		local org = data and data.org or ent.organism
 		if org and (org.godmode or org.fullbodyexploded) then return end
+		local owner = data and data.owner
+		if not hg.CanFullBodyGib(ent, org, owner, true) then return end
 
 		local pos = data and data.pos or IsValid(ent) and ent:GetPos() or vector_origin
 		local vel = data and data.vel or IsValid(ent) and ent:GetVelocity() or vector_origin
-		local owner = data and data.owner
 		if IsValid(ent) then
 			pos = getFullBodyPos(ent)
 			vel = ent:GetVelocity()
