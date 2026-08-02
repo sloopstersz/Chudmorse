@@ -272,6 +272,8 @@ end
 local SCPCBCreateThought
 
 local function SCPCBHitThought(ply, target, dmgType, dmg, hitPos, dmginfo)
+    if not dmg or dmg <= 0 then return end
+
     local isLethal = dmg >= ply:Health()
     local hitgroup = SCPCBThoughtHitgroup(target, dmgType, dmginfo, hitPos)
     local category = scpcbHitgroupToCat[hitgroup] or "generic"
@@ -549,6 +551,8 @@ function PLAYER:ResetNotification(key)
 end
 
 hook.Add("EntityTakeDamage", "SCPCB_HGThoughtDamage", function(target, dmginfo)
+    if not dmginfo or dmginfo:GetDamage() <= 0 then return end
+
     local ply = SCPCBThoughtOwner(target)
     if not IsValid(ply) then return end
     if dmginfo:IsDamageType(DMG_FALL) or dmginfo:IsDamageType(DMG_CRUSH) then return end
@@ -569,8 +573,10 @@ hook.Add("EntityFireBullets", "SCPCB_HGThoughtNearMiss", function(entity, data)
     data.Callback = function(attacker, tr, dmginfo)
         shooter = IsValid(attacker) and attacker or shooter
         local hitPly = SCPCBThoughtOwner(tr.Entity)
+        local blocked = false
 
         if IsValid(hitPly) and hitPly != shooter then
+            blocked = hg.TryExtinguisherBulletBlock and hg.TryExtinguisherBulletBlock(tr.Entity, dmginfo)
             SCPCBHitThought(hitPly, tr.Entity, "bullet", dmginfo:GetDamage(), tr.HitPos, dmginfo)
         end
 
@@ -583,7 +589,7 @@ hook.Add("EntityFireBullets", "SCPCB_HGThoughtNearMiss", function(entity, data)
             dir:Normalize()
 
             for _, ply in ipairs(player.GetAll()) do
-                if IsValid(ply) and ply:Alive() and ply != shooter and ply != entity and ply != hitPly and (ply.scpcbThoughtHitTime or 0) < CurTime() then
+                if IsValid(ply) and ply:Alive() and ply != shooter and ply != entity and ply != hitPly and not blocked and (ply.scpcbThoughtHitTime or 0) < CurTime() then
                     local plyPos = ply:GetPos() + Vector(0, 0, 50)
                     local projection = math.Clamp((plyPos - src):Dot(dir), 0, length)
                     local closestPoint = src + dir * projection

@@ -421,5 +421,10 @@ hook.Add("HG_MovementCalc_2","HG-LegKickAnim",function(mul, ply, cmd, mv)
 end)
 
 concommand.Add("hg_kick",function(ply)
-    ply:LegAttack()
+	if IsValid(ply.FakeRagdoll) and hg.FakeLegAttack then
+		hg.FakeLegAttack(ply)
+		return
+	end
+
+	ply:LegAttack()
 end)
