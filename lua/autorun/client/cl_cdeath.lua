@@ -49,10 +49,17 @@ CreateClientConVar(
     "use the quieter death sound",
     0, 1
 )
+CreateClientConVar(
+    "deatheffect_death_screen", "1",
+    true, false,
+    "enable the cinematic death screen",
+    0, 1
+)
 
 local cv_cam_max_dist = GetConVar("deatheffect_cam_max_dist")
 local cv_cam_min_dist = GetConVar("deatheffect_cam_min_dist")
 local cv_alt_sound    = GetConVar("deatheffect_alt_sound")
+local cv_death_screen = GetConVar("deatheffect_death_screen")
 
 surface.CreateFont("DeathEffect_Key", { font = "Roboto", size = 52, weight = 700 })
 surface.CreateFont("DeathEffect_Label", { font = "Roboto", size = 22, weight = 400 })
@@ -152,6 +159,18 @@ local function DeathEffectRoundActive()
 
     return true
 end
+
+local function DeathScreenEnabled()
+    return not cv_death_screen or cv_death_screen:GetBool()
+end
+
+cvars.AddChangeCallback("deatheffect_death_screen", function(_, _, newValue)
+    if newValue == "0" then
+        ReleaseAuthority()
+    elseif isDead and not compatActive then
+        TakeAuthority()
+    end
+end, "DeathEffect_DeathScreenToggle")
 
 
 local function PlayClick()
@@ -255,7 +274,9 @@ local function CinematicDeathTracker()
 
     if not ply:Alive() and not isDead and hasSpawned then
         isDead           = true
-        TakeAuthority() 
+        if DeathScreenEnabled() then
+            TakeAuthority()
+        end
         stage2Started    = false
         keepSoundAlive   = true
         inTransition     = false
@@ -332,13 +353,15 @@ local function CinematicDeathTracker()
         if (CurTime() - deathTime) >= STAGE_1_DURATION then
             stage2Started = true
             stage2Time    = CurTime()
-            LocalPlayer():SetDSP(17)
-            LocalPlayer():ConCommand("soundfade 100 99999")
+            if DeathScreenEnabled() then
+                LocalPlayer():SetDSP(17)
+                LocalPlayer():ConCommand("soundfade 100 99999")
+            end
         end
     end
 
     -- bypass loop
-    if isDead and not compatActive then
+    if isDead and not compatActive and DeathScreenEnabled() then
         ply:SetViewPunchAngles(Angle(0,0,0))
         ply:ScreenFade(SCREENFADE.IN, Color(0,0,0,0), 0.1, 0)
         
@@ -443,6 +466,8 @@ hook.Add("CreateMove", "CinematicDeathFreecamLook", CinematicDeathFreecamLook)
 
 -- cam view shit. so you can spawn things in spectator
 local function BuildDeathView(fov)
+    if not DeathScreenEnabled() then return end
+
     if compatActive then 
         return {
             origin     = LocalPlayer():EyePos(),
@@ -520,14 +545,14 @@ hook.Add("HG_CalcView", "CinematicDeathHGOverride", CinematicDeathHGCalcView)
 
 -- audio and visual overrides
 local function CinematicDeathMute()
-    if isDead and stage2Started and not inSpectator and not compatActive then
+    if isDead and stage2Started and not inSpectator and not compatActive and DeathScreenEnabled() then
         return false
     end
 end
 hook.Add("EntityEmitSound", "CinematicDeathMute", CinematicDeathMute)
 
 local function CinematicDeathHideRagdoll()
-    if not isDead or not IsValid(ragdollEnt) or compatActive then return end
+    if not isDead or not IsValid(ragdollEnt) or compatActive or not DeathScreenEnabled() then return end
     
     if (CurTime() - deathTime) < STAGE_1_DURATION then
         ragdollEnt:SetNoDraw(true)
@@ -567,6 +592,16 @@ local function CinematicDeathBackground()
         local red = math.floor((1 - fadeProgress) * 255)
         surface.SetDrawColor(red, 0, 0, overlayAlpha)
         surface.DrawRect(0, 0, sw, sh)
+
+        if not DeathScreenEnabled() then
+            local textFadeIn = math.Clamp(stageElapsed / DEATH_TEXT_FADE_IN, 0, 1)
+            local textAlpha = math.floor(textFadeIn * overlayAlpha * (1 - fadeProgress))
+            local text = "Deceased."
+            local desc = "You are no longer a witness to the world."
+            draw.SimpleText(text, "DeathEffect_HG_Large", sw / 2, sh / 2 - 40, Color(0, 0, 0, textAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            draw.SimpleText(desc, "DeathEffect_HG_Desc", sw / 2, sh / 2 + 45, Color(0, 0, 0, textAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            return
+        end
 
         if fadeProgress < 1 and IsValid(ragdollEnt) then
             cam.Start3D(deathCamPos, deathCamAng)
