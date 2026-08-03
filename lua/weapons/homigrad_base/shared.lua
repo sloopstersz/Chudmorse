@@ -704,8 +704,10 @@ function SWEP:EmitShoot()
 
 	if (self.Primary.SoundFP or self.Supressor and self.SupressedSoundFP) and nearDist then
 		self:PlaySnd((self.Supressor and self.SupressedSoundFP) or self.Primary.SoundFP, nil, nil, vol, nil, 55533, not self.Supressor)
+		if self.Supressor then self:PlaySnd(self.Primary.SoundFP or self.Primary.Sound, nil, nil, vol * 0.7, math_random(135, 160), 55534, false) end
 	else
 		self:PlaySnd(self.Supressor and (self.SupressedSound or (self:IsPistolHoldType() and "homigrad/weapons/pistols/sil.wav" or "m4a1/m4a1_suppressed_fp.wav")) or self.Primary.Sound, nil, nil, vol, nil, 55533, not self.Supressor)
+		if self.Supressor then self:PlaySnd(self.Primary.Sound, nil, nil, vol * 0.6, math_random(135, 160), 55534, false) end
 	end
 	if !self.Supressor then
 		self:PlaySndDist(self.DistSound, nil, nil, nil, nil, 55511, not self.Supressor)
