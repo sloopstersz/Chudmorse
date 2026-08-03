@@ -34,6 +34,28 @@ function hg.organism.StartFibrillation(org)
 	org.fibrillationStart = CurTime()
 end
 
+function hg.organism.TryRestartHeartWithCPR(org, cprMul)
+	if not org or not org.alive or not org.heartstop or org.deathStateKilled then return false end
+	if (org.pulse or 0) <= 15 or (org.brain or 0) >= 0.6 or (org.heart or 0) >= 1 then return false end
+
+	cprMul = cprMul or 1
+	local adrenaline = Clamp(org.adrenaline or 0, 0, 3)
+	local chance = Clamp(6 * cprMul + adrenaline * 12, 6, 45)
+
+	if math.random(100) > chance then return false end
+
+	org.heartstop = false
+	org.fibrillation = false
+	org.arrhythmia = 0
+	org.heartbeat = Clamp(org.heartbeat or 70, 55, 90)
+	org.pulse = max(org.pulse or 0, 25)
+	org.bloodPressure = max(org.bloodPressure or 0, 35)
+	org.cardiacOutput = max(org.cardiacOutput or 0, 0.35)
+	org.myocardialOxygen = max(org.myocardialOxygen or 0, 0.35)
+
+	return true
+end
+
 module[1] = function(org)
 	org.heart = 0
 	org.heartstop = false
@@ -164,9 +186,6 @@ module[2] = function(owner, org, timeValue)
 	org.fearadd = math.Approach(org.fearadd, 0, gainfear and timeValue or timeValue / 4.9) -- 15 seconds to stop fearing something and start to calm down
 	org.fearadd = math.Approach(org.fearadd, 1, gainfear and timeValue / 5 or 0)
 	
-	local adrenK = max(1 + org.adrenaline, 1)
-	local adren = org.adrenaline
-
 	if org.pulse < 10 or org.brain >= 0.6 then org.heartstop = true end
 	if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
 	if org.heartstop then
@@ -190,15 +209,6 @@ module[2] = function(owner, org, timeValue)
 	
 	if not org.heartstop then
 		org.last_heartbeat = CurTime()
-	end
-
-	if org.heartstop and adren > 0 and (org.adrenaline_try or 0) < CurTime() then
-		local chance = math.Clamp(adren * 25,0,25)
-		local rand = math.random(100)
-
-		org.adrenaline_try = CurTime() + 0.1
-
-		if chance > rand then org.heartstop = false end
 	end
 
 	if org.heartstop then

@@ -1,4 +1,5 @@
 local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vector, AngleRand, VectorRand, math, hook, util, game
+local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_deg, math_max, math_min, math_rad, math_Round, math_sin, math_sqrt = math.abs, math.Approach, math.AngleDifference, math.Clamp, math.cos, math.deg, math.max, math.min, math.rad, math.Round, math.sin, math.sqrt
 --\\ Inertia & stuff
 	--\\ Antibhop accelerate (not used anyway)
 		--[[hook.Add("OnPlayerHitGround", "Movement", function(ply, inWater, onFloater, speed)
@@ -12,28 +13,32 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 
 	--\\ Side movement calculation
 		local function calc_vector2d_angle(vector)
-			return math.deg(math.atan2(vector.y, vector.x))
+			return math_deg(math.atan2(vector.y, vector.x))
 		end
 
 		local function calc_forward_side_moves(inertia, ply_angles)
 			local ply_angle = ply_angles.y
 			local inertia_angle = calc_vector2d_angle(inertia)
-			local angdiff = math.AngleDifference(inertia_angle, ply_angle)
+			local angdiff = math_AngleDifference(inertia_angle, ply_angle)
 
-			return math.cos(math.rad(angdiff)), -math.sin(math.rad(angdiff))
+			local rad = math_rad(angdiff)
+			return math_cos(rad), -math_sin(rad)
 		end
 
 		local function calc_forward_side_moves_to_vector2d(fm, sm, ply_angles)
-			local ply_angle = ply_angles.y
+			local rad = math_rad(ply_angles.y)
 			--ply_angle = ply_angle + (CLIENT and offsetView[2] or 0)
+			local sin, cos = math_sin(rad), math_cos(rad)
+			local x = fm * cos + sm * sin
+			local y = fm * sin - sm * cos
+			local len = math_sqrt(x * x + y * y)
 
-			local vec = Vector(fm * math.cos(math.rad(ply_angle)) - sm * math.cos(math.rad(ply_angle + 90)), fm * math.sin(math.rad(ply_angle)) - sm * math.sin(math.rad(ply_angle + 90)), 0)
-
-			return vec:GetNormalized()
+			if len <= 0 then return vector_origin end
+			return Vector(x / len, y / len, 0)
 		end
 
 		local function approach_vector(vector_from, vector_to, change)
-			return Vector(math.Approach(vector_from.x, vector_to.x, change), math.Approach(vector_from.y, vector_to.y, change), math.Approach(vector_from.z, vector_to.z, change))
+			return Vector(math_Approach(vector_from.x, vector_to.x, change), math_Approach(vector_from.y, vector_to.y, change), math_Approach(vector_from.z, vector_to.z, change))
 		end
 
 		local function approach_vector_smooth(vector_from, vector_to, lerp)
@@ -231,11 +236,13 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 
 	local vomitVPAng, vecZero = Angle(1, 0, 0), Vector()
 	hook.Add("SetupMove", "HG(StartCommand)", function(ply, mv, cmd)
+		local curTime = CurTime()
+		local sysTime = SysTime()
 		--\\ DeltaTime
-			ply.LastStartCommand = ply.LastStartCommand or SysTime()
+			ply.LastStartCommand = ply.LastStartCommand or sysTime
 		local tick_interval = engine.TickInterval()
-		local delta_time = math.Clamp(SysTime() - ply.LastStartCommand, 0, tick_interval * 1.25)--FrameTime()
-			ply.LastStartCommand = SysTime()
+		local delta_time = math_Clamp(sysTime - ply.LastStartCommand, 0, tick_interval * 1.25)--FrameTime()
+			ply.LastStartCommand = sysTime
 		--//
 
 		if(not IsValid(ply) or not ply:Alive())then
@@ -271,21 +278,28 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 			end
 		end
 
-		if (ply:GetMoveType() == MOVETYPE_NOCLIP) then
+		local moveType = ply:GetMoveType()
+		if (moveType == MOVETYPE_NOCLIP) then
 			hook.Run("HG_MovementCalc", vecZero, 0, 1, ply, cmd, mv)
-			hook.Run("HG_MovementCalc_2", {1}, ply, cmd, mv)
+			local mulTable = ply.hg_movement_mul or {1}
+			ply.hg_movement_mul = mulTable
+			mulTable[1] = 1
+			hook.Run("HG_MovementCalc_2", mulTable, ply, cmd, mv)
 
 			return
 		end
 
-		if(ply:InVehicle())then
+		local inVehicle = ply:InVehicle()
+		if(inVehicle)then
 			return
 		end
 
-		local move_time = cmd:TickCount() > 0 and cmd:TickCount() * engine.TickInterval() or CurTime()
+		local tickCount = cmd:TickCount()
+		local move_time = tickCount > 0 and tickCount * tick_interval or curTime
 		local in_speed = cmd:KeyDown(IN_SPEED)
+		local crouching = ply:Crouching()
 		local slow_walk_speed = ply:GetSlowWalkSpeed()
-		local runnin_held = in_speed and not ply:Crouching() and cmd:KeyDown(IN_FORWARD)
+		local runnin_held = in_speed and not crouching and cmd:KeyDown(IN_FORWARD)
 		local no_jogging = hg_NoJogging(ply)
 		local command_number = cmd:CommandNumber()
 		local process_input = command_number <= 0 or command_number > (ply.hg_LastMovementCommand or -1)
@@ -332,7 +346,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 			cmd:RemoveKey(IN_BACK)
 		end]]
 
-		if not IsValid(ply.FakeRagdoll) and ply:KeyDown(IN_SPEED) and not ply:Crouching() and ply:KeyDown(IN_BACK) then
+		if not IsValid(ply.FakeRagdoll) and ply:KeyDown(IN_SPEED) and not crouching and ply:KeyDown(IN_BACK) then
 			cmd:RemoveKey(IN_SPEED)
 		end
 
@@ -343,17 +357,19 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		if not on_ground then
 			ply.hg_WasAirborne = true
 		elseif ply.hg_WasAirborne then
-			ply.hg_LastLandingTime = CurTime()
+			ply.hg_LastLandingTime = curTime
 			ply.hg_WasAirborne = false
 		end
 		hg_CheckSprintCollisionRagdoll(ply, vel, velLen)
-		local fm = cmd:GetForwardMove() * (org.brain and org.brain > 0.1 and math.sin(CurTime() / 2) or 1)
-		local sm = cmd:GetSideMove() * (org.brain and org.brain > 0.1 and math.sin(CurTime() / 2) or 1)
+		local brainSway = org.brain and org.brain > 0.1 and math_sin(curTime / 2) or 1
+		local fm = cmd:GetForwardMove() * brainSway
+		local sm = cmd:GetSideMove() * brainSway
 
 		local slow_walking = ply:KeyDown(IN_WALK)
 		local aiming = ply:KeyDown(IN_ATTACK2) and wep and IsValid(wep) and ishgweapon(wep)
 		local walk_speed = ply:GetWalkSpeed()
 		local crouch_walk_speed = ply:GetCrouchedWalkSpeed()
+		local run_speed = ply:GetRunSpeed()
 		local weightmul = hg.CalculateWeight(ply, 140)
 		local rag = hg.GetCurrentCharacter(ply)
 		ply.weightmul = weightmul
@@ -378,7 +394,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		end
 
 		if org.brain and org.brain > 0.05 then
-			local brainadjust = org.brain > 0.05 and math.Clamp(((org.brain - 0.05) * math.sin(CurTime() + 10) * 20), -2, 2) or 0
+			local brainadjust = org.brain > 0.05 and math_Clamp(((org.brain - 0.05) * math_sin(curTime + 10) * 20), -2, 2) or 0
 
 			if brainadjust > 1 then
 				local in_jump = cmd:KeyDown(IN_JUMP)
@@ -403,7 +419,8 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 			end
 		end
 
-		if ply:GetNetVar("vomiting", 0) > CurTime() then
+		local vomitingEnd = ply:GetNetVar("vomiting", 0)
+		if vomitingEnd > curTime then
 			cmd:AddKey(IN_DUCK)
 			mv:AddKey(IN_DUCK)
 			if ply == lply then ViewPunch(vomitVPAng) end
@@ -448,33 +465,36 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 
 		hook.Run("HG_MovementCalc", vel, velLen, weightmul, ply, cmd, mv)
 
-		local target_run_speed = ply.hg_isJogging and (ply:GetRunSpeed() * 0.55) or ply:GetRunSpeed()
-		local mul = {(ply.move or ply.CurrentSpeed) / target_run_speed}
+		local target_run_speed = ply.hg_isJogging and (run_speed * 0.55) or run_speed
+		local mulTable = ply.hg_movement_mul or {1}
+		ply.hg_movement_mul = mulTable
+		mulTable[1] = (ply.move or ply.CurrentSpeed) / target_run_speed
 
-		hook.Run("HG_MovementCalc_2", mul, ply, cmd, mv)
+		hook.Run("HG_MovementCalc_2", mulTable, ply, cmd, mv)
 
-		mul = mul[1]
+		local mul = mulTable[1]
 
 		if mul <= 0.01 then
 			mul = 0.01
 		end
 
-		mul = mul * (ply:GetNWBool("TauntStopMoving", false) and 0.01 or 1)
+		local tauntStopMoving = ply:GetNWBool("TauntStopMoving", false)
+		mul = mul * (tauntStopMoving and 0.01 or 1)
 
 		if ply.hg_isSprinting and runnin and velLen >= 10 then
 			local sprint_mul = ply.sprintDebuff and ply.sprintDebuff > move_time and 0.5 or 1
-			ply.CurrentSpeed = math.Approach(ply.CurrentSpeed, (ply.move or ply:GetRunSpeed()) * mul * sprint_mul, delta_time * ply.SpeedGainMul)
+			ply.CurrentSpeed = math_Approach(ply.CurrentSpeed, (ply.move or run_speed) * mul * sprint_mul, delta_time * ply.SpeedGainMul)
 		elseif ply.hg_isJogging and runnin and velLen >= 10 then
-			ply.CurrentSpeed = math.Approach(ply.CurrentSpeed, (ply.move or (ply:GetRunSpeed() * 0.55)) * mul, delta_time * ply.SpeedGainMul)
+			ply.CurrentSpeed = math_Approach(ply.CurrentSpeed, (ply.move or (run_speed * 0.55)) * mul, delta_time * ply.SpeedGainMul)
 		else
-			if(ply:Crouching())then
-				ply.CurrentSpeed = math.Approach(ply.CurrentSpeed, crouch_walk_speed * mul, delta_time * ply.SpeedLoseMul)
+			if(crouching)then
+				ply.CurrentSpeed = math_Approach(ply.CurrentSpeed, crouch_walk_speed * mul, delta_time * ply.SpeedLoseMul)
 			elseif(slow_walking)then
-				ply.CurrentSpeed = math.Approach(ply.CurrentSpeed, slow_walk_speed * mul, delta_time * ply.SpeedLoseMul)
+				ply.CurrentSpeed = math_Approach(ply.CurrentSpeed, slow_walk_speed * mul, delta_time * ply.SpeedLoseMul)
 			elseif(aiming)then
-				ply.CurrentSpeed = math.Approach(ply.CurrentSpeed, slow_walk_speed * mul, delta_time * ply.SpeedLoseMul)
+				ply.CurrentSpeed = math_Approach(ply.CurrentSpeed, slow_walk_speed * mul, delta_time * ply.SpeedLoseMul)
 			else
-				ply.CurrentSpeed = math.Approach(ply.CurrentSpeed, walk_speed * mul, delta_time * ply.SpeedLoseMul)
+				ply.CurrentSpeed = math_Approach(ply.CurrentSpeed, walk_speed * mul, delta_time * ply.SpeedLoseMul)
 			end
 		end
 		--//
@@ -493,16 +513,16 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 			vel2 = 1
 		end
 
-		local change = math.abs(math.AngleDifference(calc_vector2d_angle(ply.LastVelocity), calc_vector2d_angle(vel))) // * (SERVER and 0 or 5)
+		local change = math_abs(math_AngleDifference(calc_vector2d_angle(ply.LastVelocity), calc_vector2d_angle(vel))) // * (SERVER and 0 or 5)
 
 		if ply.LastVelocity == vel and ply.LastChangeVelocity then // this is so bullshit but it works
 			change = ply.LastChangeVelocity
 		end
 
-		local change_mul = math.abs(ply.CurrentSpeed - slow_walk_speed)
+		local change_mul = math_abs(ply.CurrentSpeed - slow_walk_speed)
 
 		ply.LastChangeVelocity = change
-		ply.CurrentSpeed = math.Approach(ply.CurrentSpeed, slow_walk_speed * mul, delta_time * change * change_mul * ply.SpeedSharpLoseMul * 0.25 * 200)
+		ply.CurrentSpeed = math_Approach(ply.CurrentSpeed, slow_walk_speed * mul, delta_time * change * change_mul * ply.SpeedSharpLoseMul * 0.25 * 200)
 		ply.LastVelocity = vel
 		ply.LastVelocityLen = velLen
 		--//
@@ -514,16 +534,16 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		ply.MovementInertia = ply.MovementInertia or vel
 
 		--\\ Side & back running debuffs
-			fm = fm / math.abs(fm ~= 0 and fm or 1)
-			sm = sm / math.abs(sm ~= 0 and sm or 1)
-			local movement_penalty = math.abs(sm * 1.2)
+			fm = fm / math_abs(fm ~= 0 and fm or 1)
+			sm = sm / math_abs(sm ~= 0 and sm or 1)
+			local movement_penalty = math_abs(sm * 1.2)
 
 			if(movement_penalty == 0)then
 				movement_penalty = 1
 			end
 
 			if(fm < 0)then
-				movement_penalty = math.max(movement_penalty, 1.3)
+				movement_penalty = math_max(movement_penalty, 1.3)
 			end
 
 			--if(CLIENT)then
@@ -535,14 +555,14 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		--\\ Air & water walking debuffs
 			local water_level = ply:WaterLevel()
 
-			if((not ply:OnGround()) and (water_level < 1))then
+			if((not on_ground) and (water_level < 1))then
 				if(fm ~= 0 or sm ~=0)then
 					local start_pos = ply:GetPos()
-					local trace_data = {
-						start = start_pos,
-						endpos = start_pos + inertia_to / speed * 50,
-						filter = ply
-					}
+					local trace_data = ply.hg_inertia_air_trace or { filter = ply }
+					ply.hg_inertia_air_trace = trace_data
+					trace_data.start = start_pos
+					trace_data.endpos = start_pos + inertia_to / speed * 50
+					trace_data.filter = ply
 
 					if(util.TraceLine(trace_data).Hit)then
 						movement_penalty = 1
@@ -564,10 +584,10 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 
 			if ply.organism and ply.organism.consciousness then
 				consciousness = consciousness * ply.organism.consciousness
-				consciousness = consciousness * math.Clamp(ply.organism.blood / 4000, 0.5, 1)
+				consciousness = consciousness * math_Clamp(ply.organism.blood / 4000, 0.5, 1)
 			end
 
-			local consmul = math.Clamp(((consciousness - 1) * 4 + 1), 0.1, 1)
+			local consmul = math_Clamp(((consciousness - 1) * 4 + 1), 0.1, 1)
 
 			//if(water_level > 0)then
 			//	ply.CurrentFrictionMul = math.Approach(ply.CurrentFrictionMul, 0.2, delta_time * ply.FrictionLoseMul * water_level)
@@ -582,10 +602,11 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 			-- local new_inertia = LerpVector(1 - 0.5^(delta_time * ply.InertiaBlend), ply.MovementInertia, inertia_to)
 			//local new_inertia = approach_vector(ply.MovementInertia, inertia_to, 1000)//SERVER and delta_time * ply.InertiaBlend * ply:Ping() / 100 or delta_time * ply.InertiaBlend)
 			//local new_inertia = approach_vector_smooth(ply.MovementInertia, inertia_to, hg.lerpFrameTime2(0.075, delta_time))
-		if !ply:OnGround() then
+		if !on_ground then
 			ply.MovementInertia = ply.LastVelocity
-			if ply:Ping() >= 45 and ply.MovementInertia:Length2D() > ply:GetRunSpeed() * 1.25 then
-				ply.MovementInertia = ply.MovementInertia:GetNormalized() * ply:GetRunSpeed() * 1.25
+			local ping = ply:Ping()
+			if ping >= 45 and ply.MovementInertia:Length2D() > run_speed * 1.25 then
+				ply.MovementInertia = ply.MovementInertia:GetNormalized() * run_speed * 1.25
 			end
 			end
 
@@ -593,7 +614,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 
 			ply.MovementInertia = new_inertia
 
-			local inertia_len = math.sqrt(ply.MovementInertia.x * ply.MovementInertia.x + ply.MovementInertia.y * ply.MovementInertia.y)
+			local inertia_len = math_sqrt(ply.MovementInertia.x * ply.MovementInertia.x + ply.MovementInertia.y * ply.MovementInertia.y)
 
 			/*if (SERVER or (ply.huy or 0) < SysTime()) and inertia_len > 10 then
 				if CLIENT then ply.huy = SysTime() + engine.ServerFrameTime() end
@@ -605,25 +626,29 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 			if(CLIENT)then
 				ply.MovementInertiaAddView = ply.MovementInertiaAddView or Angle(0,0,0)
 				ply.MovementInertiaAddView.r = ply.MovementInertiaAddView.r + side_move * delta_time * inertia_len * 0.03
-				ply.MovementInertiaAddView.p = ply.MovementInertiaAddView.p + math.abs(side_move) * delta_time * inertia_len * 0.01
+				ply.MovementInertiaAddView.p = ply.MovementInertiaAddView.p + math_abs(side_move) * delta_time * inertia_len * 0.01
 			end
 		--//
 
-		local move = (ply.hg_isJogging and (ply:GetRunSpeed() * 0.55) or ply:GetRunSpeed()) * 1.1
-		k = 1 * weightmul
-		k = k * math.Clamp(consmul, 0.7, 1)
-		k = k * math.Clamp((org.temperature and (1 - (org.temperature - 38) * 0.25) or 1), 0.5, 1)
-		k = k * math.Clamp((org.temperature and ((org.temperature - 35) * 0.25 + 1) or 1), 0.5, 1)
-		k = k * math.Clamp(math.Round((org.stamina and org.stamina[1] or 180), 0) / 120, hg_movement_stamina_debuff:GetFloat(), 1)
-		k = k * math.Clamp(5 / ((org.immobilization or 0) + 1), 0.25, 1)
-		k = k * math.Clamp((org.blood or 0) / 5000, 0, 1)
-		k = k * math.Clamp(10 / ((org.shock or 0) + 1), 0.25, 1)
-		k = k * (math.min(math.Round((org.adrenaline or 0), 1) / 24, 0.3) + 1)
-		k = k * math.Clamp((org.lleg and org.lleg >= 0.5 and math.max(1 - org.lleg, 0.6) or 1) * (org.lleg and org.rleg >= 0.5 and math.max(1 - org.rleg, 0.6) or 1) * ((org.analgesia * 1 + 1)), 0, 1)
+		local move = (ply.hg_isJogging and (run_speed * 0.55) or run_speed) * 1.1
+		local k = 1 * weightmul
+		k = k * math_Clamp(consmul, 0.7, 1)
+		k = k * math_Clamp((org.temperature and (1 - (org.temperature - 38) * 0.25) or 1), 0.5, 1)
+		k = k * math_Clamp((org.temperature and ((org.temperature - 35) * 0.25 + 1) or 1), 0.5, 1)
+		k = k * math_Clamp(math_Round((org.stamina and org.stamina[1] or 180), 0) / 120, hg_movement_stamina_debuff:GetFloat(), 1)
+		k = k * math_Clamp(5 / ((org.immobilization or 0) + 1), 0.25, 1)
+		k = k * math_Clamp((org.blood or 0) / 5000, 0, 1)
+		k = k * math_Clamp(10 / ((org.shock or 0) + 1), 0.25, 1)
+		k = k * (math_min(math_Round((org.adrenaline or 0), 1) / 24, 0.3) + 1)
+		k = k * math_Clamp((org.lleg and org.lleg >= 0.5 and math_max(1 - org.lleg, 0.6) or 1) * (org.lleg and org.rleg >= 0.5 and math_max(1 - org.rleg, 0.6) or 1) * ((org.analgesia * 1 + 1)), 0, 1)
 		k = k * (org.llegdislocation and 0.75 or 1) * (org.rlegdislocation and 0.75 or 1)
 		k = k * (org.pelvis == 1 and 0.4 or 1)
-		k = k * ((IsValid(ply:GetNetVar("carryent")) or IsValid(ply:GetNetVar("carryent2"))) and math.Clamp(50 / math.max(ply:GetNetVar("carrymass", 0) + ply:GetNetVar("carrymass2", 0), 1), 0.5, 1) or 1)
-		k = k * math.Clamp(20 / ((org.pain or 0) + 1), 0.01, 1)
+		local carryent = ply:GetNetVar("carryent")
+		local carryent2 = ply:GetNetVar("carryent2")
+		local validCarryEnt = IsValid(carryent)
+		local validCarryEnt2 = IsValid(carryent2)
+		k = k * ((validCarryEnt or validCarryEnt2) and math_Clamp(50 / math_max(ply:GetNetVar("carrymass", 0) + ply:GetNetVar("carrymass2", 0), 1), 0.5, 1) or 1)
+		k = k * math_Clamp(20 / ((org.pain or 0) + 1), 0.01, 1)
 		//k = k * (ishgweapon(wep) and not wep:IsPistolHoldType() and not wep:ReadyStance() and 0.75 or 1)
 
 		local slwdwn = ply:GetNetVar("slowDown", 0)
@@ -631,19 +656,19 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 			//if(SERVER)then
 				//ply:SetNetVar("slowDown", math.Approach(slwdwn, 0, delta_time * 250))
 			//end
-			k = k * math.Clamp((250 - slwdwn) / 250, 0.75, 1)
+			k = k * math_Clamp((250 - slwdwn) / 250, 0.75, 1)
 		end
 
-		k = math.max(k, 20 / 200)
+		k = math_max(k, 20 / 200)
 
-		if ply:GetNetVar("vomiting", 0) > (CurTime() - 3) then
+		if vomitingEnd > (curTime - 3) then
 			k = k * 0.25
 		end
 
-		local ent = IsValid(ply:GetNetVar("carryent")) and ply:GetNetVar("carryent") or IsValid(ply:GetNetVar("carryent2")) and ply:GetNetVar("carryent2")
+		local ent = validCarryEnt and carryent or validCarryEnt2 and carryent2
 
 		if SERVER and inertia_len > 5 and (ply.hg_isSprinting or ply.hg_isJogging) then
-			local mul = math.Clamp(inertia_len / 200, 0.5, 1) * 5 * (ply:Crouching() and 0.01 or 1)
+			local mul = math_Clamp(inertia_len / 200, 0.5, 1) * 5 * (crouching and 0.01 or 1)
 			if ply == rag then
 				if org.pelvis == 1 then
 					org.painadd = org.painadd + FrameTime() * mul
@@ -659,11 +684,12 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		end
 
 		if IsValid(ent) then
-			local bon = ply:GetNetVar("carrybone",0) ~= 0 and ply:GetNetVar("carrybone",0) or ply:GetNetVar("carrybone2",0)
+			local carrybone = ply:GetNetVar("carrybone",0)
+			local bon = carrybone ~= 0 and carrybone or ply:GetNetVar("carrybone2",0)
 			local bone = ent:TranslatePhysBoneToBone(bon)
 			local mat = ent:GetBoneMatrix(bone)
 			local pos = mat and mat:GetTranslation() or ent:GetPos()
-			local lpos = IsValid(ent) and ply:GetNetVar("carrypos",nil) or ply:GetNetVar("carrypos2",nil)
+			local lpos = validCarryEnt and ply:GetNetVar("carrypos",nil) or ply:GetNetVar("carrypos2",nil)
 
 			if lpos then
 				if not ent:IsRagdoll()then
@@ -687,16 +713,18 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		ply.move = move
 
 		if SERVER and not IsValid(ply.FakeRagdoll) then
-			ply.eyeAnglesOld = ply.eyeAnglesOld or ply:EyeAngles()
-			local cosine = ply:EyeAngles():Forward():Dot(ply.eyeAnglesOld:Forward())
-			ply.eyeAnglesOld = ply:EyeAngles()
+			local eyeAngles = ply:EyeAngles()
+			ply.eyeAnglesOld = ply.eyeAnglesOld or eyeAngles
+			local cosine = eyeAngles:Forward():Dot(ply.eyeAnglesOld:Forward())
+			ply.eyeAnglesOld = eyeAngles
 
 			if (velLen > 200 and (math.random(150) == 1 or cosine <= 0.99)) then
-				local tr = {}
-				tr.start = ply:GetPos()
-				tr.endpos = tr.start - vector_up * 1
-				tr.filter = ply
-				tr = util.TraceLine(tr)
+				local trData = ply.hg_inertia_slip_trace or { filter = ply }
+				ply.hg_inertia_slip_trace = trData
+				trData.start = ply:GetPos()
+				trData.endpos = trData.start - vector_up * 1
+				trData.filter = ply
+				local tr = util.TraceLine(trData)
 
 				if tr.SurfaceProps and util.GetSurfaceData(tr.SurfaceProps) and util.GetSurfaceData(tr.SurfaceProps).friction < 0.2 then
 					local b1 = ply:TranslateBoneToPhysBone(ply:LookupBone("ValveBiped.Bip01_L_Calf"))
@@ -722,9 +750,9 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 
 		--// Dive jump
 		if hg_divejump:GetBool() then
-			ply.lastInDuck = ply:KeyPressed(IN_DUCK) and CurTime() or ply.lastInDuck or 0
-			ply.lastInJump = ply:KeyPressed(IN_JUMP) and CurTime() or ply.lastInJump or 0
-			if(SERVER && rag == ply && (ply.lastInJump + 0.1 > CurTime()) && (ply.lastInDuck + 0.1 > CurTime()))then
+			ply.lastInDuck = ply:KeyPressed(IN_DUCK) and curTime or ply.lastInDuck or 0
+			ply.lastInJump = ply:KeyPressed(IN_JUMP) and curTime or ply.lastInJump or 0
+			if(SERVER && rag == ply && (ply.lastInJump + 0.1 > curTime) && (ply.lastInDuck + 0.1 > curTime))then
 				local force = ply:GetAimVector() * 400
 				force[3] = 0
 				local torso = ply:TranslateBoneToPhysBone(ply:LookupBone("ValveBiped.Bip01_Spine2"))
@@ -737,28 +765,28 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		--print(speed.." "..(CLIENT and "c" or "s"))
 		--speed = SERVER and speed + 50 or speed
 
-		if ply:GetMoveType() == MOVETYPE_LADDER or ply:GetMoveType() == MOVETYPE_NONE then
+		if moveType == MOVETYPE_LADDER or moveType == MOVETYPE_NONE then
 			inertia_len = 100
 		end
 
 		if org.noradrenaline and org.noradrenaline > 0 and inertia_len > 0 then
-			inertia_len = inertia_len + 200 * math.Round(org.noradrenaline, 1)
+			inertia_len = inertia_len + 200 * math_Round(org.noradrenaline, 1)
 		end
 
-		if CLIENT and ply:Ping() >= 45 and ply.hg_LastLandingTime and ply.hg_LastLandingTime + 0.35 > CurTime() then
-			inertia_len = math.min(inertia_len, ply:GetRunSpeed() * 1.1)
+		if CLIENT and ply:Ping() >= 45 and ply.hg_LastLandingTime and ply.hg_LastLandingTime + 0.35 > curTime then
+			inertia_len = math_min(inertia_len, run_speed * 1.1)
 		end
 		
 		mv:SetMaxSpeed(inertia_len)
 		mv:SetMaxClientSpeed(inertia_len)
-		ply:SetMaxSpeed(math.max(100, inertia_len))
-		ply:SetJumpPower(DEFAULT_JUMP_POWER * math.min(k, 1.1) * (not ply:GetNWBool("TauntStopMoving", false) and 1 or 0) * (ply.organism.superfighter and 1.5 or 1) * (ply.JumpPowerMul or 1))
+		ply:SetMaxSpeed(math_max(100, inertia_len))
+		ply:SetJumpPower(DEFAULT_JUMP_POWER * math_min(k, 1.1) * (not tauntStopMoving and 1 or 0) * (ply.organism.superfighter and 1.5 or 1) * (ply.JumpPowerMul or 1))
 
 		if(CLIENT)then
-			local fwangs = math.rad(GetViewPunchAngles2()[2] + GetViewPunchAngles3()[2])
+			local fwangs = math_rad(GetViewPunchAngles2()[2] + GetViewPunchAngles3()[2])
 
-			forward_move = forward_move * math.cos(fwangs) + side_move * math.sin(fwangs)
-			side_move = side_move * math.cos(fwangs) + forward_move * math.sin(fwangs)
+			forward_move = forward_move * math_cos(fwangs) + side_move * math_sin(fwangs)
+			side_move = side_move * math_cos(fwangs) + forward_move * math_sin(fwangs)
 
 			cmd:SetForwardMove(forward_move * inertia_len)
 			cmd:SetSideMove(side_move * inertia_len)

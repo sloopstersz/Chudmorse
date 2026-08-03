@@ -2489,12 +2489,22 @@ end)
 ["DSP"] =       0
 ]]
 
+local function PrecacheSoundsSWEP(self)
+	if self.HolsterSnd and self.HolsterSnd[1] then util.PrecacheSound(self.HolsterSnd[1]) end
+	if self.DeploySnd and self.DeploySnd[1] then util.PrecacheSound(self.DeploySnd[1]) end
+	if self.Primary and self.Primary.Sound and self.Primary.Sound[1] then util.PrecacheSound(self.Primary.Sound[1]) end
+	if self.DistSound then util.PrecacheSound(self.DistSound) end
+	if self.SupressedSound and self.SupressedSound[1] then util.PrecacheSound(self.SupressedSound[1]) end
+	if self.CockSound then util.PrecacheSound(self.CockSound) end
+	if self.ReloadSound then util.PrecacheSound(self.ReloadSound) end
+end
+
 hook.Add("PreRegisterSWEP", "precachemodels", function(self, class)
 	if self.ishgwep or self.Base == "homigrad_base" then
 		if self.WorldModel then util.PrecacheModel( self.WorldModel ) end
 		if self.WorldModelFake then util.PrecacheModel( self.WorldModelFake ) end
 
-		hg.PrecacheSoundsSWEP(self)
+		(hg.PrecacheSoundsSWEP or PrecacheSoundsSWEP)(self)
 	end
 end)
 

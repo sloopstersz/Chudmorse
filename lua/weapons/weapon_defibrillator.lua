@@ -193,6 +193,12 @@ local function ShouldShock(org)
 	return org.fibrillation or (org.arrhythmia or 0) > 0.65 or (org.heartbeat or 0) > 200
 end
 
+local function ShouldFalseShock(org)
+	if not org or not org.alive or org.heartstop or org.deathStateKilled then return false end
+	if (org.fibrillation or false) or (org.arrhythmia or 0) > 0.65 then return false end
+	return (org.pulse or org.heartbeat or 0) >= 135 and math.random(100) <= 16
+end
+
 local function IsDefibDead(org)
 	if not org or not org.alive or org.deathStateKilled then return true end
 	local owner = org.owner
@@ -216,17 +222,8 @@ local function ShockChest(target, forceMul)
 
 	if IsValid(phys) then
 		phys:Wake()
-		phys:ApplyForceCenter(-vector_up * 6000 * forceMul)
+		phys:ApplyForceCenter(-vector_up * 1800 * forceMul)
 		applied = true
-	end
-
-	for i = 0, target:GetPhysicsObjectCount() - 1 do
-		local obj = target:GetPhysicsObjectNum(i)
-		if IsValid(obj) and obj != phys then
-			obj:Wake()
-			obj:ApplyForceCenter(-vector_up * 2500 * forceMul)
-			applied = true
-		end
 	end
 
 	if not applied then return end
@@ -247,7 +244,6 @@ local function DropDefib(defib, target, uses, snd)
 	defib.AEDDropped = true
 	defib.AEDFinalized = true
 	defib.AEDState = "dropped"
-	StopAEDSounds(defib)
 
 	local pos = defib:GetPos()
 	local ang = defib:GetAngles()
@@ -356,8 +352,15 @@ local function IsAEDState(defib, state)
 	return IsValid(defib) and not defib.AEDDropped and defib.AEDState == state
 end
 
-local function ApplyAEDShock(org)
+local function ApplyAEDShock(org, accidental)
 	if not org then return end
+
+	if accidental then
+		org.arrhythmia = math.max(org.arrhythmia or 0, 0.35)
+		org.heartStrain = (org.heartStrain or 0) + 0.25
+		org.pulse = math.max(org.pulse or 0, 70)
+		return
+	end
 
 	org.fibrillation = false
 	org.arrhythmia = 0
@@ -382,7 +385,7 @@ local function ApplyAEDShock(org)
 	org.deathStateEnd = math.max(org.deathStateEnd or 0, org.defibDeathGrace)
 end
 
-local function BeginAEDShock(defib, ply, getTarget, uses)
+local function BeginAEDShock(defib, ply, getTarget, uses, accidental)
 	if not SetAEDState(defib, "charging") then return end
 	if defib.AEDCharging or defib.AEDShocked then return end
 
@@ -414,7 +417,7 @@ local function BeginAEDShock(defib, ply, getTarget, uses)
 		PlayAEDSound(defib, AEDSounds.shocksound, 85, 100, 2)
 		PlayAEDSound(defib, AEDSounds.shockdelivered, 75, 100, 3)
 		ShockChest(target, 2)
-		ApplyAEDShock(org)
+		ApplyAEDShock(org, accidental)
 
 		if org then
 			org.painadd = (org.painadd or 0) + 150
@@ -512,6 +515,11 @@ local function StartAEDSequence(defib, ply, getTarget, uses)
 		end
 
 		if not ShouldShock(org) then
+			if ShouldFalseShock(org) then
+				BeginAEDShock(defib, ply, getTarget, uses, true)
+				return
+			end
+
 			StartNoShockWarnings(defib, ply, getTarget, uses)
 			return
 		end

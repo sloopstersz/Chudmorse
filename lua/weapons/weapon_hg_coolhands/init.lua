@@ -470,7 +470,7 @@ function SWEP:ApplyForce()
 								hg.organism.input_list.chest(org, 1, 5, dmginfo)
 							end
 
-							if org.pulse > 15 then org.heartstop = false end
+							if hg.organism.TryRestartHeartWithCPR then hg.organism.TryRestartHeartWithCPR(org, cprMul) end
 						end
 
 						phys:ApplyForceCenter(-vector_up * 6000)

@@ -877,7 +877,12 @@ local IsValid = IsValid
 	end
 --//
 --\\ Calculate Weight 
+	local weight_cache_lifetime = 0.15
 	function hg.CalculateWeight(ply,maxweight)
+		local time = CurTime()
+		local cache = ply.hg_weight_cache
+		if cache and cache.maxweight == maxweight and cache.time > time then return cache.value end
+
 		local weight = 0
 
 		local weps = ply:GetWeapons()
@@ -899,6 +904,7 @@ local IsValid = IsValid
 		end
 
 		local weightmul = (1 / (weight / maxweight + 1))
+		ply.hg_weight_cache = { maxweight = maxweight, time = time + weight_cache_lifetime, value = weightmul }
 		return weightmul
 	end
 --//
@@ -1508,7 +1514,6 @@ local IsValid = IsValid
 		"worldspawn",
 		"prop_dynamic"
 	}
-
 	hook.Add("FindUseEntity","findhguse",function(ply,heldent)
 		if IsValid(heldent) and heldent:GetClass() == "button" then return heldent end
 
@@ -1521,7 +1526,7 @@ local IsValid = IsValid
 			local tr = {}
 			tr.start = eyetr.HitPos
 			tr.endpos = eyetr.HitPos
-			tr.filter = checkUse	
+			tr.filter = checkUse
 			tr.mins = -hullVec
 			tr.maxs = hullVec
 			tr.mask = MASK_SOLID + CONTENTS_DEBRIS + CONTENTS_PLAYERCLIP
@@ -1716,7 +1721,7 @@ duplicator.Allow( "homigrad_base" )
 --//
 
 --\\ Custom Screen Shake
-if SERVER then
+if SERVER and util.AddNetworkString then
 	util.AddNetworkString("util.ScreenShake")
 end
 

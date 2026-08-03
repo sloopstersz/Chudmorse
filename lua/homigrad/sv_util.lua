@@ -1560,9 +1560,10 @@ end )
 
 hook.Add("PlayerUse", "DoorClose", function(ply, ent)
 	local getdoor = ply:GetUseEntity()
-	if string_find(tostring(getdoor), "prop_door_rotating") and getdoor:GetInternalVariable("m_eDoorState") == 2 then
-		if getdoor:GetInternalVariable("m_hMaster") != NULL then
-			getdoor:GetInternalVariable("m_hMaster"):Fire("close")
+	if IsValid(getdoor) and getdoor:GetClass() == "prop_door_rotating" and getdoor:GetInternalVariable("m_eDoorState") == 2 then
+		local master = getdoor:GetInternalVariable("m_hMaster")
+		if master != NULL then
+			master:Fire("close")
 			hg.RunZManipAnim(ply, "door_open_back", nil, 2, {self})
 
 			return false
@@ -1856,8 +1857,11 @@ function plymeta:AddTinnitus(time,needSound)
 end
 
 local hook_Run = hook.Run
+local function runPlayerThink(ply)
+	local frame = FrameNumber()
+	if ply.hg_playerthink_frame == frame then return end
+	ply.hg_playerthink_frame = frame
 
-hook.Add("PlayerTick", "ilovefurries", function(ply)
 	local sysTime = SysTime()
 	ply.lastcall_tick = ply.lastcall_tick or sysTime - 0.01
 	local dtime = sysTime - ply.lastcall_tick
@@ -1865,16 +1869,14 @@ hook.Add("PlayerTick", "ilovefurries", function(ply)
 	hook_Run("Player Think", ply, CurTime(), dtime)
 
 	ply.lastcall_tick = sysTime
+end
+
+hook.Add("PlayerTick", "ilovefurries", function(ply)
+	runPlayerThink(ply)
 end)
 
 hook.Add("VehicleMove", "ilovefurries", function(ply, veh, mv)
-	local sysTime = SysTime()
-	ply.lastcall_tick = ply.lastcall_tick or sysTime - 0.01
-	local dtime = sysTime - ply.lastcall_tick
-
-	hook_Run("Player Think", ply, CurTime(), dtime)
-
-	ply.lastcall_tick = sysTime
+	runPlayerThink(ply)
 end)
 
 hook.Add("Player Think", "homigrad-viewoffset", function(ply)
