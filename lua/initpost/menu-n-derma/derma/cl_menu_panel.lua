@@ -894,8 +894,13 @@ function PANEL:Init()
     logoPanel:Dock(BOTTOM)
     logoPanel:SetTall(1)
     logoPanel:SetMouseInputEnabled(true)
+    logoPanel:SetCursor("hand")
     logoPanel:DockMargin(0, 0, 0, MenuUnit(menu_title.spacing))
     self.logoBaseMargin = MenuUnit(menu_title.spacing)
+    logoPanel.OnMousePressed = function(this, code)
+        if code ~= MOUSE_LEFT then return end
+        gui.OpenURL("https://github.com/kazoo43/remorseism")
+    end
     logoPanel.Think = function(this)
         local maxW = math.max(1, this:GetWide() - MenuUnit(12))
         local drawW = math.min(MenuUnit(menu_title.width), maxW)

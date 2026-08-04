@@ -320,6 +320,8 @@ local info_social_text_x = MenuUnit(54)
 local info_social_button_w = MenuUnit(72)
 local info_social_button_h = MenuUnit(24)
 local info_social_button_right = MenuUnit(18)
+local info_judge_logo = Material("vgui/judgelogo.png", "noclamp smooth")
+local info_judge_url = "https://discord.gg/hsRfFdEDTH"
 local info_active_section = nil
 local info_section_buttons = {}
 local info_content_panel = nil
@@ -1864,7 +1866,7 @@ function InfoRefreshContent()
         end
 
     elseif sectionKey == "leaderboard" then
-        local scroll = vgui.Create("DScrollPanel", info_content_panel)
+        local scroll = vgui.Create("DScrollPanel", holder)
         scroll:Dock(FILL)
         scroll:DockMargin(MenuUnit(24), MenuUnit(24), MenuUnit(24), MenuUnit(24))
         scroll.Paint = function() end
@@ -2019,7 +2021,60 @@ function InfoRefreshContent()
         end
 
     elseif sectionKey == "socials" then
-        local scroll = vgui.Create("DScrollPanel", info_content_panel)
+        local holder = vgui.Create("DPanel", info_content_panel)
+        holder:Dock(FILL)
+        holder.Paint = function() end
+
+        local bottomLogo = vgui.Create("DPanel", holder)
+        bottomLogo:Dock(BOTTOM)
+        bottomLogo:SetTall(MenuUnit(270))
+        bottomLogo.Paint = function() end
+
+        local alsoCheck = vgui.Create("DLabel", bottomLogo)
+        alsoCheck:Dock(TOP)
+        alsoCheck:SetTall(MenuUnit(30))
+        alsoCheck:SetFont("ZCity_Menu_Settings_Small")
+        alsoCheck:SetTextColor(settings_color_text)
+        alsoCheck:SetContentAlignment(5)
+        alsoCheck:SetText("Also check out:")
+
+        local judgeButton = vgui.Create("DButton", bottomLogo)
+        judgeButton:SetText("")
+        judgeButton.HoverLerp = 0
+        judgeButton:SetCursor("hand")
+        judgeButton.DoClick = function()
+            gui.OpenURL(info_judge_url)
+        end
+        judgeButton.Think = function(self)
+            self.HoverLerp = LerpFT(0.12, self.HoverLerp or 0, self:IsHovered() and 1 or 0)
+        end
+        judgeButton.Paint = function(self, w, h)
+            local scale = 1 + (self.HoverLerp or 0) * 0.08
+            local maxW = w / 1.08
+            local maxH = h / 1.08
+            local aspect = math.max(1, info_judge_logo:Height()) / math.max(1, info_judge_logo:Width())
+            local baseW = math.min(maxW, maxH / aspect)
+            local baseH = baseW * aspect
+            local drawW = baseW * scale
+            local drawH = baseH * scale
+            local drawX = math.floor(w * 0.5 - drawW * 0.5)
+            local drawY = math.floor(h * 0.5 - drawH * 0.5)
+
+            surface.SetMaterial(info_judge_logo)
+            surface.SetDrawColor(255, 255, 255, 255)
+            surface.DrawTexturedRect(drawX, drawY, drawW, drawH)
+        end
+        bottomLogo.PerformLayout = function(self, w, h)
+            local areaH = h - alsoCheck:GetTall()
+            local aspect = math.max(1, info_judge_logo:Height()) / math.max(1, info_judge_logo:Width())
+            local buttonW = math.min(w - MenuUnit(20), MenuUnit(390))
+            local buttonH = math.min(areaH - MenuUnit(10), MenuUnit(210), buttonW * aspect)
+            buttonW = buttonH / aspect
+            judgeButton:SetSize(math.ceil(buttonW * 1.08), math.ceil(buttonH * 1.08))
+            judgeButton:SetPos(math.floor(w * 0.5 - judgeButton:GetWide() * 0.5), alsoCheck:GetTall() + math.floor(areaH * 0.5 - judgeButton:GetTall() * 0.5))
+        end
+
+        local scroll = vgui.Create("DScrollPanel", holder)
         scroll:Dock(FILL)
         scroll:DockMargin(MenuUnit(24), MenuUnit(24), MenuUnit(24), MenuUnit(24))
         scroll.Paint = function() end
