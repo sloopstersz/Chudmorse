@@ -1866,6 +1866,10 @@ function InfoRefreshContent()
         end
 
     elseif sectionKey == "leaderboard" then
+        local holder = vgui.Create("DPanel", info_content_panel)
+        holder:Dock(FILL)
+        holder.Paint = function() end
+
         local scroll = vgui.Create("DScrollPanel", holder)
         scroll:Dock(FILL)
         scroll:DockMargin(MenuUnit(24), MenuUnit(24), MenuUnit(24), MenuUnit(24))
