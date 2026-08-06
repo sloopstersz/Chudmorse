@@ -33,6 +33,10 @@ local sides = {
 	["_cl"] = "cl_",
 }
 
+local blockedDirs = {
+	["homigrad/abnormalty_detection"] = true,
+}
+
 local function AddFile(File, dir)
 	local fileSide = string.lower(string.Left(File, 3))
 	local fileSide2 = string.lower(string.Right(string.sub(File, 1, -5), 3))
@@ -55,6 +59,8 @@ local function AddFile(File, dir)
 end
 
 local function IncludeDir(dir)
+	if blockedDirs[dir] then return end
+
 	dir = dir .. "/"
 	local files, directories = file.Find(dir .. "*", "LUA")
 	if files then

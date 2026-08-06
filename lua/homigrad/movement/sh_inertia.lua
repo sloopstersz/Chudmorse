@@ -175,8 +175,11 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 
 	local function hg_CheckSprintCollisionRagdoll(ply, vel, velLen)
 		if not SERVER or not IsValid(ply) or not ply:Alive() or IsValid(ply.FakeRagdoll) then return end
-		if ply.hgSprintCollisionCooldown and ply.hgSprintCollisionCooldown > CurTime() then return end
-		if ply.hg_LastLandingTime and ply.hg_LastLandingTime + 0.35 > CurTime() and ply:Ping() >= 45 then return end
+		local curTime = CurTime()
+		if ply.hgSprintCollisionNextCheck and ply.hgSprintCollisionNextCheck > curTime then return end
+		ply.hgSprintCollisionNextCheck = curTime + 0.08
+		if ply.hgSprintCollisionCooldown and ply.hgSprintCollisionCooldown > curTime then return end
+		if ply.hg_LastLandingTime and ply.hg_LastLandingTime + 0.35 > curTime and ply:Ping() >= 45 then return end
 		if ply:InVehicle() or ply:GetMoveType() != MOVETYPE_WALK or ply:WaterLevel() >= 2 then return end
 		if not (ply.hg_isSprinting or (not ply:OnGround() and ply:KeyDown(IN_SPEED) and ply:KeyDown(IN_FORWARD))) then return end
 		local lag_comp_mul, lag_comp_time = hg_GetMovementLagComp(ply)
