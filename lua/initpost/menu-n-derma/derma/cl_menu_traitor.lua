@@ -157,7 +157,7 @@ local RoleConfigs = {
             ["assassin"] = {cost = 15, name = "Assassin", desc = "Better gun control and more endurance."},
             ["damned"] = {cost = 30, name = "Damned", desc = "You start with nothing."},
             ["chemist"] = {cost = 10, name = "Chemist", desc = "Detect chemicals in the air."}
-        },
+  },
         items = {
             ["weapon_p22"] = {cost = 6, name = "Walther P22"},
             ["weapon_taser"] = {cost = 6, name = "Taser"},
@@ -193,7 +193,8 @@ local RoleConfigs = {
             ["weapon_taser"] = {["weapon_tranquilizer"] = true},
             ["weapon_tranquilizer"] = {["weapon_taser"] = true},
             ["weapon_taser"] = {["weapon_p22"] = true},
-            ["weapon_p22"] = {["weapon_taser"] = true}
+            ["weapon_p22"] = {["weapon_taser"] = true},
+    
         },
         defaultPresets = {
             {
