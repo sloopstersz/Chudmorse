@@ -186,14 +186,20 @@ local RoleConfigs = {
             ["weapon_p22"] = {"weapon_p22_silencer", "weapon_p22_ammo"}
         },
         exclusions = {
-            ["weapon_buck200knife"] = {["weapon_sogknife"] = true},
+                  ["weapon_buck200knife"] = {["weapon_sogknife"] = true},
             ["weapon_sogknife"] = {["weapon_buck200knife"] = true},
-            ["weapon_tranquilizer"] = {["weapon_p22"] = true},
-            ["weapon_p22"] = {["weapon_tranquilizer"] = true},
-            ["weapon_taser"] = {["weapon_tranquilizer"] = true},
-            ["weapon_tranquilizer"] = {["weapon_taser"] = true},
-            ["weapon_taser"] = {["weapon_p22"] = true},
-            ["weapon_p22"] = {["weapon_taser"] = true},
+            ["weapon_p22"] = {
+                ["weapon_taser"] = true,
+                ["weapon_tranquilizer"] = true,
+                ["weapon_pm9"] = true
+            },
+            ["weapon_taser"] = {
+                ["weapon_tranquilizer"] = true,
+                ["weapon_pm9"] = true
+            },
+            ["weapon_tranquilizer"] = {
+                ["weapon_pm9"] = true
+            },
     
         },
         defaultPresets = {
