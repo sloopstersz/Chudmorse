@@ -343,19 +343,19 @@ MODE.RoleChooseRoundTypes = {
 MODE.Roles = {}
 MODE.Roles.standard = {
 	traitor = {
-		objective = "You've been preparing for this for a long time. Kill everyone.",
-		name = "Murderer",
+		objective = "You are the better Chud. Prove it by killing everyone.",
+		name = "Evil Chud",
 		color = Color(190,0,0)
 	},
 
 	gunner = {
-		objective = "You're the hero. Use your loadout to stop the murderer.",
-		name = "Hero",
+		objective = "You own a gun. Protect the Innocent Chuds.",
+		name = "Gun Owning Chud",
 		color = Color(158,0,190)
 	},
 
 	innocent = {
-		name = "Bystander",
+		name = "Chud",
 		color = Color(0,120,190)
 	},
 }
