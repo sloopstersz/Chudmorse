@@ -142,7 +142,16 @@ local function ApplyTraitorLoadout(ply)
 					end
 				end
 			end)
-		else
+		elseif wep == "weapon_pm9_ammo" then
+	timer.Simple(0.5, function()
+		if IsValid(ply) and ply:HasWeapon("weapon_pm9") then
+			local w = ply:GetWeapon("weapon_pm9")
+			if IsValid(w) and w:GetPrimaryAmmoType() >= 0 then
+				ply:GiveAmmo(w:GetMaxClip1(), w:GetPrimaryAmmoType(), true)
+			end
+		end
+	end)
+else
 			local w = ply:Give(wep)
 			if wep == "weapon_zoraki" then
 				timer.Simple(1, function() if IsValid(w) then w:ApplyAmmoChanges(2) end end)
