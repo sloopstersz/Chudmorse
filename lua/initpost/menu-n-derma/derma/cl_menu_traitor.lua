@@ -159,10 +159,11 @@ local RoleConfigs = {
             ["chemist"] = {cost = 10, name = "Chemist", desc = "Detect chemicals in the air."}
   },
         items = {
-            ["weapon_pm9"] = {cost = 12, name = "PM9 Evil Gun"},
+		    ["weapon_pm9"] = {cost = 12, name = "PM9 Evil Gun"},
             ["weapon_p22"] = {cost = 6, name = "Walther P22"},
             ["weapon_taser"] = {cost = 6, name = "Taser"},
             ["weapon_tranquilizer"] = {cost = 6, name = "Tranquilizer Gun"},
+			["weapon_combatknife"] = {cost = 4, name = "M7 Bayonet"},
             ["weapon_buck200knife"] = {cost = 2, name = "Buck 200 Knife"},
             ["weapon_sogknife"] = {cost = 2, name = "SOG Knife"},
             ["weapon_hg_rgd_tpik"] = {cost = 4, name = "RGD-5 Grenade"},
@@ -188,9 +189,17 @@ local RoleConfigs = {
             ["weapon_p22"] = {"weapon_p22_silencer", "weapon_p22_ammo"},
             ["weapon_pm9"] = {"weapon_pm9_ammo"}
         },
-        exclusions = {
-                  ["weapon_buck200knife"] = {["weapon_sogknife"] = true},
-            ["weapon_sogknife"] = {["weapon_buck200knife"] = true},
+exclusions = {
+             ["weapon_sogknife"] = {
+                ["weapon_buck200knife"] = true,
+                ["weapon_combatknife"] = true
+				
+				},
+			["weapon_sogknife"] = {
+                ["weapon_buck200knife"] = true,
+				["weapon_combatknife"] = true
+            },
+			
             ["weapon_p22"] = {
                 ["weapon_taser"] = true,
                 ["weapon_tranquilizer"] = true,
@@ -203,6 +212,12 @@ local RoleConfigs = {
             ["weapon_tranquilizer"] = {
                 ["weapon_pm9"] = true
             },
+			["weapon_combatknife"] = {
+                ["weapon_buck200knife"] = true,
+				["weapon_sogknife"] = true
+            },
+            
+			
     
         },
         defaultPresets = {
