@@ -180,22 +180,22 @@ surface.CreateFont("ZB_HomicideHumongous", {
 MODE.TypeObjectives = {}
 MODE.TypeObjectives.standard = {
 	traitor = {
-		objective = "You're geared up with items, poisons, explosives and weapons hidden in your pockets. Murder everyone here.",
-		name = "a Murderer",
+		objective = "You are the better Chud. Prove it by killing everyone.",
+		name = "a Evil Chud",
 		color1 = Color(190,0,0),
 		color2 = Color(190,0,0)
 	},
 
 	gunner = {
-		objective = "You are a hero. You've tasked yourself to help police find the criminal faster.",
-		name = "a Hero",
+		objective = "You own a gun. Protect the Innocent Chuds.",
+		name = "a Gun Owning Chud",
 		color1 = Color(158,0,190),
 		color2 = Color(158,0,190)
 	},
 
 	innocent = {
-		objective = "You are a bystander of a murder scene, although it didn't happen to you, you better be cautious.",
-		name = "a Bystander",
+		objective = "You are a chud, Do whatever and survive the Traitor.",
+		name = "a Chud",
 		color1 = Color(0,120,190)
 	},
 }
