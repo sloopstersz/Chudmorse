@@ -159,6 +159,7 @@ local RoleConfigs = {
             ["chemist"] = {cost = 10, name = "Chemist", desc = "Detect chemicals in the air."}
   },
         items = {
+            ["weapon_pm9"] = {cost = 12, name = "PM9 Evil Gun"},
             ["weapon_p22"] = {cost = 6, name = "Walther P22"},
             ["weapon_taser"] = {cost = 6, name = "Taser"},
             ["weapon_tranquilizer"] = {cost = 6, name = "Tranquilizer Gun"},
@@ -180,10 +181,12 @@ local RoleConfigs = {
         },
         addons = {
             ["weapon_p22_silencer"] = {cost = 2, name = "P22 Silencer", parent = "weapon_p22"},
-            ["weapon_p22_ammo"] = {cost = 2, name = "P22 Extra Ammo", parent = "weapon_p22", desc = "Start with an extra magazine."}
+            ["weapon_p22_ammo"] = {cost = 2, name = "P22 Extra Ammo", parent = "weapon_p22", desc = "Start with an extra magazine."},
+            ["weapon_pm9_ammo"] = {cost = 2, name = "PM9 Extra Ammo", parent = "weapon_pm9", desc = "Start with an extra magazine."}
         },
         addonOrder = {
-            ["weapon_p22"] = {"weapon_p22_silencer", "weapon_p22_ammo"}
+            ["weapon_p22"] = {"weapon_p22_silencer", "weapon_p22_ammo"},
+            ["weapon_pm9"] = {"weapon_pm9_ammo"}
         },
         exclusions = {
                   ["weapon_buck200knife"] = {["weapon_sogknife"] = true},
