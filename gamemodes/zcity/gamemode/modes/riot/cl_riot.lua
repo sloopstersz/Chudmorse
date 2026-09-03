@@ -55,14 +55,14 @@ end)
 
 local teams = {
 	[0] = {
-                objective = "Overrun the police and survive the clash.",
-		name = "a Rioter",
+                objective = "Overrun the Enforcement Chuds and survive the clash.",
+		name = "a Angry Chud",
 		color1 = Color(190,0,0),
 		color2 = Color(190,0,0)
         },
         [1] = {
-                objective = "Contain the riot and neutralize the threat.",
-                name = "a Law Enforcement",
+                objective = "Contain the riot and neutralize the chuds.",
+                name = "a Chud Enforcement Officer",
                 color1 = Color(0,120,190),
                 color2 = Color(0,120,190)
 	},
