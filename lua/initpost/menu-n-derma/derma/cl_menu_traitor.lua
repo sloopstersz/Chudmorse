@@ -161,6 +161,7 @@ local RoleConfigs = {
         items = {
             ["weapon_p22"] = {cost = 6, name = "Walther P22"},
             ["weapon_taser"] = {cost = 6, name = "Taser"},
+            ["weapon_tranquilizer"] = {cost = 6, name = "Tranquilizer Gun"},
             ["weapon_buck200knife"] = {cost = 2, name = "Buck 200 Knife"},
             ["weapon_sogknife"] = {cost = 2, name = "SOG Knife"},
             ["weapon_hg_rgd_tpik"] = {cost = 4, name = "RGD-5 Grenade"},
@@ -186,7 +187,13 @@ local RoleConfigs = {
         },
         exclusions = {
             ["weapon_buck200knife"] = {["weapon_sogknife"] = true},
-            ["weapon_sogknife"] = {["weapon_buck200knife"] = true}
+            ["weapon_sogknife"] = {["weapon_buck200knife"] = true},
+            ["weapon_tranquilizer"] = {["weapon_p22"] = true},
+            ["weapon_p22"] = {["weapon_tranquilizer"] = true},
+            ["weapon_taser"] = {["weapon_tranquilizer"] = true},
+            ["weapon_tranquilizer"] = {["weapon_taser"] = true},
+            ["weapon_taser"] = {["weapon_p22"] = true},
+            ["weapon_p22"] = {["weapon_taser"] = true}
         },
         defaultPresets = {
             {
