@@ -289,10 +289,12 @@ exclusions = {
         saveFile = "zcity_hero_loadout.txt",
         presetFile = "zcity_hero_presets.txt",
         items = {
+		    ["weapon_revolver357"] = {cost = 5, name = "Colt Python", desc = "Heavy Revolver that packs a punch with room for ammo."},
             ["weapon_px4beretta"] = {cost = 4, name = "Beretta PX4", desc = "Reliable sidearm with room for ammo or a suppressor."},
             ["weapon_glock17"] = {cost = 5, name = "Glock 17", desc = "Flexible pistol with strong attachment options."},
             ["weapon_hk_usp"] = {cost = 5, name = "HK USP", desc = "Steady .45 pistol with suppressor support."},
             ["weapon_remington870"] = {cost = 8, name = "Remington 870", desc = "Close range stopper with extra shell support."},
+			["weapon_dracovska"] = {cost = 8, name = "Draco", desc = "A Smaller Rifle, good for ease of use."},
             ["weapon_kar98"] = {cost = 8, name = "Karabiner 98k", desc = "Heavy marksman pick that can take a scope and extra rounds."},
             ["ent_armor_vest3"] = {cost = 4, name = "Kevlar IIIA Vest", icon = "vgui/icons/armor01.png", desc = "Body armor that soaks torso hits."},
             ["ent_armor_helmet1"] = {cost = 2, name = "ACH Helmet III", icon = "vgui/icons/helmet.png", desc = "Ballistic helmet that protects the head."},
@@ -309,6 +311,7 @@ exclusions = {
         addons = {
             ["hero_px4_silencer"] = {cost = 2, name = "PX4 Suppressor", parent = "weapon_px4beretta", attachment = "supressor4", desc = "Keep the PX4 quieter."},
             ["hero_px4_ammo"] = {cost = 2, name = "PX4 Extra Ammo", parent = "weapon_px4beretta", desc = "Start with extra magazine."},
+			["hero_revolver357_ammo"] = {cost = 2, name = "Colt Python Extra Ammo", parent = "weapon_revolver357", desc = "Start with extra .357 rounds."},
             ["hero_glock_silencer"] = {cost = 2, name = "Glock Suppressor", parent = "weapon_glock17", attachment = "supressor4", desc = "Suppress the Glock 17."},
             ["hero_glock_rmr"] = {cost = 2, name = "Glock RMR", parent = "weapon_glock17", attachment = "holo16", desc = "Adds a compact red dot."},
             ["hero_glock_laser"] = {cost = 1, name = "Glock Laser", parent = "weapon_glock17", attachment = "laser3", desc = "Adds a visible aiming laser."},
@@ -316,6 +319,8 @@ exclusions = {
             ["hero_usp_silencer"] = {cost = 2, name = "USP Suppressor", parent = "weapon_hk_usp", attachment = "supressor4", desc = "Suppress the USP."},
             ["hero_usp_ammo"] = {cost = 2, name = "USP Extra Ammo", parent = "weapon_hk_usp", desc = "Start with extra magazine."},
             ["hero_remington_ammo"] = {cost = 2, name = "870 Extra Shells", parent = "weapon_remington870", desc = "Start with extra shells."},
+			["hero_dracovska_silencer"] = {cost = 2, name = "Draco Suppressor", parent = "weapon_dracovska", attachment = "supressor8", desc = "Supress the Draco."},
+			["hero_dracovska_ammo"] = { cost = 2, name = "Draco Extra Ammo", parent = "weapon_dracovska", desc = "Start with extra magazine."},
             ["hero_kar98_scope"] = {cost = 2, name = "Kar98 Scope", parent = "weapon_kar98", attachment = "optic12", desc = "Adds the Kar98 scope."},
             ["hero_kar98_ammo"] = {cost = 2, name = "Kar98 Extra Ammo", parent = "weapon_kar98", desc = "Start with extra rifle rounds."},
             ["hero_remington_sight"] = {cost = 2, name = "870 Sight", parent = "weapon_remington870", attachment = "holo16", desc = "Adds a sight to the Remington 870."},
@@ -333,10 +338,12 @@ exclusions = {
             ["hero_mosin_scope"] = {cost = 2, name = "Mosin Scope", parent = "weapon_mosin", attachment = "optic12", desc = "Adds a scope to the Mosin."},
             ["hero_mosin_ammo"] = {cost = 2, name = "Mosin Extra Ammo", parent = "weapon_mosin", desc = "Start with extra rounds."}
         },
-        addonOrder = {
+       addonOrder = {
             ["weapon_px4beretta"] = {"hero_px4_silencer", "hero_px4_ammo"},
             ["weapon_glock17"] = {"hero_glock_silencer", "hero_glock_rmr", "hero_glock_laser", "hero_glock_ammo"},
             ["weapon_hk_usp"] = {"hero_usp_silencer", "hero_usp_ammo"},
+			["weapon_revolver357"] = {"hero_revolver357_ammo"},
+			["weapon_dracovska"] = {"hero_dracovska_silencer", "hero_dracovska_ammo"},
             ["weapon_remington870"] = {"hero_remington_sight", "hero_remington_ammo"},
             ["weapon_remington870_long"] = {"hero_remington_long_sight", "hero_remington_long_ammo"},
             ["weapon_remington870_sawed_off"] = {"hero_remington_sawedoff_sight", "hero_remington_sawedoff_ammo"},
