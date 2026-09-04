@@ -398,6 +398,7 @@ do
         "weapon_hk_usp",
 		"weapon_revolver357",
         "weapon_remington870",
+		"weapon_dracovska",
         "weapon_remington870_long",
         "weapon_remington870_sawed_off",
         "weapon_kar98",
