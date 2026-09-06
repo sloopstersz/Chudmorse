@@ -144,7 +144,7 @@ local function GetIntensityData(index)
     return intensities[index] or intensities[2] or {
         id = "ESCALATED",
         name = "Escalated",
-        description = "Some people are armed, the fire is rising."
+        description = "Some Chuds are armed, the fire is rising."
     }
 end
 
@@ -159,7 +159,7 @@ end
 
 local function GetIntroRoleName(ply, intensityId)
     if GetRiotTeam(ply) == 0 then
-        return "a Rioter"
+        return "A Angry Chud"
     end
 
     if intensityId == "ANARCHY" then
@@ -310,7 +310,7 @@ function MODE:RoundStart()
 end
 
 local function GiveContainedRioter(ply)
-    zb.GiveRole(ply, "Rioter", Color(190, 0, 0))
+    zb.GiveRole(ply, "A Angry Chud", Color(190, 0, 0))
     ply:SetPlayerClass("terrorist")
     ply:SetNetVar("CurPluv", "pluvmajima")
     ply:Give("weapon_hands_sh")
@@ -321,7 +321,7 @@ local function GiveContainedRioter(ply)
 end
 
 local function GiveEscalatedRioter(ply, index, shotgunIndex)
-    zb.GiveRole(ply, "Rioter", Color(190, 0, 0))
+    zb.GiveRole(ply, "A Angry Chud", Color(190, 0, 0))
     ply:SetPlayerClass("terrorist")
     ply:SetNetVar("CurPluv", "pluvmajima")
     ply:Give("weapon_hands_sh")
@@ -344,7 +344,7 @@ local function GiveEscalatedRioter(ply, index, shotgunIndex)
 end
 
 local function GiveAnarchyRioter(ply)
-    zb.GiveRole(ply, "Rioter", Color(190, 0, 0))
+    zb.GiveRole(ply, "A Angry Chud", Color(190, 0, 0))
     ply:SetPlayerClass("terrorist")
     ply:SetNetVar("CurPluv", "pluvmajima")
     ply:Give("weapon_hands_sh")
@@ -360,7 +360,7 @@ local function GiveAnarchyRioter(ply)
 end
 
 local function GiveContainedLaw(ply, lawIndex)
-    zb.GiveRole(ply, "Law Enforcement", Color(0, 0, 190))
+    zb.GiveRole(ply, "Chud Enforcement", Color(0, 0, 190))
     ply:SetPlayerClass("police")
     GiveSling(ply)
     ply:Give("weapon_hands_sh")
@@ -382,7 +382,7 @@ local function GiveContainedLaw(ply, lawIndex)
 end
 
 local function GiveEscalatedLaw(ply, lawIndex, glockIndex)
-    zb.GiveRole(ply, "Law Enforcement", Color(0, 0, 190))
+    zb.GiveRole(ply, "Chud Enforcement", Color(0, 0, 190))
     ply:SetPlayerClass("police")
     GiveSling(ply)
     ply:Give("weapon_hands_sh")
