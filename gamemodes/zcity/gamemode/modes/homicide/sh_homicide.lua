@@ -139,14 +139,29 @@ local function ApplyTraitorLoadout(ply)
 				end
 			end)
 		elseif wep == "weapon_p22_ammo" then
-			timer.Simple(0.5, function()
-				if IsValid(ply) and ply:HasWeapon("weapon_p22") then
-					local w = ply:GetWeapon("weapon_p22")
-					if IsValid(w) and w:GetPrimaryAmmoType() >= 0 then
-						ply:GiveAmmo(w:GetMaxClip1(), w:GetPrimaryAmmoType(), true)
-					end
-				end
-			end)
+    timer.Simple(0.5, function()
+        if IsValid(ply) and ply:HasWeapon("weapon_p22") then
+            local w = ply:GetWeapon("weapon_p22")
+            if IsValid(w) and w:GetPrimaryAmmoType() >= 0 then
+                ply:GiveAmmo(w:GetMaxClip1(), w:GetPrimaryAmmoType(), true)
+            end
+        end
+    end)
+
+elseif wep == "weapon_tranquilizer_ammo" then
+    timer.Simple(0.5, function()
+        if IsValid(ply) and ply:HasWeapon("weapon_tranquilizer") then
+            local w = ply:GetWeapon("weapon_tranquilizer")
+
+            if IsValid(w) and w:GetPrimaryAmmoType() >= 0 then
+                ply:GiveAmmo(
+                    w:GetMaxClip1(),
+                    w:GetPrimaryAmmoType(),
+                    true
+                )
+            end
+        end
+    end)
 		elseif wep == "weapon_pm9_ammo" then
 	timer.Simple(0.5, function()
 		if IsValid(ply) and ply:HasWeapon("weapon_pm9") then
