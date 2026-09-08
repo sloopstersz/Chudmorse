@@ -19,7 +19,8 @@ local ZB_FORCED_MODE_POOL = {
         ["hmcd"] = true,
         ["dm"] = true,
         ["tdm"] = true,
-        ["riot"] = true
+        ["riot"] = true,
+        ["event"] = true
 }
 local ZB_NO_BACK_TO_BACK_MODES = {
         ["dm"] = true,
