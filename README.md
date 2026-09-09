@@ -1,2 +1,5 @@
-RELEASE
-https://steamcommunity.com/sharedfiles/filedetails/?id=3759394449
+chudmorse
+
+discord - https://discord.gg/GqBvFKHEYA
+
+collection - https://steamcommunity.com/sharedfiles/filedetails/?id=3793275026
