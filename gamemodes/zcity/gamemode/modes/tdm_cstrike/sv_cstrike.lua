@@ -235,7 +235,7 @@ function MODE:EndRound()
                 end
                 
                 winner = maxTeam == 0 and 1 or 0
-                PrintMessage(HUD_PRINTTALK, (maxTeam == 0 and "Terrorists" or "Counter-Terrorists") .. " have killed the hostage")
+                PrintMessage(HUD_PRINTTALK, (maxTeam == 0 and "Terrorist Chud" or "Counter Chud") .. " have killed the hostage")
             else
                 winner = 3
             end
@@ -255,7 +255,7 @@ function MODE:EndRound()
         end
     end
 
-    local winnerprt = (winner == 1 and "Counter-Terrorists") or (winner == 0 and "Terrorists") or "Nobody"
+    local winnerprt = (winner == 1 and "Counter Chud") or (winner == 0 and "Terrorist Chud") or "Nobody"
     
     PrintMessage(HUD_PRINTTALK, winnerprt.." have won the round.")
 
@@ -313,7 +313,7 @@ function MODE:EndRound()
         end
 
         if winner then
-            local winnerprt = (winner == 1 and "Counter-Terrorists") or (winner == 0 and "Terrorists") or "Nobody"
+            local winnerprt = (winner == 1 and "Counter Chud") or (winner == 0 and "Terrorist Chud") or "Nobody"
             
             PrintMessage(HUD_PRINTTALK, winnerprt.." have won the game.")
         end

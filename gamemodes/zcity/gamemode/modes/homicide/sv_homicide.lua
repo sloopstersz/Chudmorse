@@ -1634,6 +1634,7 @@ local TraitorAssistantStarterItems = {
 	"weapon_bigbandage_sh",
 	"weapon_bandage_sh",
 	"weapon_pocketknife",
+	"weapon_dronecontroller_ful",
 }
 
 local function GiveTraitorAssistantStarterItem(ply)

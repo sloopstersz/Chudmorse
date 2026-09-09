@@ -1,5 +1,2 @@
-the collection and discord
-
-https://steamcommunity.com/sharedfiles/filedetails/?id=3793275026
-
-https://discord.gg/GqBvFKHEYA
+RELEASE
+https://steamcommunity.com/sharedfiles/filedetails/?id=3759394449

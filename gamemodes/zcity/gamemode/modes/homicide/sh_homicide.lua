@@ -147,7 +147,7 @@ local function ApplyTraitorLoadout(ply)
             end
         end
     end)
-
+      
 elseif wep == "weapon_tranquilizer_ammo" then
     timer.Simple(0.5, function()
         if IsValid(ply) and ply:HasWeapon("weapon_tranquilizer") then
@@ -276,7 +276,7 @@ MODE.SubRoles = {
 		Name = "Traitor",
 		Description = [[You are the custom traitor.
 Your abilities and loadout are based on your selected preset or loadout.]],
-		Objective = "Use your loadout to murder everyone here.",
+		Objective = "You are EVIL! Kill everyone.",
 		SpawnFunction = function(ply)
 			ApplyTraitorLoadout(ply)
 		end,
@@ -372,7 +372,7 @@ MODE.RoleChooseRoundTypes = {
 MODE.Roles = {}
 MODE.Roles.standard = {
 	traitor = {
-		objective = "You are the better Chud. Prove it by killing everyone.",
+		objective = "You are EVIL! Kill everyone.",
 		name = "Evil Chud",
 		color = Color(190,0,0)
 	},

@@ -166,7 +166,7 @@ local function GetIntroRoleName(ply, intensityId)
         return "SWAT"
     end
 
-    return "Law Enforcement"
+    return "Chud Enforcement"
 end
 
 function MODE:Intermission()
