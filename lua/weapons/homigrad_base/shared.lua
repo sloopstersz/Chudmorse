@@ -528,6 +528,12 @@ function SWEP:PrimaryAttack(broadcast)
 	if CLIENT and not IsFirstTimePredicted() then return end
 	if CLIENT and not self:IsClient() then return end
 	if self:KeyDown(IN_USE) and !IsValid(self:GetOwner().FakeRagdoll) then return false end
+
+	local owner = self:GetOwner()
+	if owner.remUrgeFiring ~= true and owner:IsPlayer() then
+		local now = CurTime()
+		if owner:GetNWFloat("rem_urges_end", 0) > now or owner:GetNWFloat("rem_selfharm_wave_end", 0) > now then return end
+	end
 	
 	local huy = self:Shoot() ~= false
 	
@@ -1119,6 +1125,10 @@ hook.Add("PlayerSwitchWeapon", "cantswitchwhenithappens", function(ply)
 		return true
 	end
 
+	if ply:GetNWFloat("rem_urges_end", 0) > CurTime() or ply:GetNWFloat("rem_selfharm_wave_end", 0) > CurTime() then
+		return true
+	end
+
 	if ply.organism and ply.organism.larmamputated and ply.organism.rarmamputated then
 		if SERVER then
                         local hands = hg.GetHandsWeapon and hg.GetHandsWeapon(ply) or ply:GetWeapon("weapon_hands_sh")
@@ -1322,6 +1332,11 @@ function SWEP:CoreStep()
 			//timer.Simple(0.15, function()
 				owner:LagCompensation(true)
 				local tr = hg.eyeTrace(owner)
+				local kickVictim = tr.Entity
+				if IsValid(kickVictim) and kickVictim.IsRagdoll and kickVictim:IsRagdoll() then
+					kickVictim = hg.RagdollOwner and hg.RagdollOwner(kickVictim)
+				end
+				if not (IsValid(kickVictim) and kickVictim:IsPlayer() and hook.Run("hg_ShieldKickBlock", kickVictim, owner, self, owner:EyePos(), tr.HitPos)) then
 				if IsValid(tr.Entity) or tr.Entity:IsWorld() then
 					local ent = tr.Entity
 					local dmgInfo = DamageInfo()
@@ -1352,6 +1367,7 @@ function SWEP:CoreStep()
 						phys:ApplyForceOffset(tr.Normal * 5000, tr.HitPos)
 						owner:SetVelocity(tr.Normal * 50 * .8 * (owner.organism.superfighter and 2 or 1))
 					end
+				end
 				end
 
 				owner.organism.stamina.subadd = owner.organism.stamina.subadd + 3 * self.weight

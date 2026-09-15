@@ -189,6 +189,11 @@ DMusic:AddSequence( "splinter_cell", "Penthouse", Music )
 if SERVER then
     util.AddNetworkString("DMusic")
     function DMusic:AddPanic(ply,ammout)
+        if IsValid(ply) and ply:IsPlayer() and ply.GetPlayerClass then
+            local class = ply:GetPlayerClass()
+            if class and class.PanicImmune then return end
+        end
+
         net.Start("DMusic")
             net.WriteFloat(ammout)
         net.Send(ply)

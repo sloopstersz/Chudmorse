@@ -401,6 +401,8 @@ util.AddNetworkString("ZB_SpecMode")
 net.Receive("ZB_SpecMode",function(len,ply)
 	local bool = net.ReadBool()
 
+	if hook.Run("ZB_SpecToggle", ply, bool) then return end
+
 	local enable = !hook.Run("ZB_JoinSpectators", ply)
 
 	if enable and bool and ply:Team() != TEAM_SPECTATOR then if ply:Alive() then ply:Kill() end ply:SetTeam(TEAM_SPECTATOR) PrintMessage(HUD_PRINTTALK,ply:Name().." joined the spectators.") 

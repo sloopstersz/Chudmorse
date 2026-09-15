@@ -1865,6 +1865,9 @@ local function runPlayerThink(ply)
 	local sysTime = SysTime()
 	ply.lastcall_tick = ply.lastcall_tick or sysTime - 0.01
 	local dtime = sysTime - ply.lastcall_tick
+	if ply.organism and not istable(ply.organism.o2) and hg.organism and hg.organism.EnsureO2 then
+		hg.organism.EnsureO2(ply.organism)
+	end
 
 	hook_Run("Player Think", ply, CurTime(), dtime)
 

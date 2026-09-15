@@ -551,6 +551,7 @@ function SWEP:PrimaryAttack()
 	local target, ply = TraceDefibTarget(owner, self.DefibRange)
 	if not IsValid(target) or target == owner or ply == owner then return end
 	if IsValid(target.DefibModelEnt) or target.DefibInProgress then return end
+	if hook.Run("DefibCanTarget", owner, target, ply) == false then return end
 
 	self.DefibApplying = {
 		target = target,
@@ -762,8 +763,135 @@ function SWEP:AttachDefib(owner, target, ply)
 		end
 	end)
 
-	StartAEDSequence(defib, ply, function() return activeTarget end, uses)
+	if hook.Run("DefibOnAttached", defib, owner, target, ply, function() return activeTarget end, uses) ~= true then
+		StartAEDSequence(defib, ply, function() return activeTarget end, uses)
+	end
 	owner:StripWeapon(self:GetClass())
+end
+
+function hg.DefibReviveIncapacitated(defib, owner, ply, getTarget, uses)
+	if not IsValid(defib) then return end
+	if defib.AEDDropped or defib.AEDFinalized then return end
+	if not SetAEDState(defib, "charging") then return end
+
+	defib.AEDCharging = true
+	defib.AEDNoShockWarnings = false
+	PlayAEDSound(defib, AEDSounds.shockadvised)
+	PlayAEDSound(defib, AEDSounds.charging)
+
+	timer.Simple(1.5, function()
+		if IsAEDState(defib, "charging") then PlayAEDSound(defib, AEDSounds.standclear) end
+	end)
+
+	timer.Simple(3, function()
+		if not IsAEDState(defib, "charging") or defib.AEDShocked then return end
+
+		defib.AEDCharging = false
+		local target = GetCurrentDefibTarget(ply, getTarget())
+		if not IsValid(target) then
+			DropDefib(defib, nil, uses)
+			return
+		end
+
+		local org = GetDefibOrganism(ply, target)
+		if not org then
+			DropDefib(defib, target, uses)
+			return
+		end
+
+		defib.AEDState = "shocked"
+		defib.AEDFinalized = true
+		defib.AEDShocked = true
+
+		PlayAEDSound(defib, AEDSounds.shocksound, 85, 100, 2)
+		PlayAEDSound(defib, AEDSounds.shockdelivered, 75, 100, 3)
+		ShockChest(target, 2)
+
+		local victim = IsValid(ply) and ply or org.owner
+
+		if hg.organism and hg.organism.Clear then
+			hg.organism.Clear(org)
+		else
+			org.otrub = false
+			org.needotrub = false
+			org.incapacitated = false
+			org.heartstop = false
+			org.fibrillation = false
+			org.arrhythmia = 0
+			org.heartStrain = 0
+			org.heartbeat = 70
+			org.pulse = 70
+			org.blood = 5000
+			org.bloodPressure = 120
+			org.myocardialOxygen = 1
+			org.consciousness = 1
+			org.shock = 0
+			org.painadd = 0
+			org.pain = 0
+			org.immobilization = 0
+			org.disorientation = 0
+			org.bleed = 0
+			org.internalBleed = 0
+			org.wounds = {}
+			org.arterialwounds = {}
+			if IsValid(org.owner) then
+				org.owner:SetNetVar("wounds", {})
+				org.owner:SetNetVar("arterialwounds", {})
+			end
+		end
+
+		org.deathStateEnd = nil
+		org.deathStateKilled = nil
+		org.needotrub = false
+		org.needfake = false
+		org.defibDeathGrace = CurTime() + 45
+
+		if IsValid(victim) and victim:IsPlayer() then
+			victim.fullsend = true
+		end
+		if IsValid(org.owner) then
+			org.owner.fullsend = true
+		end
+
+		timer.Simple(1, function()
+			if not IsValid(victim) or not victim:IsPlayer() or not victim:Alive() then return end
+			if org.otrub or org.incapacitated then return end
+			if not IsValid(victim.FakeRagdoll) then return end
+			if hg and hg.FakeUp then hg.FakeUp(victim, true) end
+		end)
+
+		for _, otherPly in ipairs(player.GetAll()) do
+			if not otherPly:Alive() or otherPly == ply then continue end
+			local isTouching = false
+
+			if IsShockTarget(otherPly:GetNetVar("carryent"), target) or IsShockTarget(otherPly:GetNetVar("carryent2"), target) then
+				isTouching = true
+			end
+
+			local fakeRag = otherPly.FakeRagdoll
+			if not isTouching and IsValid(fakeRag) then
+				if (IsValid(fakeRag.ConsLH) and (IsShockTarget(fakeRag.ConsLH.Ent2, target) or IsShockTarget(fakeRag.ConsLH.choking, target))) or
+				   (IsValid(fakeRag.ConsRH) and (IsShockTarget(fakeRag.ConsRH.Ent2, target) or IsShockTarget(fakeRag.ConsRH.choking, target))) then
+					isTouching = true
+				end
+			end
+
+			if isTouching then
+				local otherOrg = otherPly.organism
+				if otherOrg then
+					otherOrg.painadd = (otherOrg.painadd or 0) + 150
+					otherOrg.shock = (otherOrg.shock or 0) + 150
+					if hg and hg.StunPlayer then hg.StunPlayer(otherPly, 2) end
+				end
+			end
+		end
+
+		timer.Simple(2, function()
+			if not IsValid(defib) then return end
+			PlayAEDSound(defib, AEDSounds.startcpr, 75, 100, 3)
+			DropDefib(defib, target, uses - 1)
+		end)
+	end)
 end
 
 function SWEP:SecondaryAttack()

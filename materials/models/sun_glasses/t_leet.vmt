@@ -1,0 +1,9 @@
+SDK_VertexLitGeneric
+{
+	"$baseTexture" "models\sun_glasses\arcticgear001a"
+        "$envmap" 			"env_cubemap"
+	"$normalmapalphaenvmapmask" 1
+	"$envmapcontrast" 0.3
+	"$envmapsaturation" 0.7
+	"$envmaptint" "[ 0.36 0.36 0.36 ]"
+}

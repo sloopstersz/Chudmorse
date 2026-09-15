@@ -213,69 +213,207 @@ if SERVER then
 
     end, 2, "name; message"}
 
+local VIP_MODEL_WHITELIST = {
+		["models/gacommissions/tungtungtungsahur.mdl"] = true,
+		["models/nikita488/player/joker.mdl"] = true,
+		["models/blop/expie/expie.mdl"] = true,
+		["models/player/skeleton.mdl"] = true,
+		["models/player/big_boss.mdl"] = true,
+		["models/tctgosling.mdl"] = true,
+		["models/player/corpse1.mdl"] = true,
+		["models/player/charple.mdl"] = true,
+		["models/player/amir/amir_v2.mdl"] = true,
+		["models/splinks/hotline_miami/jacket/player_jacket.mdl"] = true,
+		["models/player/vin_diesel/slow.mdl"] = true,
+		["models/cheddar/cyberpunk/trauma_team/tt_pilot.mdl"] = true,
+		["models/cheddar/cyberpunk/trauma_team/tt_medic.mdl"] = true,
+		["models/cheddar/cyberpunk/trauma_team/tt_guard.mdl"] = true,
+		["models/dannio/pm/rizzler_costco.mdl"] = true,
+		["models/player/efeber/tonysop.mdl"] = true,
+		["models/player/spook01/male_01.mdl"] = true,
+		["models/dannio/pm/aj_costco.mdl"] = true,
+		["models/player/h3_masterchief_player.mdl"] = true,
+		["models/deadspace2023/dsrisaaclv3.mdl"] = true,
+		["models/pechenko_121/doomslayerfull.mdl"] = true,
+		["models/player/group01/clark_playermodel.mdl"] = true,
+		["models/bindycot/player/po.mdl"] = true,
+		["models/player/ntwffelixkranken.mdl"] = true,
+		["models/i6nis/freddy_player.mdl"] = true,
+        ["models/i6nis/bonnie_player.mdl"] = true,
+        ["models/i6nis/chica_player.mdl"] = true,
+        ["models/i6nis/foxy_player.mdl"] = true
+	}
+
+	local function NormalizeSetModelPath(mdl)
+		mdl = string.Trim(string.lower(tostring(mdl or "")))
+		mdl = string.Replace(mdl, "\\", "/")
+		return mdl
+	end
+
+	local function FindZCityAppearanceModel(mdl)
+		mdl = NormalizeSetModelPath(mdl)
+		if not hg or not hg.Appearance or not hg.Appearance.PlayerModels then return nil end
+
+		for sex = 1, 2 do
+			for appearanceName, data in pairs(hg.Appearance.PlayerModels[sex] or {}) do
+				if istable(data) and NormalizeSetModelPath(data.mdl) == mdl then
+					return appearanceName, data
+				end
+			end
+		end
+	end
+
+	local function SaveSetModelOriginalAppearance(ply)
+		if ply.ChudSetModelOriginalAppearance then return end
+
+		if ply.CurAppearance then
+			ply.ChudSetModelOriginalAppearance = table.Copy(ply.CurAppearance)
+		end
+
+		ply.ChudSetModelOriginalModel = ply:GetModel()
+	end
+
+	local function RestoreSetModelAppearance(ply)
+		if not IsValid(ply) then return false end
+		if not hg or not hg.Appearance or not hg.Appearance.ForceApplyAppearance then return false end
+
+		local appearance = ply.ChudSetModelOriginalAppearance or ply.CurAppearance
+		if not appearance then return false end
+
+		hg.Appearance.ForceApplyAppearance(ply, table.Copy(appearance))
+
+		ply.ChudSetModelOriginalAppearance = nil
+		ply.ChudSetModelOriginalModel = nil
+		return true
+	end
+
+	local function IsUsableZCityRagdollModel(mdl)
+		if not util.IsValidModel(mdl) then
+			return false, "That model is invalid or is not installed on the server."
+		end
+
+		-- Z-City creates player ragdolls constantly. A model without ragdoll physics
+		-- can make the player invisible/broken and causes C_ServerRagdoll errors.
+		if util.IsValidRagdoll and not util.IsValidRagdoll(mdl) then
+			return false, "That model is not Z-City compatible because it has no valid ragdoll physics."
+		end
+
+		return true
+	end
+
+	local function ApplyTemporaryZCityModel(ply, mdl)
+		local appearanceName = FindZCityAppearanceModel(mdl)
+		if not appearanceName then return false end
+
+		SaveSetModelOriginalAppearance(ply)
+
+		local originalAppearance = ply.ChudSetModelOriginalAppearance or ply.CurAppearance
+		local temporaryAppearance = originalAppearance and table.Copy(originalAppearance) or hg.Appearance.GetRandomAppearance()
+		temporaryAppearance.AModel = appearanceName
+
+		-- Apply the model using Z-City's own appearance code so clothes/submaterials
+		-- are correct, then keep the original appearance saved for !setmodel default.
+		hg.Appearance.ForceApplyAppearance(ply, temporaryAppearance)
+		if originalAppearance then
+			ply.CurAppearance = table.Copy(originalAppearance)
+		end
+
+		return true
+	end
+
+	local function ApplyTemporaryCustomModel(ply, mdl)
+		SaveSetModelOriginalAppearance(ply)
+
+		-- Do not edit CurAppearance/AClothes/AAttachments. Those are the player's
+		-- normal Z-City appearance and are needed to restore them later.
+		ply:SetModel(mdl)
+		ply:SetSubMaterial()
+
+		if ply.SetSkin then
+			ply:SetSkin(0)
+		end
+
+		for _, bodygroup in ipairs(ply:GetBodyGroups() or {}) do
+			ply:SetBodygroup(bodygroup.id or 0, 0)
+		end
+
+		-- Accessories from the normal Z-City model can be attached to incompatible
+		-- bones on custom playermodels. Hide them temporarily; default restores them.
+		ply:SetNetVar("Accessories", {})
+	end
+
 	COMMANDS.setmodel = {function(ply, args)
-	local group = string.lower(ply:GetUserGroup() or "user")
-	local isVIP = group == "vip"
-	local isAdmin = ply:IsAdmin()
+		local group = string.lower(ply:GetUserGroup() or "user")
+		local isVIP = group == "vip"
+		local isAdmin = ply:IsAdmin()
 
-	-- Only VIPs and admins can use this
-	if not isVIP and not isAdmin then
-		ply:ChatPrint("You do not have permission to use this command.")
-		return
-	end
-
-	if not args[1] then
-		ply:ChatPrint("Usage: !setmodel <model>")
-		return
-	end
-
-	-- VIP: can ONLY change their own model
-	if isVIP then
-		local mdl = args[1]
-
-		if not ply:Alive() then
-			ply:ChatPrint("You must be alive to change your model.")
+		if not isVIP and not isAdmin then
+			ply:ChatPrint("You do not have permission to use this command.")
 			return
 		end
 
-		local Appearance = ply.CurAppearance or hg.Appearance.GetRandomAppearance()
-		Appearance.AColthes = ""
-
-		ply:SetNetVar("Accessories", "")
-		ply:SetModel(mdl)
-		ply:SetSubMaterial()
-		ply:SetPlayerColor(ply:GetNWVector("PlayerColor", vector_origin))
-
-		ply:ChatPrint("Your model was set to " .. tostring(mdl))
-		return
-	end
-
-	-- Admin:
-	-- !setmodel <model>
-	-- !setmodel <player> <model>
-
-	local plya = #args > 1 and args[1] or ply:Name()
-	local mdl = #args > 1 and args[2] or args[1]
-
-	for _, ply2 in pairs(player.GetListByName(plya)) do
-		if ply2:Alive() then
-			local Appearance = ply2.CurAppearance or hg.Appearance.GetRandomAppearance()
-			Appearance.AColthes = ""
-
-			ply2:SetNetVar("Accessories", "")
-			ply2:SetModel(mdl)
-			ply2:SetSubMaterial()
-			ply2:SetPlayerColor(ply2:GetNWVector("PlayerColor", vector_origin))
-
-			ply:ChatPrint(
-				ply2:Name() .. "'s model set to " .. tostring(mdl)
-			)
+		if not args[1] then
+			ply:ChatPrint("Usage: !setmodel <model/default> OR !setmodel <player> <model/default>")
+			return
 		end
-	end
-end, 0}
 
---// Aliases
-COMMANDS.model = COMMANDS.setmodel
-COMMANDS.playermodel = COMMANDS.setmodel
-COMMANDS.setplayermodel = COMMANDS.setmodel
+		local target = ply
+		local requestedModel = args[1]
+
+		-- Admins can target another player. VIPs can only target themselves.
+		if isAdmin and #args > 1 then
+			local matches = player.GetListByName(args[1])
+			target = matches and matches[1] or nil
+			requestedModel = args[2]
+
+			if not IsValid(target) then
+				ply:ChatPrint("Player not found: " .. tostring(args[1]))
+				return
+			end
+		end
+
+		if not IsValid(target) or not target:Alive() then
+			ply:ChatPrint("The player must be alive to change models.")
+			return
+		end
+
+		local mdl = NormalizeSetModelPath(requestedModel)
+
+		if mdl == "default" then
+			if RestoreSetModelAppearance(target) then
+				ply:ChatPrint(target == ply and "Your normal Z-City appearance was restored." or (target:Name() .. "'s normal Z-City appearance was restored."))
+			else
+				ply:ChatPrint("Could not restore the normal Z-City appearance.")
+			end
+			return
+		end
+
+		local zcityAppearanceName = FindZCityAppearanceModel(mdl)
+
+		-- VIPs may use only explicitly whitelisted custom models or the built-in
+		-- models registered by Z-City's appearance system.
+		if not isAdmin and not VIP_MODEL_WHITELIST[mdl] and not zcityAppearanceName then
+			ply:ChatPrint("That model is not available for VIPs.")
+			return
+		end
+
+		local usable, reason = IsUsableZCityRagdollModel(mdl)
+		if not usable then
+			ply:ChatPrint(reason)
+			return
+		end
+
+		if zcityAppearanceName then
+			ApplyTemporaryZCityModel(target, mdl)
+		else
+			ApplyTemporaryCustomModel(target, mdl)
+		end
+
+		ply:ChatPrint((target == ply and "Your model was set to " or (target:Name() .. "'s model was set to ")) .. mdl)
+	end, 0}
+
+	--// Aliases
+	COMMANDS.model = COMMANDS.setmodel
+	COMMANDS.playermodel = COMMANDS.setmodel
+	COMMANDS.setplayermodel = COMMANDS.setmodel
 end

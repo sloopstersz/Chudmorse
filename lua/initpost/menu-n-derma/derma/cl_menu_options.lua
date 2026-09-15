@@ -11,6 +11,7 @@ local hg_font = ConVarExists("hg_font") and GetConVar("hg_font") or CreateClient
 local hg_oldradialmenu = CreateClientConVar("hg_oldradialmenu", "0", true, false, "use the old radial menu style", 0, 1)
 local hg_nojogging = CreateClientConVar("hg_nojogging", "0", true, true, "Automatically sprint when holding shift.", 0, 1)
 local hg_gollavo_headshot_effect = ConVarExists("hg_gollavo_headshot_effect") and GetConVar("hg_gollavo_headshot_effect") or CreateClientConVar("hg_gollavo_headshot_effect", "1", true, false, "Enable Gollavo headshot effect", 0, 1)
+local hg_reduce_screeneffects = ConVarExists("hg_reduce_screeneffects") and GetConVar("hg_reduce_screeneffects") or CreateClientConVar("hg_reduce_screeneffects", "0", true, false, "Reduce screen shader effects by 50%", 0, 1)
 
 local function ForceHGFirstPersonDeath()
 	if hg_firstperson_death:GetString() != "0" then
@@ -143,6 +144,7 @@ hg.settings:AddOpt("Debug","hg_setzoompos", "Edit weapon zoompos, check console 
 hg.settings:AddOpt("Debug","hg_show_hitbox", "Show hitboxes")
 
 hg.settings:AddOpt("Optimization","hg_potatopc", "Potato PC Mode")
+hg.settings:AddOpt("Optimization","hg_reduce_screeneffects", "Reduce screen effects 50%")
 hg.settings:AddOpt("Optimization","hg_anims_draw_distance", "Animations Draw Distance", true, nil, "int")
 hg.settings:AddOpt("Optimization","hg_anim_fps", "Animations FPS", nil, nil, "int")
 hg.settings:AddOpt("Optimization","hg_attachment_draw_distance", "Attachment Draw Distance", true, nil, "int")
@@ -268,6 +270,7 @@ local isValidMainMenuPanel = false
 local info_sections = {
     {title = "Rank", key = "rank"},
     {title = "Leaderboard", key = "leaderboard"},
+    {title = "Borealis", key = "borealis"},
     {title = "Credits", key = "credits", disabled = true, disabledColor = Color(105, 105, 105, 180)},
     {title = "Socials", key = "socials"}
 }
@@ -288,6 +291,9 @@ local info_stat_rows = {
     {"Deaths", "Deaths"},
     {"Suicides", "Suicides"}
 }
+local info_chudmorse_logo = Material("vgui/chudmorse_logo.png", "noclamp smooth")
+local info_borealis_logo = Material("vgui/borealis.png", "noclamp smooth")
+local info_chudmorse_url = "https://discord.gg/GqBvFKHEYA"
 local info_social_links = {
     {
         title = "Lapse",
@@ -312,6 +318,12 @@ local info_social_links = {
         subtitle = "If you are looking for a more vanilla-ish BETTER alternative.",
         url = "https://discord.gg/3UrJapj6kF",
         icon = Material("vgui/communhub.png", "smooth")
+    },
+	{
+        title = "Borealis",
+        subtitle = "If your looking for a heavily modded Z-CITY server that does events frequently.",
+        url = "https://discord.gg/xvbBJxfzNz",
+        icon = Material("vgui/borealis.png", "smooth")
     }
 }
 local info_social_icon_size = MenuUnit(24)
@@ -320,8 +332,8 @@ local info_social_text_x = MenuUnit(54)
 local info_social_button_w = MenuUnit(72)
 local info_social_button_h = MenuUnit(24)
 local info_social_button_right = MenuUnit(18)
-local info_judge_logo = Material("vgui/judgelogo.png", "noclamp smooth")
-local info_judge_url = "https://discord.gg/hsRfFdEDTH"
+local info_judge_logo = Material("vgui/chudmorse_logo.png", "noclamp smooth")
+local info_judge_url = "https://discord.gg/GqBvFKHEYA"
 local info_active_section = nil
 local info_section_buttons = {}
 local info_content_panel = nil
@@ -623,6 +635,7 @@ function SettingsRefreshContent()
 
     for convarName, settingData in SortedPairs(hg.settings.tbl[settings_active_category]) do
         if convarName == "hg_gollavo_headshot_effect" and not InfoHasLocalAchievement("gollavo") then continue end
+        if convarName == "hg_reduce_screeneffects" and not GetConVar("hg_potatopc"):GetBool() then continue end
         local convar = GetConVar(settingData[2])
         if not convar then continue end
 
@@ -1985,6 +1998,82 @@ function InfoRefreshContent()
             RebuildRows()
         end
         RebuildRows()
+
+    elseif sectionKey == "borealis" then
+        local holder = vgui.Create("DPanel", info_content_panel)
+        holder:Dock(FILL)
+        holder:DockMargin(MenuUnit(24), MenuUnit(24), MenuUnit(24), MenuUnit(24))
+        holder.Paint = function(self, w, h)
+            surface.SetDrawColor(20, 20, 30, 130)
+            surface.DrawRect(0, 0, w, h)
+            surface.SetDrawColor(settings_color_whitey.r, settings_color_whitey.g, settings_color_whitey.b, 90)
+            surface.DrawOutlinedRect(0, 0, w, h, 1)
+        end
+
+        local hero = vgui.Create("DPanel", holder)
+        hero:Dock(LEFT)
+        hero:SetWide(MenuUnit(340))
+        hero:DockMargin(MenuUnit(16), MenuUnit(16), MenuUnit(22), MenuUnit(16))
+        hero.Paint = function(self, w, h)
+            local iw = math.max(1, info_borealis_logo:Width())
+            local ih = math.max(1, info_borealis_logo:Height())
+            local scale = math.min((w - MenuUnit(12)) / iw, (h - MenuUnit(12)) / ih)
+            local dw, dh = iw * scale, ih * scale
+            surface.SetMaterial(info_borealis_logo)
+            surface.SetDrawColor(255, 255, 255, 255)
+            surface.DrawTexturedRect((w - dw) * 0.5, (h - dh) * 0.5, dw, dh)
+        end
+
+        local content = vgui.Create("DPanel", holder)
+        content:Dock(FILL)
+        content:DockMargin(0, MenuUnit(26), MenuUnit(24), MenuUnit(24))
+        content.Paint = function() end
+
+        local title = vgui.Create("DLabel", content)
+        title:Dock(TOP)
+        title:SetTall(MenuUnit(44))
+        title:SetFont("ZCity_Menu_Settings_Small")
+        title:SetTextColor(settings_color_whitey)
+        title:SetText("BOREALIS")
+
+        local subtitle = vgui.Create("DLabel", content)
+        subtitle:Dock(TOP)
+        subtitle:DockMargin(0, 0, 0, MenuUnit(16))
+        subtitle:SetTall(MenuUnit(30))
+        subtitle:SetFont("ZCity_Menu_Settings_Tiny")
+        subtitle:SetTextColor(settings_color_text_dim)
+        subtitle:SetText("CHUDMORSE SERVER INFORMATION")
+
+        local body = vgui.Create("DLabel", content)
+        body:Dock(TOP)
+        body:SetTall(MenuUnit(150))
+        body:SetFont("ZCity_Menu_Settings_Tiny")
+        body:SetTextColor(settings_color_text)
+        body:SetWrap(true)
+        body:SetAutoStretchVertical(true)
+        body:SetText("Welcome to CHUDMORSE. Use this page for server information and community links. For announcements, rules, updates, and support, join the official CHUDMORSE Discord below.")
+
+        local discord = vgui.Create("DButton", content)
+        discord:Dock(TOP)
+        discord:DockMargin(0, MenuUnit(18), MenuUnit(110), 0)
+        discord:SetTall(MenuUnit(40))
+        discord:SetText("")
+        discord.HoverLerp = 0
+        discord:SetCursor("hand")
+        discord.DoClick = function()
+            gui.OpenURL(info_chudmorse_url)
+        end
+        discord.Think = function(self)
+            self.HoverLerp = LerpFT(0.15, self.HoverLerp or 0, self:IsHovered() and 1 or 0)
+        end
+        discord.Paint = function(self, w, h)
+            local a = 180 + 55 * (self.HoverLerp or 0)
+            surface.SetDrawColor(0, 0, 0, 220)
+            surface.DrawRect(0, 0, w, h)
+            surface.SetDrawColor(255, 255, 255, a)
+            surface.DrawOutlinedRect(0, 0, w, h, 1)
+            draw.SimpleText("JOIN CHUDMORSE DISCORD", "ZCity_Menu_Settings_Tiny", w * 0.5, h * 0.5, settings_color_whitey, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        end
 
     elseif sectionKey == "credits" then
         local scroll = vgui.Create("DScrollPanel", info_content_panel)

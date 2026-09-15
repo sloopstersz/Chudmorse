@@ -435,14 +435,14 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 		ply.FrictionGainMul = 0.01
 		ply.FrictionLoseMul = 0.2
 
-		ply.SpeedGainMul = 240 * weightmul * (ply.organism.superfighter and 5 or 1) * (ply:GetNWInt("SpeedGainClassMul", 1) or 1)
+		ply.SpeedGainMul = 240 * weightmul * (ply.organism.superfighter and ply.PlayerClassName ~= "juggernaut" and 5 or 1) * (ply:GetNWInt("SpeedGainClassMul", 1) or 1)
 		ply.SpeedGainMul = ply.SpeedGainMul * hg_movement_speed_gain_mul:GetFloat()
 
 		ply.SpeedLoseMul = 10000
 		ply.SpeedLoseMul = ply.SpeedLoseMul * hg_movement_speed_lose_mul:GetFloat()
 
 		ply.SpeedSharpLoseMul = 0.007
-		ply.InertiaBlend = 2000 * weightmul * (ply.organism.superfighter and 100 or 1)
+		ply.InertiaBlend = 2000 * weightmul * (ply.organism.superfighter and ply.PlayerClassName ~= "juggernaut" and 100 or 1)
 		ply.DuckingSlowdown = ply.DuckingSlowdown or 0
 		-- ply.InertiaBlend = 15 * weightmul * ply.CurrentFrictionMul
 		local inertia_blend_mul = 1
@@ -668,6 +668,10 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 			k = k * 0.25
 		end
 
+		if ply:GetNWBool("selfharming", false) then
+			k = k * 0.3
+		end
+
 		local ent = validCarryEnt and carryent or validCarryEnt2 and carryent2
 
 		if SERVER and inertia_len > 5 and (ply.hg_isSprinting or ply.hg_isJogging) then
@@ -783,7 +787,7 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 		mv:SetMaxSpeed(inertia_len)
 		mv:SetMaxClientSpeed(inertia_len)
 		ply:SetMaxSpeed(math_max(100, inertia_len))
-		ply:SetJumpPower(DEFAULT_JUMP_POWER * math_min(k, 1.1) * (not tauntStopMoving and 1 or 0) * (ply.organism.superfighter and 1.5 or 1) * (ply.JumpPowerMul or 1))
+		ply:SetJumpPower(DEFAULT_JUMP_POWER * math_min(k, 1.1) * (not tauntStopMoving and 1 or 0) * (ply.organism.superfighter and ply.PlayerClassName ~= "juggernaut" and 1.5 or 1) * (ply.JumpPowerMul or 1))
 
 		if(CLIENT)then
 			local fwangs = math_rad(GetViewPunchAngles2()[2] + GetViewPunchAngles3()[2])

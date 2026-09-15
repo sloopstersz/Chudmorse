@@ -19,13 +19,19 @@ local ZB_FORCED_MODE_POOL = {
         ["hmcd"] = true,
         ["dm"] = true,
         ["tdm"] = true,
+        -- Separate top-level gamemodes. These are independent MODE tables.
+        ["realish"] = true,
+        ["event"] = true,
         ["riot"] = true,
-        ["event"] = true
+        ["juggernaut"] = true,
+        ["president"] = true
 }
 local ZB_NO_BACK_TO_BACK_MODES = {
         ["dm"] = true,
         ["tdm"] = true,
-        ["riot"] = true
+        ["riot"] = true,
+        ["juggernaut"] = true,
+        ["president"] = true
 }
 local ZB_HAS_CHANGELEVEL
 
@@ -165,7 +171,8 @@ function zb:RoundThink()
 end
 
 hook.Add("CanListenOthers","RoundStartChat",function(output, input, isChat, teamonly, text)
-	if zb.ROUND_STATE == 0 or zb.ROUND_STATE == 3 then return true, false end
+	-- Keep pre/post-round text chat global, but do not disable proximity/3D voice.
+	if (zb.ROUND_STATE == 0 or zb.ROUND_STATE == 3) and isChat then return true, false end
 end)
 
 function zb:EndRound(skipPresentation)

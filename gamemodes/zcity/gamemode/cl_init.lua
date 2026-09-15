@@ -103,6 +103,7 @@ local keydownattack2
 local keydownreload
 
 hook.Add("HUDPaint","FUCKINGSAMENAMEUSEDINHOOKFUCKME",function()
+    if zb and zb.CROUND == "realish" then return end
     if LocalPlayer():Alive() then return end
 	local spect = LocalPlayer():GetNWEntity("spect")
 	if not IsValid(spect) then return end
@@ -873,6 +874,7 @@ function GM:ScoreboardShow()
 	body.List = playersCol
 
 	RefreshRows = function()
+		if not IsValid(playersCol) or not IsValid(playersCol.Scroll) then return end
 		playersCol.Scroll:Clear()
 		local players = {}
 		local requestedXP = false
@@ -900,7 +902,7 @@ function GM:ScoreboardShow()
 
 		if requestedXP then
 			timer.Simple(0.35, function()
-				if IsValid(scoreBoardMenu) then RefreshRows() end
+				if IsValid(playersCol) and IsValid(playersCol.Scroll) then RefreshRows() end
 			end)
 		end
 

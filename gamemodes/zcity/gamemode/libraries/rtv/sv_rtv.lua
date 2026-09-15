@@ -34,7 +34,8 @@ end
 local blacklist = {
     ["gm_construct"] = true, ["gm_flatgrass"] = true, ["gm_altarskforest"] = true, ["gm_renostruct_v2"] = true,
     ["gm_renostruct_v2_night"] = true, ["gm_city_of_silence"] = true, ["ttt_hogwarts"] = true,
-    ["hmcd_gonka"] = true, ["hmcd_bloodring"] = true,
+    ["hmcd_gonka"] = true, ["hmcd_bloodring"] = true, ["gm_br_complex"] = true, ["gm_br_pitfalls"] = true,
+	["gm_fork"] = true, ["gm_shenanigans"] = true,  ["gm_bigcity"] = true, ["gm_bigcity_improved"] = true,
 }
 
 local allowedPrefix = {

@@ -1,0 +1,15 @@
+SDK_VertexLitGeneric
+{
+	"$baseTexture" "models\sun_glasses\t_leet_glass"
+	
+
+// Specularity
+	"$envmap" 			"env_cubemap"
+	"$envmapmask" "models\sun_glasses\t_leet_glass_spec"
+
+
+// Transparency
+	"$translucent" 1
+	"$nocull" 1
+	
+}

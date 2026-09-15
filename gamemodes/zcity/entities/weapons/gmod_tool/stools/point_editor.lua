@@ -11,13 +11,17 @@ function TOOL:LeftClick(trace, attach)
 	end
 
 	if SERVER then
-		local pos = trace.HitPos
-
 		local name = ply:GetInfo(self:GetMode() .. "_point")
 		if not name then return end
 
+		local pos = trace.HitPos
 		local ang = ply:EyeAngles()
 		ang.x = 0
+
+		if name == "REALISH_MENU_CAMERA" then
+			pos = ply:EyePos()
+			ang = ply:EyeAngles()
+		end
 
 		local pointData = {
 			pos = pos,
@@ -40,10 +44,14 @@ function TOOL:RightClick(trace)
 
 	if SERVER then
 		timer.Simple(0.1, function()
+			if not IsValid(ply) then return end
 			if ply:KeyDown(IN_ATTACK2) then return end
 
-			local pos = trace.HitPos
-			local closest_distance = 500
+			local eyePos = ply:EyePos()
+			local aimDir = ply:EyeAngles():Forward()
+			local maxRange = 9999
+			local threshold = 20
+			local bestDist = threshold + 1
 			local closest_winner_point
 			local closest_winner_key
 
@@ -51,10 +59,15 @@ function TOOL:RightClick(trace)
 				if not v.Points then continue end
 
 				for k2, v2 in ipairs(v.Points) do
-					if v2.pos:Distance(pos) <= closest_distance then
+					local t = (v2.pos - eyePos):Dot(aimDir)
+					if t < 0 or t > maxRange then continue end
+
+					local dist = v2.pos:Distance(eyePos + aimDir * t)
+
+					if dist <= threshold and dist < bestDist then
+						bestDist = dist
 						closest_winner_point = k
 						closest_winner_key = k2
-						closest_distance = v2.pos:Distance(pos)
 					end
 				end
 			end

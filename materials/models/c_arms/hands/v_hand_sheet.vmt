@@ -1,0 +1,5 @@
+"VertexLitGeneric"
+{
+	"$basetexture" "models/c_arms/hands/v_hand_sheet"
+	"$bumpmap" "models/c_arms/hands/v_hand_sheet_normal"
+}

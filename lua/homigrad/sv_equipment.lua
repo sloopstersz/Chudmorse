@@ -81,6 +81,24 @@ local function getArmorDropVelocity(dmgInfo)
 	return force
 end
 
+local function syncLinkedArmor(ent)
+	if not IsValid(ent) then return end
+
+	ent:SyncArmor()
+
+	if not ent:IsRagdoll() then return end
+
+	local owner = hg.RagdollOwner(ent)
+	if not IsValid(owner) then return end
+
+	owner.armors = table.Copy(ent.armors or owner.armors or {})
+	owner.armors_shots = table.Copy(ent.armors_shots or owner.armors_shots or {})
+	owner.armors_health = table.Copy(ent.armors_health or owner.armors_health or {})
+	owner.armors_broken = table.Copy(ent.armors_broken or owner.armors_broken or {})
+	owner.armors_broken_mul = table.Copy(ent.armors_broken_mul or owner.armors_broken_mul or {})
+	owner:SyncArmor()
+end
+
 function hg.BreakArmor(ent, equipment, pos, dmgInfo)
 	if not IsValid(ent) then return false end
 	if not ent.armors or not table.HasValue(ent.armors, equipment) then return false end
@@ -115,24 +133,6 @@ function hg.BreakArmor(ent, equipment, pos, dmgInfo)
 	hg.PlayArmorBreakSound(equipmentEnt)
 
 	return true
-end
-
-local function syncLinkedArmor(ent)
-	if not IsValid(ent) then return end
-
-	ent:SyncArmor()
-
-	if not ent:IsRagdoll() then return end
-
-	local owner = hg.RagdollOwner(ent)
-	if not IsValid(owner) then return end
-
-	owner.armors = table.Copy(ent.armors or owner.armors or {})
-	owner.armors_shots = table.Copy(ent.armors_shots or owner.armors_shots or {})
-	owner.armors_health = table.Copy(ent.armors_health or owner.armors_health or {})
-	owner.armors_broken = table.Copy(ent.armors_broken or owner.armors_broken or {})
-	owner.armors_broken_mul = table.Copy(ent.armors_broken_mul or owner.armors_broken_mul or {})
-	owner:SyncArmor()
 end
 
 function hg.HandleArmorShot(org, placement, armor, dmgInfo, hit)

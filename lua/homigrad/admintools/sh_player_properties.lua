@@ -533,6 +533,11 @@ properties.Add( "amputate_limb", {
 		rleg:SetChecked(ent.organism.rleg > 0)
 		rleg:SetIsCheckable(true)
 		rleg.OnChecked = function(s, checked) self:AmputateLimb(ent, 4) end
+
+		local torso = submenu:AddOption("Amputate Torso")
+		torso:SetRadio(true)
+		torso:SetIsCheckable(true)
+		torso.OnChecked = function(s, checked) self:AmputateLimb(ent, 5) end
 	end,
 
 	AmputateLimb = function( self, ent, id )
@@ -562,6 +567,8 @@ properties.Add( "amputate_limb", {
 			hg.organism.AmputateLimb(ent.organism, "lleg")
 		elseif limb == 4 then
 			hg.organism.AmputateLimb(ent.organism, "rleg")
+		elseif limb == 5 then
+			hg.AmputateTorso(ent, VectorRand(-250, 250), false)
 		end
 	end
 } )

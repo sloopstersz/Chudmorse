@@ -139,7 +139,21 @@ local hg_attachment_draw_distance = ConVarExists("hg_attachment_draw_distance") 
 
 function SWEP:DrawAttachments()
 	local owner = self:GetOwner()
-	self.attacments = self:GetNetVar("attachments",{})
+
+	if CLIENT then
+		local netAtts = self:GetNetVar("attachments")
+		if netAtts ~= nil and netAtts ~= self.attachments then
+			self.attachments = netAtts
+			if self.modelAtt then
+				for atta, model in pairs(self.modelAtt) do
+					if not atta then continue end
+					if IsValid(model) then model:Remove() end
+					self.modelAtt[atta] = nil
+				end
+			end
+		end
+	end
+
 	//self.Supressor = (self:HasAttachment("barrel", "supressor") and true) or self.SetSupressor
 	local magwell, magwellData = self:HasAttachment("magwell")
 	if magwellData then 
@@ -160,7 +174,6 @@ function SWEP:DrawAttachments()
 	if not IsValid(gun) or not att then return end
 	
 	if self.attachments == nil and CLIENT then
-		self:SyncAtts()
 		return
 	end
 	

@@ -196,7 +196,7 @@ surface.CreateFont("ZC_MM_Title", {
 -- local Title = markup.Parse("error")
 
 local Pluv = Material("pluv/pluvkid.jpg")
-local LogoistMat = Material("vgui/logoist.png", "noclamp smooth")
+local LogoistMat = Material("vgui/chudmorse_logo.png", "noclamp smooth")
 
 function PANEL:InitializeMarkup()
 	local mapname = game.GetMap()
@@ -266,7 +266,7 @@ local menu_profile = {
     medal_size = 50
 }
 local menu_title = {
-    width = 500,
+    width = 300,
     offset_x = -11,
     spacing = 55
 }
@@ -890,22 +890,24 @@ function PANEL:Init()
 
     local logoPanel = vgui.Create("DPanel", lDock)
     local logoAspect = math.max(1, LogoistMat:Height()) / math.max(1, LogoistMat:Width())
+    if LogoistMat:IsError() then
+        print("[Chudmorse] WARNING: materials/vgui/chudmorse_logo.png failed to load. Make sure that file exists at exactly that path (case-sensitive) inside your addon, then fully rejoin/restart the game.")
+    end
     self.logoPanel = logoPanel
     logoPanel:Dock(BOTTOM)
     logoPanel:SetTall(1)
-    logoPanel:SetMouseInputEnabled(true)
-    logoPanel:SetCursor("hand")
+    logoPanel:SetMouseInputEnabled(false) -- purely decorative now; must stay off or it can steal clicks from the button list below it
     logoPanel:DockMargin(0, 0, 0, MenuUnit(menu_title.spacing))
     self.logoBaseMargin = MenuUnit(menu_title.spacing)
-    logoPanel.OnMousePressed = function(this, code)
-        if code ~= MOUSE_LEFT then return end
-        gui.OpenURL("https://github.com/kazoo43/remorseism")
-    end
+    local LOGO_EXTRA_DROP = MenuUnit(75) -- centers the logo between the profile header and the button list; raise/lower to taste
+
     logoPanel.Think = function(this)
         local maxW = math.max(1, this:GetWide() - MenuUnit(12))
         local drawW = math.min(MenuUnit(menu_title.width), maxW)
         local drawH = drawW * logoAspect
         this:SetTall(math.ceil(drawH * (1 + menu_live.title_hover_scale) + MenuUnit(8)))
+        local x, y = this:GetPos()
+        this:SetPos(x, y + LOGO_EXTRA_DROP)
     end
     logoPanel.Paint = function(this, w, h)
         local driftX, driftY = self:GetLiveOffset(MenuUnit(menu_live.logo_drift_x), MenuUnit(menu_live.logo_drift_y))
@@ -950,6 +952,33 @@ function PANEL:Init()
 
     function git:DoClick()
         gui.OpenURL("https://github.com/" .. hg.GitHub_ReposOwner .. "/" .. hg.GitHub_ReposName)
+    end
+
+    local CHUDMORSE_DISCORD_URL = "https://discord.gg/GqBvFKHEYA"
+    local clr_discord = Color(88, 101, 242)
+    local clr_discord_hover = Color(150, 158, 255)
+
+    local discord = vgui.Create("DLabel", bottomDock)
+    discord:Dock(BOTTOM)
+    discord:DockMargin(ScreenScale(10), 0, 0, 0)
+    discord:SetFont("ZCity_Menu_Tiny")
+    discord:SetTextColor(clr_discord)
+    discord:SetText("Chudmorse Discord: discord.gg/GqBvFKHEYA")
+    discord:SetContentAlignment(4)
+    discord:SetMouseInputEnabled(true)
+    discord:SetCursor("hand")
+    discord:SizeToContents()
+
+    function discord:DoClick()
+        gui.OpenURL(CHUDMORSE_DISCORD_URL)
+    end
+
+    function discord:OnCursorEntered()
+        self:SetTextColor(clr_discord_hover)
+    end
+
+    function discord:OnCursorExited()
+        self:SetTextColor(clr_discord)
     end
 
     local version = vgui.Create("DLabel", bottomDock)

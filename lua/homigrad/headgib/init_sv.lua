@@ -138,6 +138,9 @@ local zippyHeadGoreModels = {
 	Model("models/headpartial/headpartial4.mdl"),
 	Model("models/headpartial/headpartial5.mdl"),
 }
+local eyeRModel = Model("models/gore/head_eye01.mdl")
+local eyeLModel = Model("models/gore/head_eye02.mdl")
+
 local zippyHeadGibModels = {
 	Model("models/gore/head_headbitfrontleft.mdl"),
 	Model("models/gore/head_headbitfrontright.mdl"),
@@ -145,10 +148,21 @@ local zippyHeadGibModels = {
 	Model("models/gore/head_headbitbackright.mdl"),
 	Model("models/gore/head_headbittopleft.mdl"),
 	Model("models/gore/head_headbittopright.mdl"),
-	Model("models/gore/head_eye01.mdl"),
-	Model("models/gore/head_eye02.mdl"),
+	eyeRModel,
+	eyeLModel,
 	Model("models/gore/head_jawlo.mdl"),
 }
+
+function hg.HeadGibModels(org)
+	if not org or not (org.eyePoppedL or org.eyePoppedR) then return zippyHeadGibModels end
+	local models = {}
+	for i, mdl in ipairs(zippyHeadGibModels) do
+		if mdl == eyeRModel and org.eyePoppedR then continue end
+		if mdl == eyeLModel and org.eyePoppedL then continue end
+		models[#models + 1] = mdl
+	end
+	return models
+end
 local fullBodySounds = {
 	Sound("fullbodyexplode/rem_fullbodygib1.wav"),
 	Sound("fullbodyexplode/rem_fullbodygib2.wav"),
@@ -274,7 +288,7 @@ function Gib_UpdateHeadGoreStage(rag, damage)
 		net.WriteFloat(math.Rand(5, 10))
 		net.WriteBool(true)
 		net.Broadcast()
-		SpawnMeatGore(rag.zippyHeadGore, rag.zippyHeadGore:GetPos(), 3, VectorRand(-120, 120), 0.45, zippyHeadGibModels)
+		SpawnMeatGore(rag.zippyHeadGore, rag.zippyHeadGore:GetPos(), 3, VectorRand(-120, 120), 0.45, hg.HeadGibModels(rag.organism))
 		return
 	end
 
@@ -287,7 +301,7 @@ function Gib_UpdateHeadGoreStage(rag, damage)
 	net.WriteFloat(math.Rand(5, 10))
 	net.WriteBool(true)
 	net.Broadcast()
-	SpawnMeatGore(ent, ent:GetPos(), 3, VectorRand(-120, 120), 0.45, zippyHeadGibModels)
+	SpawnMeatGore(ent, ent:GetPos(), 3, VectorRand(-120, 120), 0.45, hg.HeadGibModels(rag.organism))
 
 	rag:CallOnRemove("remove_zippy_head_gore", function()
 		if IsValid(ent) then ent:Remove() end
@@ -333,7 +347,7 @@ function Gib_Input(rag, bone, force, damage)
 		net.WriteBool(true)
 		net.Broadcast()
 
-		SpawnMeatGore(ent, pos, nil, force, nil, zippyHeadGibModels) --модельки поменять и будет эпик
+		SpawnMeatGore(ent, pos, nil, force, nil, hg.HeadGibModels(rag.organism)) --модельки поменять и будет эпик
 
 		local armors = rag:GetNetVar("Armor",{})
 
@@ -522,7 +536,7 @@ local function fullBodyExplodeAt(pos, force, velocity, org, soundEnt, owner, dmg
 	end
 
 	if not (org and org.headamputated) then
-		spawnFullBodyMeat(velocity, pos, 8, force, 0.8, zippyHeadGibModels)
+		spawnFullBodyMeat(velocity, pos, 8, force, 0.8, hg.HeadGibModels(org))
 	end
 
 	if IsValid(owner) then

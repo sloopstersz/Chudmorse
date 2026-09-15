@@ -866,7 +866,22 @@ local IsValid = IsValid
 --\\ Suicide
 	if SERVER then
 		concommand.Add("suicide", function(ply)
-			ply.suiciding = !ply.suiciding
+			if not IsValid(ply) or not ply:IsPlayer() then return end
+			if ply:GetNWFloat("rem_urges_end", 0) > CurTime() then return end
+			if ply.remUrgeEnd then return end
+			if not ply.suiciding and ply.organism and (ply.organism.depression or 0) < 0.5 then
+				if ply:GetInfoNum("hg_newthoughts", 0) > 0 then
+					ply:Thought("You shouldnt do this.", 6, "depression_block_suicide", 0)
+				else
+					ply:Notify("I shouldnt do this", 6, "depression_block_suicide", 0)
+				end
+				return
+			end
+			if not ply.suiciding then
+				hg.StartSuicideUrge(ply)
+			else
+				ply.suiciding = false
+			end
 		end)
 	end
 
@@ -881,7 +896,8 @@ local IsValid = IsValid
 	function hg.CalculateWeight(ply,maxweight)
 		local time = CurTime()
 		local cache = ply.hg_weight_cache
-		if cache and cache.maxweight == maxweight and cache.time > time then return cache.value end
+		local no_loadout_weight = ply:GetNWBool("RealishNoLoadoutWeight", false)
+		if cache and cache.maxweight == maxweight and cache.no_loadout_weight == no_loadout_weight and cache.time > time then return cache.value end
 
 		local weight = 0
 
@@ -893,18 +909,20 @@ local IsValid = IsValid
 
 		weight = math.max(weight - 1,0)
 
-		local ammo = ply:GetAmmo()
-		for id,count in pairs(ammo) do
-			weight = weight + (game.GetAmmoForce(id) * count) / 1500
-		end
+		if not no_loadout_weight then
+			local ammo = ply:GetAmmo()
+			for id,count in pairs(ammo) do
+				weight = weight + (game.GetAmmoForce(id) * count) / 1500
+			end
 
-		ply.armors = ply:GetNetVar("Armor",{})
-		for plc,arm in pairs(ply.armors) do
-			weight = weight + (hg.armor[plc][arm].mass or 1)
+			ply.armors = ply:GetNetVar("Armor",{})
+			for plc,arm in pairs(ply.armors) do
+				weight = weight + (hg.armor[plc][arm].mass or 1)
+			end
 		end
 
 		local weightmul = (1 / (weight / maxweight + 1))
-		ply.hg_weight_cache = { maxweight = maxweight, time = time + weight_cache_lifetime, value = weightmul }
+		ply.hg_weight_cache = { maxweight = maxweight, no_loadout_weight = no_loadout_weight, time = time + weight_cache_lifetime, value = weightmul }
 		return weightmul
 	end
 --//

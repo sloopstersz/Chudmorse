@@ -18,6 +18,8 @@ local TRAITOR_CONTENT_FADE_SPEED = 12
 local TRAITOR_LIST_START_OFFSET = 80
 local TRAITOR_PREVIEW_START_OFFSET = 80
 
+local CARD_TITLE_FONTS = {"ZCity_Card_Title_1", "ZCity_Card_Title_2", "ZCity_Card_Title_3", "ZCity_Card_Title_4"}
+
 local function CreateTraitorMenuFonts()
     surface.CreateFont(TRAITOR_MENU_FONT, {
         font = "Verily Serif Mono",
@@ -32,6 +34,24 @@ local function CreateTraitorMenuFonts()
         weight = 400,
         antialias = true
     })
+
+    surface.CreateFont(CARD_TITLE_FONTS[1], {font = "Verily Serif Mono", size = ScreenScale(22), weight = 800, antialias = true})
+    surface.CreateFont(CARD_TITLE_FONTS[2], {font = "Verily Serif Mono", size = ScreenScale(17), weight = 800, antialias = true})
+    surface.CreateFont(CARD_TITLE_FONTS[3], {font = "Verily Serif Mono", size = ScreenScale(13), weight = 800, antialias = true})
+    surface.CreateFont(CARD_TITLE_FONTS[4], {font = "Verily Serif Mono", size = ScreenScale(10), weight = 800, antialias = true})
+end
+
+-- Picks the largest of CARD_TITLE_FONTS that keeps `text` within maxWidth, so long
+-- titles (like "Gun Owning Chud") shrink to fit instead of overflowing the card.
+local function GetFittedTitleFont(text, maxWidth)
+    for _, fontName in ipairs(CARD_TITLE_FONTS) do
+        surface.SetFont(fontName)
+        local tw = surface.GetTextSize(text)
+        if tw <= maxWidth then
+            return fontName
+        end
+    end
+    return CARD_TITLE_FONTS[#CARD_TITLE_FONTS]
 end
 
 hook.Add("OnScreenSizeChanged", "ZCity_TraitorLoadout_Fonts", CreateTraitorMenuFonts)
@@ -145,7 +165,7 @@ CreateClientConVar("hmcd_hero_loadout", "", true, true, "Saved hero loadout")
 
 local RoleConfigs = {
     traitor = {
-        title = "TRAITOR",
+        title = "Evil Chud",
         buttonTitle = "Traitor",
         maxPoints = 30,
         convar = "hmcd_traitor_loadout",
@@ -284,7 +304,7 @@ exclusions = {
         }
     },
     hero = {
-        title = "HERO",
+        title = "Gun Owning Chud",
         buttonTitle = "Hero",
         maxPoints = 16,
         convar = "hmcd_hero_loadout",
@@ -1384,17 +1404,19 @@ function hg.DrawLoadoutMenu(parentPanel)
     local cardData = {
         {
             roleId = "hero",
-            title = "HERO",
+            title = "Gun Owning Chud",
             desc = "Pick the gunner weapon",
             points = "16 POINTS",
-            align = "left"
+            align = "left",
+            color = Color(160, 0, 191)
         },
         {
             roleId = "traitor",
-            title = "TRAITOR",
+            title = "Evil Chud",
             desc = "Pick the traitor weapon",
             points = "30 POINTS",
-            align = "right"
+            align = "right",
+            color = Color(191, 0, 0)
         }
     }
 
@@ -1428,7 +1450,8 @@ function hg.DrawLoadoutMenu(parentPanel)
             draw.RoundedBox(0, 0, 0, w, h, Color(0, 0, 0, 235))
             surface.SetDrawColor(255, 255, 255, 120 + hover * 135)
             surface.DrawOutlinedRect(0, 0, w, h, 1)
-            draw.SimpleText(info.title, "ZCity_Menu_Small", w * 0.5, h * cardTitleY, color_whitey, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            local titleFont = GetFittedTitleFont(info.title, w * 0.88)
+            draw.SimpleTextOutlined(info.title, titleFont, w * 0.5, h * cardTitleY, info.color or color_whitey, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0, 255))
             draw.SimpleText(info.points, TRAITOR_MENU_FONT, w * 0.5, h * cardPointsY, Color(225, 225, 225, 230), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             draw.SimpleText(info.desc, TRAITOR_MENU_FONT, w * 0.5, h * cardDescY, Color(225, 225, 225, 210), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         end

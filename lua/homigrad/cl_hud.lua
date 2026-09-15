@@ -22,7 +22,11 @@ local gordon_hide = {
 }
 
 hook.Add("HUDShouldDraw", "homigrad", function(name)
-	if hide[name] or lply.PlayerClassName and lply.PlayerClassName == "Gordon" and gordon_hide[name] then
+	if hide[name] then
+		return false
+	end
+	local ply = IsValid(lply) and lply or LocalPlayer()
+	if IsValid(ply) and ply.PlayerClassName == "Gordon" and gordon_hide[name] then
 		return false
 	end
 end)
@@ -960,9 +964,17 @@ hook.Add("HUDPaint","Identifier",function()
 		local coloutline = (col.r < 50 and col.g < 50 and col.b < 50) and Color(100,100,100) or Color(0,0,0)
 		coloutline.a = 255 * Size * 1
 
-		draw.DrawText(trace.Entity:GetPlayerName() or "", "HomigradFontLarge", x + 1, y + 31, coloutline, TEXT_ALIGN_CENTER)
+		local displayName = trace.Entity:GetPlayerName() or ""
 
-		draw.DrawText(trace.Entity:GetPlayerName() or "", "HomigradFontLarge", x, y + 30, col, TEXT_ALIGN_CENTER)
+		-- Juggernaut mode: the close-range identifier should show the
+		-- character display name instead of the player's generated in-game name.
+		if trace.Entity:IsPlayer() and trace.Entity.GetPlayerClass and trace.Entity:GetPlayerClass() == "juggernaut" then
+			displayName = "Fat Chud"
+		end
+
+		draw.DrawText(displayName, "HomigradFontLarge", x + 1, y + 31, coloutline, TEXT_ALIGN_CENTER)
+
+		draw.DrawText(displayName, "HomigradFontLarge", x, y + 30, col, TEXT_ALIGN_CENTER)
 	end
 end)
 

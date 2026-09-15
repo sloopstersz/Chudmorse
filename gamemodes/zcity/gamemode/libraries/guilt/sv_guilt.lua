@@ -237,12 +237,17 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
     end
     
     local guiltadd = amt * 60
+    local isShove = dmgInfo.GetDamageCustom and dmgInfo:GetDamageCustom() == 1
     local maxLoss = zb.IsForce(Attacker) and 50 or 30
     local karmaDone = zb.HarmDoneKarma[Victim][Attacker]
     zb.HarmReturnedKarma[Attacker] = zb.HarmReturnedKarma[Attacker] or {}
-    local karmaReturn = math.max(((zb.HarmDoneKarma[Attacker] and zb.HarmDoneKarma[Attacker][Victim] or 0) * 0.5) - (zb.HarmReturnedKarma[Attacker][Victim] or 0), 0)
-    zb.HarmReturnedKarma[Attacker][Victim] = (zb.HarmReturnedKarma[Attacker][Victim] or 0) + karmaReturn
+    local karmaReturn = 0
+    if not isShove then
+        karmaReturn = math.max(((zb.HarmDoneKarma[Attacker] and zb.HarmDoneKarma[Attacker][Victim] or 0) * 0.5) - (zb.HarmReturnedKarma[Attacker][Victim] or 0), 0)
+        zb.HarmReturnedKarma[Attacker][Victim] = (zb.HarmReturnedKarma[Attacker][Victim] or 0) + karmaReturn
+    end
     add = math.Clamp(add, 0, math.max(maxLoss - karmaDone, 0))
+    if isShove then add = 0 end
 
     if Victim:IsPlayer() and add > 0 then
         zb.HarmReceivedKarma[Victim] = zb.HarmReceivedKarma[Victim] or 0
@@ -253,9 +258,10 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
     end
 
     Attacker.Guilt = (Attacker.Guilt or 0) + guiltadd
-    Attacker.Karma = math.Clamp((Attacker.Karma or 100) - add + karmaReturn, -60, zb.MaxKarma)
-
-    zb.HarmDoneKarma[Victim][Attacker] = zb.HarmDoneKarma[Victim][Attacker] + add
+    if not isShove then
+        Attacker.Karma = math.Clamp((Attacker.Karma or 100) - add + karmaReturn, -60, zb.MaxKarma)
+        zb.HarmDoneKarma[Victim][Attacker] = zb.HarmDoneKarma[Victim][Attacker] + add
+    end
 
     if shouldBanGuilt and Attacker.Guilt >= 100 then
 		-- if ULib then
@@ -267,11 +273,13 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
         PrintMessage(HUD_PRINTTALK, "Player "..Attacker:Name().." has been banned for 30 minutes for RDMing in a team based gamemode.")
     end
 
-    Attacker:SetNetVar("Karma", Attacker.Karma)
+    if not isShove then
+        Attacker:SetNetVar("Karma", Attacker.Karma)
+    end
     
     zb.GuiltTable[Attacker][Victim] = math.Clamp((zb.GuiltTable[Attacker][Victim] or 0) + guiltadd, 0, 200)
 
-    if Attacker.Karma <= 0 then
+    if not isShove and Attacker.Karma <= 0 then
         local steamID = Attacker:SteamID()
         local name = Attacker:Name()
         local karma = Attacker.Karma

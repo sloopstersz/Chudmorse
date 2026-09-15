@@ -72,6 +72,7 @@ local function WriteShoveHarm(owner, target, wep, harm)
         dmginfo:SetDamage(harm * 10)
         dmginfo:SetDamageType(DMG_CLUB)
         dmginfo:SetDamagePosition(target:GetPos())
+        dmginfo:SetDamageCustom(1)
 
         hook.Run("HomigradDamage", target, dmginfo, HITGROUP_CHEST, target, harm)
 end
@@ -596,6 +597,8 @@ SWEP.DamagePrimary = 10
 
 function SWEP:BlockingLogic(ent, mul, attacktype, trace)
 	local ent = hg.RagdollOwner(ent) or ent
+	local shieldBlock = hook.Run("hg_MeleeShieldBlock", self, ent, attacktype, trace)
+	if shieldBlock then return 0 end
 
 	if ent:IsPlayer() then
 		local wep = ent:GetActiveWeapon()
@@ -928,6 +931,12 @@ function SWEP:ShoveFront(sprintShove)
         pushVel = pushVel * shoveForce * (sprintShove and 1.3 or 1)
 
         if IsDMCounterPlayerTarget(ent) then
+                owner:LagCompensation(false)
+                return
+        end
+
+        local target = hg.RagdollOwner(ent) or ent
+        if IsValid(target) and target:IsPlayer() and target ~= owner and hook.Run("hg_ShieldKickBlock", target, owner, self, owner:EyePos(), trace.HitPos or target:WorldSpaceCenter()) then
                 owner:LagCompensation(false)
                 return
         end

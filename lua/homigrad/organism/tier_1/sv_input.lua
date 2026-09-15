@@ -291,12 +291,24 @@ local ents_Create = ents.Create
 function hg.organism.AmputateLimb(org, limb)
 	if org[limb.."amputated"] == nil then return end
 
+	local owner = org.owner
+	local ply = owner
+	if IsValid(ply) and not ply:IsPlayer() then
+		ply = (hg.RagdollOwner and hg.RagdollOwner(ply)) or (IsValid(ply.ply) and ply.ply) or ply:GetNWEntity("ply")
+	end
+	if org.torsoamputated or (IsValid(ply) and (ply.__hgTorsoPending or ply.__hgTorsoBlastQueued or ply:GetNWBool("hgTorsoSevered", false))) then return end
+
 	local bone = limbs[limb]
+	if !bone then return end
 	if !IsValid(org.owner) then return end
-	local len = org.owner:BoneLength(org.owner:LookupBone(bone))
+
+	local boneIndex = org.owner:LookupBone(bone)
+	if !boneIndex then return end
+
+	local len = org.owner:BoneLength(boneIndex)
 	local vec = Vector(len, 0, 0)
 	local ang = Angle()
-	local boneup = org.owner:GetBoneName(org.owner:LookupBone(bone) - 1)
+	local boneup = org.owner:GetBoneName(boneIndex - 1)
 	
 	local wnds = {}
 
@@ -322,7 +334,10 @@ function hg.organism.AmputateLimb(org, limb)
 	org.owner:EmitSound(sounds[math.random(#sounds)], 70, math.random(95, 105), 2)
 	
 	local ent = hg.GetCurrentCharacter(org.owner)
-	SpawnMeatGore(ent, select(1, ent:GetBonePosition(ent:LookupBone(bone))), 4)
+	local goreBone = ent:LookupBone(bone)
+	if goreBone then
+		SpawnMeatGore(ent, select(1, ent:GetBonePosition(goreBone)), 4)
+	end
 
 	hook.Run("OnAmputateLimb", org, ent, limb)
 
@@ -520,7 +535,7 @@ function hg.AddHarm(ply, harm, reason)
 		//ply:ChatPrint(reason..": harm count is "..math.Round(harm,2))
 	end
 
-	ply.harm = ply.harm + harm
+	ply.harm = (ply.harm or 0) + harm
 end
 
 function hg.ExplodeHead(ent, damage, slash, force)
@@ -531,19 +546,22 @@ function hg.ExplodeHead(ent, damage, slash, force)
 	if ent:IsNPC() and ent.organism then ent.organism.shock = 100 end
 
 	timer.Simple(0, function()
-		local ent = ent:IsRagdoll() and ent or ent:GetNWEntity("RagdollDeath")
 		if not IsValid(ent) then return end
-		--[[if not isbool(ent) then
-			hook.Run("OnHeadExplode", ply, ent)
-		end]]
+		local rag = ent:IsRagdoll() and ent or ent:GetNWEntity("RagdollDeath")
+		if not IsValid(rag) then return end
 
-		Gib_Input(ent, ent:LookupBone("ValveBiped.Bip01_Head1"), force, damage)
-		
-		ent.organism.headamputated = true
-		ent.headexploded = true
+		local headBone = rag:LookupBone("ValveBiped.Bip01_Head1")
+		if not headBone then return end
+		Gib_Input(rag, headBone, force, damage)
 
-		ent.organism.owner.fullsend = true
-		hg.send_bareinfo(ent.organism)
+		if not rag.organism then return end
+		rag.organism.headamputated = true
+		rag.headexploded = true
+
+		if IsValid(rag.organism.owner) then
+			rag.organism.owner.fullsend = true
+			hg.send_bareinfo(rag.organism)
+		end
 	end)
 end
 

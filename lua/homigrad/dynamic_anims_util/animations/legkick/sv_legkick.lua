@@ -309,6 +309,11 @@ function PLAYER:LegAttack()
                 if IsValid(ent) and not blacklist[ent] then
                     local phys = ent:GetPhysicsObjectNum(tr.PhysicsBone or 0)
                     if !ent:IsPlayer() and not IsValid(phys) then continue end
+
+					local shieldTarget = hg.RagdollOwner(ent) or ent
+					local inflictor = self:GetWeapon(handClass)
+					if IsValid(shieldTarget) and shieldTarget:IsPlayer() and hook.Run("hg_ShieldKickBlock", shieldTarget, self, inflictor, self:EyePos(), tr.HitPos) then continue end
+
                     if not soundplayed then
                         soundplayed = true
 
