@@ -1,0 +1,6 @@
+"UnLitGeneric"
+{
+	$basetexture	"models\weapons\tfa_cso\bunkerbuster\$0b_bunker_target04"
+	$additive "1"
+	$nocull    "1"
+}

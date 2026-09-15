@@ -1,0 +1,9 @@
+"UnlitGeneric"
+{
+	"$basetexture" "vgui/killicons/kamikaze_k2s"
+	$translucent "1"
+	$nocull "1"
+	$ignorez "1"
+	$vertexcolor "1"
+	$vertexalpha "1"
+}

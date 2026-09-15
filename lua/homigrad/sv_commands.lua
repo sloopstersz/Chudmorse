@@ -214,47 +214,68 @@ if SERVER then
     end, 2, "name; message"}
 
 	COMMANDS.setmodel = {function(ply, args)
-		if not ply:IsAdmin() then return end
-		local plya = #args > 1 and args[1] or ply:Name()
-		local mdl = #args > 1 and args[2] or args[1]
+	local group = string.lower(ply:GetUserGroup() or "user")
+	local isVIP = group == "vip"
+	local isAdmin = ply:IsAdmin()
 
-		for i, ply2 in pairs(player.GetListByName(plya)) do
-			if ply2:Alive() then
-				local Appearance = ply2.CurAppearance or hg.Appearance.GetRandomAppearance()
-				Appearance.AColthes = ""
-				ply2:SetNetVar("Accessories", "")
-				ply2:SetModel(mdl)
-				ply2:SetSubMaterial()
-				ply2:SetPlayerColor(ply2:GetNWVector("PlayerColor", vector_origin))
+	-- Only VIPs and admins can use this
+	if not isVIP and not isAdmin then
+		ply:ChatPrint("You do not have permission to use this command.")
+		return
+	end
 
-				ply:ChatPrint(ply2:Name().. "'s model set to " .. tostring(mdl))
-			end
+	if not args[1] then
+		ply:ChatPrint("Usage: !setmodel <model>")
+		return
+	end
+
+	-- VIP: can ONLY change their own model
+	if isVIP then
+		local mdl = args[1]
+
+		if not ply:Alive() then
+			ply:ChatPrint("You must be alive to change your model.")
+			return
 		end
-	end, 0}
 
-	--// Aliases
-	COMMANDS.model = COMMANDS.setmodel
-	COMMANDS.playermodel = COMMANDS.setmodel
-	COMMANDS.setplayermodel = COMMANDS.setmodel
+		local Appearance = ply.CurAppearance or hg.Appearance.GetRandomAppearance()
+		Appearance.AColthes = ""
 
-	COMMANDS.setscale = {function(ply, args)
-		if not ply:IsAdmin() then return end
-		local plya = #args > 1 and args[1] or ply:Name()
-		local scale = #args > 1 and args[2] or args[1]
+		ply:SetNetVar("Accessories", "")
+		ply:SetModel(mdl)
+		ply:SetSubMaterial()
+		ply:SetPlayerColor(ply:GetNWVector("PlayerColor", vector_origin))
 
-		for i, ply2 in pairs(player.GetListByName(plya)) do
-			if ply2:Alive() then
-				ply2:SetModelScale(scale)
+		ply:ChatPrint("Your model was set to " .. tostring(mdl))
+		return
+	end
 
-				ply:ChatPrint(ply2:Name().. "'s model scale set to " .. tostring(scale))
-			end
+	-- Admin:
+	-- !setmodel <model>
+	-- !setmodel <player> <model>
+
+	local plya = #args > 1 and args[1] or ply:Name()
+	local mdl = #args > 1 and args[2] or args[1]
+
+	for _, ply2 in pairs(player.GetListByName(plya)) do
+		if ply2:Alive() then
+			local Appearance = ply2.CurAppearance or hg.Appearance.GetRandomAppearance()
+			Appearance.AColthes = ""
+
+			ply2:SetNetVar("Accessories", "")
+			ply2:SetModel(mdl)
+			ply2:SetSubMaterial()
+			ply2:SetPlayerColor(ply2:GetNWVector("PlayerColor", vector_origin))
+
+			ply:ChatPrint(
+				ply2:Name() .. "'s model set to " .. tostring(mdl)
+			)
 		end
-	end, 0}
+	end
+end, 0}
 
-	--// Aliases
-	COMMANDS.setsize = COMMANDS.setscale
-	COMMANDS.scale = COMMANDS.setscale
-	COMMANDS.size = COMMANDS.setscale
-	COMMANDS.setmodelscale = COMMANDS.setscale
-	COMMANDS.modelscale = COMMANDS.setscale
+--// Aliases
+COMMANDS.model = COMMANDS.setmodel
+COMMANDS.playermodel = COMMANDS.setmodel
+COMMANDS.setplayermodel = COMMANDS.setmodel
 end
