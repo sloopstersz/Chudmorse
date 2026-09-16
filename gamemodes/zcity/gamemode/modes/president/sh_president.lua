@@ -9,7 +9,7 @@ MODE.GuiltDisabled = true
 MODE.ForBigMaps = false
 MODE.Chance = 0.05
 MODE.shouldfreeze = true
-MODE.ROUND_TIME = 180
+MODE.ROUND_TIME = 510
 
 MODE.BodyguardFraction = 0.35
 

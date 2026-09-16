@@ -324,6 +324,12 @@ local info_social_links = {
         subtitle = "If your looking for a heavily modded Z-CITY server that does events frequently.",
         url = "https://discord.gg/xvbBJxfzNz",
         icon = Material("vgui/borealis.png", "smooth")
+    },
+	{
+        title = "Fartens Community",
+        subtitle = "Server of a popular Z-City Content Creator. (Events Every Friday)",
+        url = "https://discord.gg/CZ9x7xp83H",
+        icon = Material("vgui/farten.png", "smooth")
     }
 }
 local info_social_icon_size = MenuUnit(24)

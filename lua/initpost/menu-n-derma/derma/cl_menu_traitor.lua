@@ -18,8 +18,6 @@ local TRAITOR_CONTENT_FADE_SPEED = 12
 local TRAITOR_LIST_START_OFFSET = 80
 local TRAITOR_PREVIEW_START_OFFSET = 80
 
-local CARD_TITLE_FONTS = {"ZCity_Card_Title_1", "ZCity_Card_Title_2", "ZCity_Card_Title_3", "ZCity_Card_Title_4"}
-
 local function CreateTraitorMenuFonts()
     surface.CreateFont(TRAITOR_MENU_FONT, {
         font = "Verily Serif Mono",
@@ -34,24 +32,6 @@ local function CreateTraitorMenuFonts()
         weight = 400,
         antialias = true
     })
-
-    surface.CreateFont(CARD_TITLE_FONTS[1], {font = "Verily Serif Mono", size = ScreenScale(22), weight = 800, antialias = true})
-    surface.CreateFont(CARD_TITLE_FONTS[2], {font = "Verily Serif Mono", size = ScreenScale(17), weight = 800, antialias = true})
-    surface.CreateFont(CARD_TITLE_FONTS[3], {font = "Verily Serif Mono", size = ScreenScale(13), weight = 800, antialias = true})
-    surface.CreateFont(CARD_TITLE_FONTS[4], {font = "Verily Serif Mono", size = ScreenScale(10), weight = 800, antialias = true})
-end
-
--- Picks the largest of CARD_TITLE_FONTS that keeps `text` within maxWidth, so long
--- titles (like "Gun Owning Chud") shrink to fit instead of overflowing the card.
-local function GetFittedTitleFont(text, maxWidth)
-    for _, fontName in ipairs(CARD_TITLE_FONTS) do
-        surface.SetFont(fontName)
-        local tw = surface.GetTextSize(text)
-        if tw <= maxWidth then
-            return fontName
-        end
-    end
-    return CARD_TITLE_FONTS[#CARD_TITLE_FONTS]
 end
 
 hook.Add("OnScreenSizeChanged", "ZCity_TraitorLoadout_Fonts", CreateTraitorMenuFonts)
@@ -165,7 +145,7 @@ CreateClientConVar("hmcd_hero_loadout", "", true, true, "Saved hero loadout")
 
 local RoleConfigs = {
     traitor = {
-        title = "Evil Chud",
+        title = "TRAITOR",
         buttonTitle = "Traitor",
         maxPoints = 30,
         convar = "hmcd_traitor_loadout",
@@ -198,18 +178,24 @@ local RoleConfigs = {
             ["weapon_traitor_poison_consumable"] = {cost = 3, name = "Potassium Cyanide Powder"},
             ["weapon_traitor_suit"] = {cost = 1, name = "Traitor Suit"},
             ["weapon_hg_jam"] = {cost = 1, name = "Door Jam"},
-            ["weapon_walkie_talkie"] = {cost = 1, name = "Walkie-Talkie"}
+            ["weapon_walkie_talkie"] = {cost = 1, name = "Walkie-Talkie"},
+			["weapon_tokarev"] = {cost = 6, name = "TT-33"},
+			["weapon_hg_molotov_tpik"] = {cost = 4, name = "Molotov Cocktail"},
+			["weapon_hg_flashbang_tpik"] = {cost = 3, name = "Flashbang"}
+		
         },
         addons = {
             ["weapon_p22_silencer"] = {cost = 2, name = "P22 Silencer", parent = "weapon_p22"},
             ["weapon_p22_ammo"] = {cost = 2, name = "P22 Extra Ammo", parent = "weapon_p22", desc = "Start with an extra magazine."},
             ["weapon_pm9_ammo"] = {cost = 3, name = "PM9 Extra Ammo", parent = "weapon_pm9", desc = "Start with an extra magazine."},
-            ["weapon_tranquilizer_ammo"] = {cost = 2, name = "Tranquilizer Extra Ammo", parent = "weapon_tranquilizer", desc = "Start with extra tranquilizer ammo."}
+            ["weapon_tranquilizer_ammo"] = {cost = 2, name = "Tranquilizer Extra Ammo", parent = "weapon_tranquilizer", desc = "Start with extra tranquilizer ammo."},
+			["weapon_tokarev_ammo"] = {cost = 2, name = "TT-33 Extra Ammo", parent = "weapon_tokarev", desc = "Start with an extra magazine."}
         },
         addonOrder = {
             ["weapon_p22"] = {"weapon_p22_silencer", "weapon_p22_ammo"},
             ["weapon_pm9"] = {"weapon_pm9_ammo"},
-            ["weapon_tranquilizer"] = {"weapon_tranquilizer_ammo"}
+            ["weapon_tranquilizer"] = {"weapon_tranquilizer_ammo"},
+			["weapon_tokarev"] = {"weapon_tokarev_ammo"}
         },
 exclusions = {
              ["weapon_sogknife"] = {
@@ -223,17 +209,39 @@ exclusions = {
             },
 			
             ["weapon_p22"] = {
-                ["weapon_taser"] = true,
-                ["weapon_tranquilizer"] = true,
-                ["weapon_pm9"] = true
-            },
-            ["weapon_taser"] = {
-                ["weapon_tranquilizer"] = true,
-                ["weapon_pm9"] = true
-            },
-            ["weapon_tranquilizer"] = {
-                ["weapon_pm9"] = true
-            },
+    ["weapon_pm9"] = true,
+    ["weapon_tokarev"] = true,
+    ["weapon_tranquilizer"] = true,
+    ["weapon_taser"] = true
+},
+
+["weapon_pm9"] = {
+    ["weapon_p22"] = true,
+    ["weapon_tokarev"] = true,
+    ["weapon_tranquilizer"] = true,
+    ["weapon_taser"] = true
+},
+
+["weapon_tokarev"] = {
+    ["weapon_p22"] = true,
+    ["weapon_pm9"] = true,
+    ["weapon_tranquilizer"] = true,
+    ["weapon_taser"] = true
+},
+
+["weapon_tranquilizer"] = {
+    ["weapon_p22"] = true,
+    ["weapon_pm9"] = true,
+    ["weapon_tokarev"] = true,
+    ["weapon_taser"] = true
+},
+
+["weapon_taser"] = {
+    ["weapon_p22"] = true,
+    ["weapon_pm9"] = true,
+    ["weapon_tokarev"] = true,
+    ["weapon_tranquilizer"] = true
+},
 			["weapon_combatknife"] = {
                 ["weapon_buck200knife"] = true,
 				["weapon_sogknife"] = true
@@ -304,7 +312,7 @@ exclusions = {
         }
     },
     hero = {
-        title = "Gun Owning Chud",
+        title = "HERO",
         buttonTitle = "Hero",
         maxPoints = 16,
         convar = "hmcd_hero_loadout",
@@ -328,7 +336,13 @@ exclusions = {
             ["weapon_remington870_sawed_off"] = {cost = 6, name = "Remington 870 Sawed-off", desc = "Compact sawed-off pump-action shotgun."},
             ["weapon_vpo209"] = {cost = 12, name = "VPO-209", desc = "Semi-auto carbine chambered in .366 TKM."},
             ["weapon_vpo136"] = {cost = 12, name = "VPO-136", desc = "Semi-auto carbine chambered in 7.62x39mm."},
-            ["weapon_mosin"] = {cost = 8, name = "Mosin-Nagant M38", desc = "Bolt-action rifle chambered in 7.62x54mm."}
+            ["weapon_mosin"] = {cost = 8, name = "Mosin-Nagant M38", desc = "Bolt-action rifle chambered in 7.62x54mm."},
+			["weapon_revolver2"] = {cost = 5, name = "MR-96", desc = "Revolver chambered in .38 Special"},
+			["weapon_cz75"] = {cost = 5, name = "CZ-75", desc = "Pistol chambered in 9x19 mm."},
+			["weapon_m870mcs"] = {cost = 6, name = "Remington M870 MCS", desc = "'What's the most you've ever lost on a coin toss?'"},
+			["weapon_m1911compact"] = {cost = 5, name = "M1911 Compact", desc = "It's in the name lmao."},
+			["weapon_fn45"] = {cost = 5, name = "FNX-45", desc = "STAY IN CHARACTER!"},
+			
         },
         addons = {
             ["hero_px4_silencer"] = {cost = 2, name = "PX4 Suppressor", parent = "weapon_px4beretta", attachment = "supressor4", desc = "Keep the PX4 quieter."},
@@ -358,7 +372,17 @@ exclusions = {
             ["hero_vpo136_ammo"] = {cost = 2, name = "VPO-136 Extra Ammo", parent = "weapon_vpo136", desc = "Start with extra magazine."},
             ["hero_mosin_silencer"] = {cost = 2, name = "Mosin Suppressor", parent = "weapon_mosin", attachment = "supressor1", desc = "Suppress the Mosin."},
             ["hero_mosin_scope"] = {cost = 2, name = "Mosin Scope", parent = "weapon_mosin", attachment = "optic12", desc = "Adds a scope to the Mosin."},
-            ["hero_mosin_ammo"] = {cost = 2, name = "Mosin Extra Ammo", parent = "weapon_mosin", desc = "Start with extra rounds."}
+            ["hero_mosin_ammo"] = {cost = 2, name = "Mosin Extra Ammo", parent = "weapon_mosin", desc = "Start with extra rounds."},
+			["hero_revolver2_ammo"] = {cost = 2, name = "MR-96 Extra Ammo", parent = "weapon_revolver2", desc = "Start with extra rounds."},
+			["hero_cz75_ammo"] = {cost = 2, name = "CZ-75 Extra Ammo", parent = "weapon_cz75", desc = "Start with extra rounds."},
+			["hero_cz75_silencer"] = {cost = 2, name = "CZ-75 Suppressor", parent = "weapon_cz75", attachment = "supressor4", desc = "Suppress the CZ-75."},
+			["hero_m870mcs_silencer"] = {cost = 2, name = "M870 Suppressor", parent = "weapon_m870mcs", attachment = "supressor5", desc = "'Call it'"},
+	        ["hero_m870mcs_ammo"] = {cost = 2, name = "M870 Extra Ammo", parent = "weapon_m870mcs", desc = "'If the rule you followed brought you to this, of what use was the rule?'"},
+			["hero_m1911compact_ammo"] = {cost = 2, name = "M1911 Extra Ammo", parent = "weapon_m1911compact", desc = "Do you all even read these?"},
+			["hero_m1911compact_laser"] = {cost = 2, name = "M1911 Laser", parent = "weapon_m1911compact", attachment = "laser5", desc = "I'm gonna rip xeno apart..."},
+			["hero_fn45_ammo"] = {cost = 2, name = "FNX-45 Extra Ammo", parent = "weapon_fn45", desc = "I need more boollets"},
+			["hero_fn45_laser"] = {cost = 2, name = "FNX-45 Laser", parent = "weapon_fn45", desc = "yea"},
+			["hero_fn45_silencer"] = {cost = 2, name = "FNX-45 Suppressor", parent = "weapon_fn45", desc = "Something silent?"},
         },
        addonOrder = {
             ["weapon_px4beretta"] = {"hero_px4_silencer", "hero_px4_ammo"},
@@ -372,7 +396,12 @@ exclusions = {
             ["weapon_kar98"] = {"hero_kar98_scope", "hero_kar98_ammo"},
             ["weapon_vpo209"] = {"hero_vpo209_silencer", "hero_vpo209_optic", "hero_vpo209_ammo"},
             ["weapon_vpo136"] = {"hero_vpo136_silencer", "hero_vpo136_optic", "hero_vpo136_ammo"},
-            ["weapon_mosin"] = {"hero_mosin_silencer", "hero_mosin_scope", "hero_mosin_ammo"}
+            ["weapon_mosin"] = {"hero_mosin_silencer", "hero_mosin_scope", "hero_mosin_ammo"},
+			["weapon_revolver2"] = {"hero_revolver2_ammo"},
+			["weapon_cz75"] = {"hero_cz75_ammo", "hero_cz75_silencer"},
+			["weapon_m870mcs"] = {"hero_m870mcs_ammo", "hero_m870mcs_silencer"},
+			["weapon_m1911compact"] = {"hero_m1911compact_ammo", "hero_m1911compact_laser"},
+			["weapon_fn45"] = {"hero_fn45_ammo", "hero_fn45_laser", "hero_fn45_silencer"},
         },
         exclusions = {},
         defaultPresets = {
@@ -426,7 +455,12 @@ do
         "weapon_kar98",
         "weapon_vpo209",
         "weapon_vpo136",
-        "weapon_mosin"
+        "weapon_mosin",
+		"weapon_revolver2",
+		"weapon_cz75",
+		"weapon_m870mcs",
+		"weapon_m1911compact",
+		"weapon_fn45",
     }
 
     for _, weaponId in ipairs(heroWeaponIds) do
@@ -1404,19 +1438,17 @@ function hg.DrawLoadoutMenu(parentPanel)
     local cardData = {
         {
             roleId = "hero",
-            title = "Gun Owning Chud",
+            title = "HERO",
             desc = "Pick the gunner weapon",
             points = "16 POINTS",
-            align = "left",
-            color = Color(160, 0, 191)
+            align = "left"
         },
         {
             roleId = "traitor",
-            title = "Evil Chud",
+            title = "TRAITOR",
             desc = "Pick the traitor weapon",
             points = "30 POINTS",
-            align = "right",
-            color = Color(191, 0, 0)
+            align = "right"
         }
     }
 
@@ -1450,8 +1482,7 @@ function hg.DrawLoadoutMenu(parentPanel)
             draw.RoundedBox(0, 0, 0, w, h, Color(0, 0, 0, 235))
             surface.SetDrawColor(255, 255, 255, 120 + hover * 135)
             surface.DrawOutlinedRect(0, 0, w, h, 1)
-            local titleFont = GetFittedTitleFont(info.title, w * 0.88)
-            draw.SimpleTextOutlined(info.title, titleFont, w * 0.5, h * cardTitleY, info.color or color_whitey, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0, 255))
+            draw.SimpleText(info.title, "ZCity_Menu_Small", w * 0.5, h * cardTitleY, color_whitey, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             draw.SimpleText(info.points, TRAITOR_MENU_FONT, w * 0.5, h * cardPointsY, Color(225, 225, 225, 230), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             draw.SimpleText(info.desc, TRAITOR_MENU_FONT, w * 0.5, h * cardDescY, Color(225, 225, 225, 210), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         end

@@ -697,6 +697,7 @@ util.AddNetworkString("HMCD_RoundStart")
 util.AddNetworkString("HMCD_SetNextTraitorRole")
 
 MODE.NextRoundTraitorRoles = MODE.NextRoundTraitorRoles or {}
+zb.NextSpecialRoleTargets = zb.NextSpecialRoleTargets or {}
 
 net.Receive("HMCD_SetNextTraitorRole", function(_, ply)
 	if not IsValid(ply) or not ply:IsSuperAdmin() then return end
@@ -704,10 +705,24 @@ net.Receive("HMCD_SetNextTraitorRole", function(_, ply)
 	local target = net.ReadEntity()
 	local role = net.ReadString()
 	if not IsValid(target) or not target:IsPlayer() then return end
-	if role ~= "traitor" and role ~= "assistant" then return end
 
-	MODE.NextRoundTraitorRoles[target:SteamID()] = role
-	ply:ChatPrint(target:Nick() .. " will be " .. (role == "traitor" and "traitor" or "traitor assistant") .. " next round.")
+	if role == "traitor" or role == "assistant" then
+		MODE.NextRoundTraitorRoles[target:SteamID()] = role
+		ply:ChatPrint(target:Nick() .. " will be " .. (role == "traitor" and "traitor" or "traitor assistant") .. " next Homicide round.")
+		return
+	end
+
+	if role == "vic" then
+		zb.NextSpecialRoleTargets.vic = target:SteamID()
+		ply:ChatPrint(target:Nick() .. " will be the VIC next VIC round.")
+		return
+	end
+
+	if role == "juggernaut" then
+		zb.NextSpecialRoleTargets.juggernaut = target:SteamID()
+		ply:ChatPrint(target:Nick() .. " will be the Fat Chud next Juggernaut round.")
+		return
+	end
 end)
 
 function MODE:GetPlySpawn(ply)

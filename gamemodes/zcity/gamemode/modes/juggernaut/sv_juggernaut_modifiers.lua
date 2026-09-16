@@ -1,13 +1,15 @@
 local function IsJuggernaut(ent)
     if not IsValid(ent) then return false end
-    if ent:IsPlayer() then
-        return ent:Team() == 1
-    end
-    local owner = hg.RagdollOwner(ent)
-    if IsValid(owner) and owner:IsPlayer() then
-        return owner:Team() == 1
-    end
-    return false
+
+    -- Team 1 is reused by other modes (TDM SWAT, President defenders, etc.).
+    -- Never identify the Juggernaut by team number alone.
+    local ply = ent:IsPlayer() and ent or hg.RagdollOwner(ent)
+    if not IsValid(ply) or not ply:IsPlayer() then return false end
+
+    local round = CurrentRound and CurrentRound()
+    if not round or round.name ~= "juggernaut" then return false end
+
+    return ply.PlayerClassName == "juggernaut"
 end
 
 local juggernautLastDamage = {}
@@ -29,7 +31,7 @@ hook.Add("Think", "JuggernautConstantUpdate", function()
     for _, ply in pairs(player.GetAll()) do
         if not IsValid(ply) then continue end
         if not ply:IsPlayer() then continue end
-        if ply:Team() ~= 1 then continue end
+        if not IsJuggernaut(ply) then continue end
         if not ply:Alive() then continue end
         
         local org = ply.organism
@@ -144,7 +146,7 @@ end)
 hook.Add("FinishMove", "JuggernautStamina", function(ply, move)
     if not IsValid(ply) then return end
     if not ply:IsPlayer() then return end
-    if ply:Team() ~= 1 then return end
+    if not IsJuggernaut(ply) then return end
     if not ply.organism then return end
     if not ply.organism.stamina then return end
     
@@ -163,7 +165,7 @@ end)
 hook.Add("PreHomigradDamage", "JuggernautBlockBoneDamage", function(ply, dmgInfo, hitgroup, ent, harm, hitBoxs, inputHole)
     if not IsValid(ply) then return end
     if not ply:IsPlayer() then return end
-    if ply:Team() ~= 1 then return end
+    if not IsJuggernaut(ply) then return end
 
     -- Remorse passes the hitgroup separately to this hook.
     -- CTakeDamageInfo has no GetHitGroup() method.

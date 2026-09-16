@@ -8,6 +8,17 @@ local BULLDOZER_MODEL = "models/mark2580/payday2/pd2_bulldozer_player.mdl"
 function CLASS.On(self)
     if CLIENT then return end
 
+    -- Fat Chud has an exclusive custom voice pack. Stop any normal human
+    -- phrase/pain scream that was already playing before the class switch.
+    if hg and hg.StopPainScream then
+        hg.StopPainScream(self, 0)
+    end
+    if self.lastPhr and self.lastPhr ~= "" then
+        self:StopSound(self.lastPhr)
+    end
+    self.lastPhr = nil
+    self.phrCld = 0
+
     ApplyAppearance(self, nil, nil, nil, true)
 
     local Appearance = self.CurAppearance or hg.Appearance.GetRandomAppearance()

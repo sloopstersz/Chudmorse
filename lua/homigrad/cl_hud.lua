@@ -968,7 +968,7 @@ hook.Add("HUDPaint","Identifier",function()
 
 		-- Juggernaut mode: the close-range identifier should show the
 		-- character display name instead of the player's generated in-game name.
-		if trace.Entity:IsPlayer() and trace.Entity.GetPlayerClass and trace.Entity:GetPlayerClass() == "juggernaut" then
+		if trace.Entity:IsPlayer() and trace.Entity.PlayerClassName == "juggernaut" then
 			displayName = "Fat Chud"
 		end
 

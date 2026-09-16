@@ -182,9 +182,8 @@ local CHUD_PROTECTOR_PRIMARY_POOL = {
     "weapon_p90",
     "weapon_spas12_modern",
     "weapon_sr25",
-    "weapon_sg552",
     "weapon_m16a1",
-    "weapon_ash12",
+    "weapon_asval",
     "weapon_hk416"
 }
 
@@ -1087,7 +1086,23 @@ function MODE:RoundStart()
 
     table.Shuffle(players)
 
-    local president = table.remove(players, 1)
+    -- Superadmins can queue a specific player as the next VIC from the scoreboard menu.
+    local forcedVICSteamID = zb.NextSpecialRoleTargets and zb.NextSpecialRoleTargets.vic
+    local president
+
+    if forcedVICSteamID then
+        for index, candidate in ipairs(players) do
+            if IsValid(candidate) and candidate:SteamID() == forcedVICSteamID then
+                president = table.remove(players, index)
+                break
+            end
+        end
+
+        -- Consume the request when a VIC round starts, matching the one-shot Traitor selector behavior.
+        zb.NextSpecialRoleTargets.vic = nil
+    end
+
+    president = president or table.remove(players, 1)
     if not IsValid(president) then return end
 
     local remaining = #players

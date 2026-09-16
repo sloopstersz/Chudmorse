@@ -60,4 +60,11 @@ if SERVER then
     resource.AddFile('materials/models/mark2580/payday2/bulldozer/pupil_ambient.vtf')
     resource.AddFile('materials/models/mark2580/payday2/bulldozer/pyro_lightwarp.vtf')
     resource.AddFile('sound/juggernaut/juggernaut_intro.mp3')
+    resource.AddFile('sound/juggernaut/voices/dozer1.mp3')
+    resource.AddFile('sound/juggernaut/voices/dozer2.mp3')
+    resource.AddFile('sound/juggernaut/voices/dozer3.mp3')
+    resource.AddFile('sound/juggernaut/voices/dozer4.mp3')
+    resource.AddFile('sound/juggernaut/voices/dozer5.mp3')
+    resource.AddFile('sound/juggernaut/voices/dozer6.mp3')
+    resource.AddFile('sound/juggernaut/voices/dozer7.mp3')
 end

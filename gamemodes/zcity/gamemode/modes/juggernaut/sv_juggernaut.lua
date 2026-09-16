@@ -7,23 +7,32 @@ MODE.ForBigMaps = false
 MODE.Chance = 0.03
 
 local victimWeapons1 = {
-	"weapon_uzi",
-	"weapon_vector",
-	"weapon_ruger",
-	"weapon_tmp",
-	"weapon_mp5",
-	"weapon_mac11"
+    "weapon_toz106",
+    "weapon_musket",
+    "weapon_winchester",
+    "weapon_mini14",
+    "weapon_m16a1",
+    "weapon_mp5",
+    "weapon_skorpion"
+}
+
+-- Scared Chud long guns that should spawn with sling support.
+-- Skorpion is intentionally excluded because it is the compact sidearm-style primary.
+local victimWeaponsWithSling = {
+    ["weapon_toz106"] = true,
+    ["weapon_musket"] = true,
+    ["weapon_winchester"] = true,
+    ["weapon_mini14"] = true,
+    ["weapon_m16a1"] = true,
+    ["weapon_mp5"] = true
 }
 
 local victimWeapons2 = {
 	"weapon_glock17",
-	"weapon_m45",
 	"weapon_m9beretta",
-	"weapon_revolver357",
 	"weapon_hk_usp",
 	"weapon_makarov",
-	"weapon_p22",
-	"weapon_browninghp"
+	"weapon_p22"
 }
 
 local victimConsumables = {
@@ -36,7 +45,8 @@ local victimConsumables = {
 local juggernautLoadout = {
     weapons = {
         {class = "weapon_pkm", extraMags = 2, sling = true},
-        {class = "weapon_deagle_annihilator", extraMags = 4}
+        {class = "weapon_deagle_annihilator", extraMags = 4},
+        {class = "weapon_hg_pipebomb_tpik"}
     },
     armor = {
         "ent_armor_vest5",
@@ -185,7 +195,9 @@ function MODE:SpawnNationalGuard()
         ply:SetTeam(0)
 
         if not basepos then
+            -- National Chuds use the normal random spawn system.
             basepos = zb:GetRandomSpawn()
+
             if basepos then
                 ply:SetPos(basepos)
             end
@@ -230,6 +242,22 @@ function MODE:GiveEquipment()
     local numPlayers = #players
     if numPlayers < 3 then return end
 
+    -- Superadmins can queue a specific player as the next Fat Chud from the scoreboard menu.
+    -- Move that player to the final slot, which is the slot this mode already reserves for Juggernaut.
+    local forcedJuggernautSteamID = zb.NextSpecialRoleTargets and zb.NextSpecialRoleTargets.juggernaut
+    if forcedJuggernautSteamID then
+        for index, candidate in ipairs(players) do
+            if IsValid(candidate) and candidate:SteamID() == forcedJuggernautSteamID then
+                table.remove(players, index)
+                players[#players + 1] = candidate
+                break
+            end
+        end
+
+        -- Consume the request when a Juggernaut round starts.
+        zb.NextSpecialRoleTargets.juggernaut = nil
+    end
+
     local numac = 1
     local numkillers = numPlayers - numac
 
@@ -245,6 +273,18 @@ function MODE:GiveEquipment()
     
         local victimWeapons1_choice = victimWeapons1[math.random(#victimWeapons1)]
         local wep1 = ply:Give(victimWeapons1_choice)
+
+        -- Every Scared Chud rifle/long gun receives sling support.
+        if victimWeaponsWithSling[victimWeapons1_choice] then
+            local inv = ply:GetNetVar("Inventory", {})
+            inv["Weapons"] = inv["Weapons"] or {}
+            inv["Weapons"]["hg_sling"] = true
+            ply:SetNetVar("Inventory", inv)
+
+            if IsValid(wep1) then
+                wep1.sling = true
+            end
+        end
         
         local victimWeapons2_choice = victimWeapons2[math.random(#victimWeapons2)]
         local wep2 = ply:Give(victimWeapons2_choice)
@@ -253,7 +293,7 @@ function MODE:GiveEquipment()
             local ammoType = wep1:GetPrimaryAmmoType()
             local maxClip = wep1:GetMaxClip1()
             if ammoType and ammoType >= 0 and maxClip and maxClip > 0 then
-                ply:GiveAmmo(maxClip * 2, ammoType, true)
+                ply:GiveAmmo(maxClip, ammoType, true)
             end
         end
         
@@ -261,7 +301,7 @@ function MODE:GiveEquipment()
             local ammoType = wep2:GetPrimaryAmmoType()
             local maxClip = wep2:GetMaxClip1()
             if ammoType and ammoType >= 0 and maxClip and maxClip > 0 then
-                ply:GiveAmmo(maxClip * 2, ammoType, true)
+                ply:GiveAmmo(maxClip, ammoType, true)
             end
             ply:SelectWeapon(wep2:GetClass())
         end
@@ -326,7 +366,8 @@ function MODE:GiveEquipment()
                 ply.armors["ears"] = "headphones1"
             end
             
-            ply.noTinnitus = true
+            -- Keep normal tinnitus behavior; the Juggernaut's headphones provide hearing protection.
+            ply.noTinnitus = nil
         end)
     end
 
@@ -342,7 +383,17 @@ function MODE:GiveEquipment()
 end
 
 function MODE:GetTeamSpawn()
-	return zb.TranslatePointsToVectors(zb.GetMapPoints( "HMCD_TDM_T" )), zb.TranslatePointsToVectors(zb.GetMapPoints( "HMCD_TDM_CT" ))
+    -- Team 0 = Scared Chuds, Team 1 = Fat Chud.
+    -- Only the Fat Chud has a Juggernaut-specific editor point.
+    -- Scared Chuds keep the normal TDM spawn group.
+    local scared = zb.TranslatePointsToVectors(zb.GetMapPoints("HMCD_TDM_T"))
+    local fat = zb.TranslatePointsToVectors(zb.GetMapPoints("JUGGERNAUT_FAT_CHUD_SPAWN"))
+
+    if not fat or #fat == 0 then
+        fat = zb.TranslatePointsToVectors(zb.GetMapPoints("HMCD_TDM_CT"))
+    end
+
+    return scared, fat
 end
 
 function MODE:RoundThink()

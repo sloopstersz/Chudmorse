@@ -26,6 +26,11 @@ local HeroWeaponData = {
 	["weapon_vpo209"] = {extraClips = 0},
 	["weapon_vpo136"] = {extraClips = 0},
 	["weapon_mosin"] = {extraClips = 0, sling = true},
+	["weapon_revolver2"] = {extraClips = 0},
+	["weapon_cz75"] = {extraClips = 0},
+	["weapon_m870mcs"] = {extraClips = 0},
+	["weapon_m1911compact"] = {extraClips = 0},
+	["weapon_fn45"] = {extraClips = 0},
 }
 
 local HeroUpgradeData = {
@@ -57,6 +62,16 @@ local HeroUpgradeData = {
 	["hero_mosin_silencer"] = {parent = "weapon_mosin", type = "attachment", attachment = "supressor1"},
 	["hero_mosin_scope"] = {parent = "weapon_mosin", type = "attachment", attachment = "optic12"},
 	["hero_mosin_ammo"] = {parent = "weapon_mosin", type = "ammo", extraClips = 1},
+	["hero_revolver2_ammo"] = {parent = "weapon_revolver2", type = "ammo", extraClips = 1},
+	["hero_cz75_ammo"] = {parent = "weapon_cz75", type = "ammo", extraClips = 1},
+	["hero_cz75_silencer"] = {parent = "weapon_cz75", type = "attachment", attachment = "supressor4"},
+	["hero_m870mcs_ammo"] = {parent = "weapon_m870mcs", type = "ammo", extraClips = 1},
+	["hero_m870mcs_silencer"] = {parent = "weapon_m870mcs", type = "attachment", attachment = "supressor5"},
+	["hero_m1911compact_ammo"] = {parent = "weapon_m1911compact", type = "ammo", extraClips = 1},
+	["hero_m1911compact_laser"] = {parent = "weapon_m1911compact", type = "attachment", attachment = "laser5"},
+	["hero_fn45_silencer"] = {parent = "weapon_fn45", type = "attachment", attachment = "supressor4"},
+	["hero_fn45_laser"] = {parent = "weapon_fn45", type = "attachment", attachment = "laser5"},
+	["hero_fn45_ammo"] = {parent = "weapon_fn45", type = "ammo", extraClips = 1},
 }
 
 local function ParseLoadoutString(dataStr)
@@ -94,6 +109,14 @@ local TraitorSkillsetSubRoles = {
 	["chemist"] = "traitor_chemist",
 }
 
+local TraitorSidearmWeapons = {
+	["weapon_pm9"] = true,
+	["weapon_p22"] = true,
+	["weapon_tokarev"] = true,
+	["weapon_tranquilizer"] = true,
+	["weapon_taser"] = true,
+}
+
 local function ApplyTraitorLoadout(ply)
 	local loadout = ParseLoadoutString(ply:GetInfo("hmcd_traitor_loadout"))
 	if not loadout.skillset and not istable(loadout.weapons) then loadout = LegacyTraitorLoadout end
@@ -122,8 +145,15 @@ local function ApplyTraitorLoadout(ply)
 	local hasP22 = false
 	local hasPL15 = false
 	local hasTaser = false
+	local selectedSidearm = nil
 
-	for _, wep in pairs(weaponsList) do
+	for _, wep in ipairs(weaponsList) do
+		-- PM9, P22, Tokarev, Tranquilizer and Taser share one sidearm slot.
+		-- The client menu already enforces this; keep a server-side guard too.
+		if TraitorSidearmWeapons[wep] then
+			if selectedSidearm then continue end
+			selectedSidearm = wep
+		end
 		if wep == "weapon_p22_silencer" then
 			timer.Simple(0.5, function()
 				if IsValid(ply) and ply:HasWeapon("weapon_p22") then
@@ -152,6 +182,21 @@ elseif wep == "weapon_tranquilizer_ammo" then
     timer.Simple(0.5, function()
         if IsValid(ply) and ply:HasWeapon("weapon_tranquilizer") then
             local w = ply:GetWeapon("weapon_tranquilizer")
+
+            if IsValid(w) and w:GetPrimaryAmmoType() >= 0 then
+                ply:GiveAmmo(
+                    w:GetMaxClip1(),
+                    w:GetPrimaryAmmoType(),
+                    true
+                )
+            end
+        end
+    end)
+	            
+	elseif wep == "weapon_tokarev_ammo" then
+    timer.Simple(0.5, function()
+        if IsValid(ply) and ply:HasWeapon("weapon_tokarev") then
+            local w = ply:GetWeapon("weapon_tokarev")
 
             if IsValid(w) and w:GetPrimaryAmmoType() >= 0 then
                 ply:GiveAmmo(

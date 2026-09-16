@@ -254,6 +254,12 @@ hg.GetPlayerClassPhrases = GetPlayerClassPhrases
 
 local mClamp, mRandom = math.Clamp, math.random
 
+-- Fat Chud uses the custom Dozer pack for normal Phrase voice lines.
+-- Pain/burn/berserk scream systems stay unchanged.
+local function IsJuggernautVoiceExclusive(ply)
+	return IsValid(ply) and ply:IsPlayer() and ply.PlayerClassName == "juggernaut"
+end
+
 local function PlayClassPhrase(ply, phraseType)
 	if !IsValid(ply) or !ply:Alive() then return end
 	if ply.organism and ply.organism.otrub then return end
@@ -288,6 +294,7 @@ end)
 
 util.AddNetworkString("hg_phrase")
 net.Receive("hg_phrase", function(len, ply)
+	if IsJuggernautVoiceExclusive(ply) then return end
 	if (ply.phrCld or 0) > CurTime() then return end
 	local result = hook.Run("HG_CanDoPhrase", ply, cmd, args) // return here true to reject phrase 
 	if result then return end
@@ -446,7 +453,6 @@ end)
 
 local function canPainScream(ply)
 	if !IsValid(ply) or !ply:IsPlayer() or !ply:Alive() then return false end
-
 	local org = ply.organism
 	if !org or org.otrub or ply:WaterLevel() >= 3 then return false end
 
@@ -665,6 +671,7 @@ end)
 // Context Phrases
 concommand.Add("hg_phrase_context",function(ply, cmd, args)
 	if !IsValid(ply) then return end
+	if IsJuggernautVoiceExclusive(ply) then return end
 	local result = hook.Run("HG_CanDoPhrase", ply, cmd, args) // return here true to reject phrase 
 	if result then return end
 
@@ -682,6 +689,7 @@ concommand.Add("hg_phrase_context",function(ply, cmd, args)
 end)
 
 hook.Add("HG_CanDoPhrase", "Pharse_Check", function(ply, cmd, args)
+	if IsJuggernautVoiceExclusive(ply) then return true end
 	if (ply.phrCld or 0) > CurTime() then return true end
 	if ply.PlayerClassName == "Gordon" then return true end // move it to gordon playerclass soon...
 	if !IsValid(ply) or !ply:Alive() or ply:WaterLevel() >= 3 then return true end

@@ -356,6 +356,100 @@ properties.Add("removeply", {
 	end 
 })
 
+-- Context-menu Juggernaut equipment. Keep this in sync with
+-- gamemodes/zcity/gamemode/modes/juggernaut/sv_juggernaut.lua.
+local function GiveContextJuggernautLoadout(ply)
+    if CLIENT or not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
+
+    -- Make the context-menu class behave like the actual Juggernaut spawn,
+    -- rather than stacking Juggernaut equipment on top of an old loadout.
+    ply:StripWeapons()
+    ply:RemoveAllAmmo()
+
+    local inv = ply:GetNetVar("Inventory", {})
+    inv["Weapons"] = inv["Weapons"] or {}
+    inv["Weapons"]["hg_sling"] = true
+    ply:SetNetVar("Inventory", inv)
+
+    local hands = ply:Give("weapon_hands_sh")
+
+    -- Juggernaut/Fat Chud starts with a medkit.
+    ply:Give("weapon_medkit_sh")
+    ply:SetNetVar("CurPluv", "pluvberet")
+
+    local weapons = {
+        {class = "weapon_pkm", extraMags = 2, sling = true},
+        {class = "weapon_deagle_annihilator", extraMags = 4},
+        {class = "weapon_hg_pipebomb_tpik"}
+    }
+
+    for _, weaponInfo in ipairs(weapons) do
+        local wep = ply:Give(weaponInfo.class)
+
+        if IsValid(wep) then
+            local ammoType = wep:GetPrimaryAmmoType()
+            local maxClip = wep:GetMaxClip1()
+
+            -- Same reserve-ammo counts as the Juggernaut gamemode.
+            if weaponInfo.extraMags and weaponInfo.extraMags > 0
+                and ammoType and ammoType >= 0
+                and maxClip and maxClip > 0 then
+                ply:GiveAmmo(maxClip * weaponInfo.extraMags, ammoType, true)
+            end
+
+            if weaponInfo.sling then
+                wep.sling = true
+            end
+        end
+    end
+
+    -- Replace old armor with the actual Fat Chud armor set.
+    ply.armors = {}
+    ply.armors_health = {}
+    if ply.SyncArmor then ply:SyncArmor() end
+
+    if hg and hg.AddArmor then
+        hg.AddArmor(ply, "ent_armor_vest5")
+        hg.AddArmor(ply, "ent_armor_mask1")
+        hg.AddArmor(ply, "ent_armor_helmet5")
+        hg.AddArmor(ply, "ent_armor_headphones1")
+    end
+
+    if IsValid(hands) then
+        ply:SelectWeapon(hands:GetClass())
+    end
+
+    -- Set the visible role too, matching the normal Juggernaut round.
+    if zb and zb.GiveRole then
+        zb.GiveRole(ply, "Fat Chud", Color(0, 0, 190))
+    end
+
+    timer.Simple(0.2, function()
+        if not IsValid(ply) then return end
+
+        ply:SetMaxHealth(350)
+        ply:SetHealth(350)
+
+        -- Do NOT disable tinnitus here. The Juggernaut already gets
+        -- ent_armor_headphones1, so hearing protection should come from
+        -- the headphones instead of a permanent role immunity.
+        ply.noTinnitus = nil
+
+        -- Re-assert the armor slots the same way the Juggernaut mode does.
+        if ply.armors then
+            ply.armors["head"] = "helmet5"
+            ply.armors["torso"] = "vest5"
+            ply.armors["face"] = "mask1"
+            ply.armors["ears"] = "headphones1"
+            if ply.SyncArmor then ply:SyncArmor() end
+        end
+
+        if ply:HasWeapon("weapon_deagle_annihilator") then
+            ply:SelectWeapon("weapon_deagle_annihilator")
+        end
+    end)
+end
+
 properties.Add( "setplayerclass", {
 	MenuLabel = "Set player class", -- Name to display on the context menu
 	Order = 15, -- The order to display this property relative to other properties
@@ -378,15 +472,25 @@ properties.Add( "setplayerclass", {
 		if not self:Filter(ent, ply) then return end -- this line was not here before
 		local class = net.ReadString( )
 
+		-- VICTIM is intentionally unavailable from the admin context menu.
+		if string.lower(class or "") == "victim" then return end
+
 		ent = hg.RagdollOwner(ent) or hg.GetCurrentCharacter(ent) or ent
 		if IsValid(ent) and ent:IsPlayer() and player.classList[class] then
 			ent:SetPlayerClass(class)
+
+			if class == "juggernaut" then
+				GiveContextJuggernautLoadout(ent)
+			end
 		end
 	end,
 	MenuOpen = function( self, option, ent, tr )
 		local submenu = option:AddSubMenu()
 
 		for name, tbl in pairs(player.classList) do
+			-- Do not expose the legacy VICTIM class in the context menu.
+			if string.lower(name or "") == "victim" then continue end
+
 			local opt = submenu:AddOption(name)
 			opt:SetRadio(true)
 			opt:SetChecked(ent.PlayerClassName == name)
