@@ -313,6 +313,17 @@ if CLIENT then
 			--hg.radialOptions[#hg.radialOptions + 1] = {randomPhrase, (LocalPlayer().PlayerClassName == "Slugcat" and "Wáaaaǎa\nWāaaàaâ") or (LocalPlayer().PlayerClassName == "Gordon" and "...") or "Say something"}
 			hg.radialOptions[#hg.radialOptions + 1] = {
 				[1] = function(mouseClick)
+					local isChudBeast = lply.PlayerClassName == "chudbeast"
+						or (zb and zb.CROUND == "chudbeasts" and zb.ROUND_STATE == 1)
+
+					-- Chud Beasts have one exclusive six-sound phrase pack.
+					-- Both mouse buttons use it instead of exposing the old
+					-- default/context phrase sounds.
+					if isChudBeast then
+						randomPhrase()
+						return
+					end
+
 					if mouseClick == 1 or (organism.pain or 0) > 60 then
 						randomPhrase()
 					else

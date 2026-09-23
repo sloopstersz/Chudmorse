@@ -270,14 +270,17 @@ local isValidMainMenuPanel = false
 local info_sections = {
     {title = "Rank", key = "rank"},
     {title = "Leaderboard", key = "leaderboard"},
-    {title = "Borealis", key = "borealis"},
-    {title = "Credits", key = "credits", disabled = true, disabledColor = Color(105, 105, 105, 180)},
+    {title = "Credits", key = "credits"},
     {title = "Socials", key = "socials"}
 }
-local info_credit_lines = {
-    "PLACEHOLDER",
-    "PLACEHOLDER",
-    "PLACEHOLDER"
+
+local info_credit_people = {
+    {fallbackName = "sloopsters", role = "Co-Owner", steamID64 = "76561198370899886", group = "lead"},
+    {fallbackName = "Kazoo", role = "Creator", steamID64 = "76561199404982388", group = "lead"},
+    {fallbackName = "Koi", role = "Owner", steamID64 = "76561198840745229", group = "lead"},
+    {fallbackName = "Rojok", role = "Helper", steamID64 = "76561197993188046", group = "helper"},
+    {fallbackName = "CAT", role = "Helper", steamID64 = "76561199401339884", group = "helper", featured = true},
+    {fallbackName = "Fizzy", role = "Helper", steamID64 = "76561199121849332", group = "helper"}
 }
 local info_fallback_band = {
     icon = Material("vgui/mats_jack_awards/10")
@@ -325,10 +328,10 @@ local info_social_links = {
         url = "https://discord.gg/xvbBJxfzNz",
         icon = Material("vgui/borealis.png", "smooth")
     },
-	{
+    {
         title = "Fartens Community",
-        subtitle = "Server of a popular Z-City Content Creator. (Events Every Friday)",
-        url = "https://discord.gg/CZ9x7xp83H",
+        subtitle = "A Popular Z-City Content Creator's Community.",
+        url = "https://discord.gg/SzTQAMeqa4",
         icon = Material("vgui/farten.png", "smooth")
     }
 }
@@ -344,6 +347,7 @@ local info_active_section = nil
 local info_section_buttons = {}
 local info_content_panel = nil
 local info_header_label = nil
+local info_parent_panel = nil
 
 local function InfoGetObtainedAchievements()
     local results = {}
@@ -707,6 +711,10 @@ function SettingsRefreshContent()
             local decimals = settingData[4] and 2 or 0
             local min = convar:GetMin() or 0
             local max = convar:GetMax() or 100
+            if convarName == "hg_fov" then
+                min = 75
+                max = 120
+            end
             
             local sliderBg = vgui.Create("DButton", row)
             sliderBg:SetSize(ctrlW - MenuUnit(50), MenuUnit(24))
@@ -1459,6 +1467,19 @@ local function InfoCreateSectionButton(pParent, strTitle, sectionKey)
         if not IsValid(self) then return end
         if self.SectionDisabled then return end
         surface.PlaySound(SOUND_SETTINGS_CLICK)
+
+        -- Achievements is a real full page, not an Information sub-page.
+        -- Replace the Information UI with the existing achievements renderer.
+        if self.SectionKey == "achievements" then
+            local parent = info_parent_panel
+            info_active_section = "rank"
+            if IsValid(parent) and hg and hg.DrawAchievmentsMenu then
+                parent:Clear()
+                hg.DrawAchievmentsMenu(parent)
+            end
+            return
+        end
+
         info_active_section = self.SectionKey
         InfoRefreshContent()
     end
@@ -2099,25 +2120,111 @@ function InfoRefreshContent()
             draw.RoundedBox(2, 1, 1, w - 2, h - 2, col)
         end
 
-        for _, line in ipairs(info_credit_lines) do
+        local title = vgui.Create("DLabel", scroll)
+        title:Dock(TOP)
+        title:SetTall(MenuUnit(48))
+        title:SetFont("ZCity_Menu_Settings_Medium")
+        title:SetTextColor(settings_color_whitey)
+        title:SetContentAlignment(5)
+        title:SetText("CHUDMORSE CREDITS")
+
+        local subtitle = vgui.Create("DLabel", scroll)
+        subtitle:Dock(TOP)
+        subtitle:SetTall(MenuUnit(24))
+        subtitle:SetFont("ZCity_Menu_Settings_Tiny")
+        subtitle:SetTextColor(settings_color_text_dim)
+        subtitle:SetContentAlignment(5)
+        subtitle:SetText("CREATORS  /  OWNERS  /  CONTRIBUTORS")
+
+        local function CreateCreditRow(people, rowHeight)
             local row = vgui.Create("DPanel", scroll)
             row:Dock(TOP)
-            row:DockMargin(0, 0, 0, MenuUnit(10))
-            row:SetTall(MenuUnit(64))
-            row.Paint = function(self, w, h)
-                surface.SetDrawColor(20, 20, 30, 120)
-                surface.DrawRect(0, 0, w, h)
-                surface.SetDrawColor(settings_color_whitey.r, settings_color_whitey.g, settings_color_whitey.b, 80)
-                surface.DrawRect(0, h - MenuUnit(1), w, MenuUnit(1))
+            row:DockMargin(0, MenuUnit(8), 0, MenuUnit(10))
+            row:SetTall(rowHeight)
+            row.Paint = function() end
+
+            local cards = {}
+            for _, person in ipairs(people) do
+                local personData = person
+                local card = vgui.Create("DButton", row)
+                card:SetText("")
+                card:SetCursor(personData.steamID64 ~= "" and "hand" or "arrow")
+                card.Person = personData
+                card.DisplayName = personData.fallbackName
+                card.Paint = function(self, w, h)
+                    surface.SetDrawColor(12, 12, 18, self:IsHovered() and 245 or 220)
+                    surface.DrawRect(0, 0, w, h)
+                    surface.SetDrawColor(192, 57, 43, self:IsHovered() and 230 or 150)
+                    surface.DrawRect(0, 0, w, MenuUnit(personData.featured and 4 or 2))
+                    surface.SetDrawColor(255, 255, 255, self:IsHovered() and 145 or 55)
+                    surface.DrawOutlinedRect(0, 0, w, h, 1)
+                    draw.SimpleText(self.DisplayName, "ZCity_Menu_Settings_Small", w * 0.5, h - MenuUnit(48), settings_color_whitey, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                    draw.SimpleText(string.upper(personData.role), "ZCity_Menu_Settings_Tiny", w * 0.5, h - MenuUnit(22), personData.featured and Color(215, 90, 75) or settings_color_text_dim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                end
+                card.DoClick = function()
+                    if personData.steamID64 ~= "" then
+                        gui.OpenURL("https://steamcommunity.com/profiles/" .. personData.steamID64)
+                    end
+                end
+
+                local avatar = vgui.Create("AvatarImage", card)
+                avatar:SetSize(MenuUnit(112), MenuUnit(112))
+                avatar:SetPos(0, MenuUnit(14))
+                avatar:SetMouseInputEnabled(false)
+                if personData.steamID64 ~= "" then
+                    avatar:SetSteamID(personData.steamID64, 128)
+                    steamworks.RequestPlayerInfo(personData.steamID64, function(steamName)
+                        if IsValid(card) and isstring(steamName) and steamName ~= "" then
+                            card.DisplayName = steamName
+                        end
+                    end)
+                end
+
+                card.Avatar = avatar
+                cards[#cards + 1] = card
             end
 
-            local text = vgui.Create("DLabel", row)
-            text:SetPos(MenuUnit(18), MenuUnit(18))
-            text:SetFont("ZCity_Menu_Settings_Small")
-            text:SetTextColor(settings_color_text)
-            text:SetText(line)
-            text:SizeToContents()
+            row.PerformLayout = function(self, w, h)
+                local count = #cards
+                local gap = MenuUnit(18)
+                local cardW = math.min(MenuUnit(210), (w - gap * (count - 1)) / count)
+                local totalW = cardW * count + gap * (count - 1)
+                local x = (w - totalW) * 0.5
+                for _, card in ipairs(cards) do
+                    card:SetPos(x, 0)
+                    card:SetSize(cardW, h)
+                    if IsValid(card.Avatar) then
+                        local avatarSize = math.min(MenuUnit(112), cardW - MenuUnit(26))
+                        card.Avatar:SetSize(avatarSize, avatarSize)
+                        card.Avatar:SetPos((cardW - avatarSize) * 0.5, MenuUnit(14))
+                    end
+                    x = x + cardW + gap
+                end
+            end
         end
+
+        local leads = {}
+        local helpers = {}
+        for _, person in ipairs(info_credit_people) do
+            if person.group == "helper" then
+                helpers[#helpers + 1] = person
+            else
+                leads[#leads + 1] = person
+            end
+        end
+
+        CreateCreditRow(leads, MenuUnit(205))
+
+        local helpersTitle = vgui.Create("DLabel", scroll)
+        helpersTitle:Dock(TOP)
+        helpersTitle:DockMargin(0, MenuUnit(-8), 0, 0)
+        helpersTitle:SetTall(MenuUnit(34))
+        helpersTitle:SetFont("ZCity_Menu_Settings_Small")
+        helpersTitle:SetTextColor(settings_color_whitey)
+        helpersTitle:SetContentAlignment(5)
+        helpersTitle:SetText("HELPERS")
+
+        CreateCreditRow(helpers, MenuUnit(205))
 
     elseif sectionKey == "socials" then
         local holder = vgui.Create("DPanel", info_content_panel)
@@ -2237,6 +2344,7 @@ end
 
 function hg.DrawInformation(ParentPanel)
     settings_sw, settings_sh = ScrW(), ScrH()
+    info_parent_panel = ParentPanel
 
     ParentPanel:SetAlpha(0)
     ParentPanel.Paint = function(self, w, h)
@@ -2455,7 +2563,7 @@ function hg.DrawInformation(ParentPanel)
     headerHint:SetPos(MenuUnit(25), MenuUnit(45))
     headerHint:SetFont("ZCity_Menu_Settings_Tiny")
     headerHint:SetTextColor(settings_color_text_dim)
-    headerHint:SetText("View rank and social links")
+    headerHint:SetText("View rank, credits, and social links")
     headerHint:SizeToContents()
 
     local contentHolder = vgui.Create("DPanel", mainPanel)

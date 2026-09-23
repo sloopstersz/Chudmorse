@@ -1,27 +1,63 @@
-local function IsJuggernaut(ent)
-    if not IsValid(ent) then return false end
+local function GetJuggernautPlayer(ent)
+    if not IsValid(ent) then return nil end
 
-    -- Team 1 is reused by other modes (TDM SWAT, President defenders, etc.).
-    -- Never identify the Juggernaut by team number alone.
-    local ply = ent:IsPlayer() and ent or hg.RagdollOwner(ent)
+    local ply
+    if ent:IsPlayer() then
+        ply = ent
+    else
+        -- Damage hooks can run before the fake/ragdoll helper library is ready.
+        if hg and isfunction(hg.RagdollOwner) then
+            ply = hg.RagdollOwner(ent)
+        end
+
+        if not IsValid(ply) and IsValid(ent.ply) then
+            ply = ent.ply
+        end
+
+        if not IsValid(ply) and ent.GetNWEntity then
+            local nwPly = ent:GetNWEntity("ply")
+            if IsValid(nwPly) then ply = nwPly end
+        end
+    end
+
+    if not IsValid(ply) or not ply:IsPlayer() then return nil end
+
+    -- Team 1 is reused by TDM SWAT, President defenders, etc.
+    local round = CurrentRound and CurrentRound()
+    if not round or round.name ~= "juggernaut" then return nil end
+    if ply.PlayerClassName ~= "juggernaut" then return nil end
+
+    return ply
+end
+
+local function IsJuggernaut(ent)
+    return IsValid(GetJuggernautPlayer(ent))
+end
+
+-- Limb/organ regrowth also applies to a Juggernaut assigned from the admin
+-- context menu. Other combat modifiers remain limited to the real mode.
+local function HasJuggernautRegrowth(ply)
     if not IsValid(ply) or not ply:IsPlayer() then return false end
+    if ply.PlayerClassName ~= "juggernaut" then return false end
+
+    if ply.ContextJuggernaut == true then return true end
 
     local round = CurrentRound and CurrentRound()
-    if not round or round.name ~= "juggernaut" then return false end
-
-    return ply.PlayerClassName == "juggernaut"
+    return round and round.name == "juggernaut"
 end
 
 local juggernautLastDamage = {}
 
 hook.Add("EntityTakeDamage", "JuggernautDamage", function(ent, dmgInfo)
     if not IsValid(ent) then return end
-    if not IsJuggernaut(ent) then return end
+
+    local juggernaut = GetJuggernautPlayer(ent)
+    if not IsValid(juggernaut) then return end
     
-    juggernautLastDamage[ent] = CurTime()
+    juggernautLastDamage[juggernaut] = CurTime()
     
     local oldDamage = dmgInfo:GetDamage()
-    local newDamage = oldDamage * 0.3
+    local newDamage = oldDamage * 0.5
     
     dmgInfo:SetDamage(newDamage)
     dmgInfo:SetDamageForce(Vector(0, 0, 0))
@@ -31,7 +67,7 @@ hook.Add("Think", "JuggernautConstantUpdate", function()
     for _, ply in pairs(player.GetAll()) do
         if not IsValid(ply) then continue end
         if not ply:IsPlayer() then continue end
-        if not IsJuggernaut(ply) then continue end
+        if not HasJuggernautRegrowth(ply) then continue end
         if not ply:Alive() then continue end
         
         local org = ply.organism
@@ -95,10 +131,6 @@ hook.Add("Think", "JuggernautConstantUpdate", function()
         org.canmovehead = true
         
         if timeSinceDamage > 5 then
-            if ply:Health() < 350 then
-                ply:SetHealth(math.min(ply:Health() + 1, 350))
-            end
-            
             if org.blood and org.blood < 8000 then
                 org.blood = math.min(org.blood + 10, 8000)
             end

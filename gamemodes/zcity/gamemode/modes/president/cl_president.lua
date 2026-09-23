@@ -391,8 +391,11 @@ net.Receive("president_end", function()
     local president = net.ReadEntity()
     local presidentSideWon = net.ReadBool()
     local byTasks = net.ReadBool()
+    local isDraw = net.ReadBool()
 
-    if presidentSideWon then
+    if isDraw then
+        chat.AddText(Color(220, 220, 220), "Time expired. The VIC round ends in a draw!")
+    elseif presidentSideWon then
         if byTasks then
             chat.AddText(PRESIDENT_COLOR, "President side wins by completing the tasks!")
         else

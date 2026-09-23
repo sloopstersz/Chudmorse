@@ -293,7 +293,8 @@ function MODE:GiveEquipment()
             local ammoType = wep1:GetPrimaryAmmoType()
             local maxClip = wep1:GetMaxClip1()
             if ammoType and ammoType >= 0 and maxClip and maxClip > 0 then
-                ply:GiveAmmo(maxClip, ammoType, true)
+                -- Scared Chuds get 3 reserve primary magazines total (2 more than before).
+                ply:GiveAmmo(maxClip * 3, ammoType, true)
             end
         end
         

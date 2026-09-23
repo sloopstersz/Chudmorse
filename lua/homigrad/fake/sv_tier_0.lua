@@ -1202,7 +1202,11 @@ function hg.FakeUp(ply, forced, instant)
 	end
 
 	OverrideSpawn = true
-	local hp, armor = ply:Health(), ply:Armor()
+	-- Fake-up uses Player:Spawn internally. Preserve the player's real vitals
+	-- and mark this as a fake-up spawn so normal spawn-reset hooks do not
+	-- reset HP/organism state to the default 100 HP.
+	local hp, armor, maxhp = ply:Health(), ply:Armor(), ply:GetMaxHealth()
+	ply.hgFakeUpSpawning = true
 	local ang, wep = ply:EyeAngles(), ply:GetActiveWeapon()
 	hg.OverrideSpawn(ply)
 	//local pos = ply:GetPos()
@@ -1212,6 +1216,7 @@ function hg.FakeUp(ply, forced, instant)
 	ply.LastFakeUp = CurTime()
 	ply.hg_no_fake_until = CurTime() + 1
 	ply:DrawWorldModel(true)
+	ply:SetMaxHealth(maxhp)
 	ply:SetHealth(hp)
 	ply:SetArmor(armor)
 	ply:SetEyeAngles(ang)
@@ -1223,6 +1228,19 @@ function hg.FakeUp(ply, forced, instant)
 	end
 
 	OverrideSpawn = nil
+
+	-- The engine's player_spawn event can arrive after OverrideSpawn is
+	-- cleared. Re-assert the saved vitals after that event, then clear the
+	-- per-player fake-up guard. This keeps ragdolling from becoming a heal.
+	timer.Simple(0, function()
+		if not IsValid(ply) then return end
+		if ply:Alive() then
+			ply:SetMaxHealth(maxhp)
+			ply:SetHealth(hp)
+			ply:SetArmor(armor)
+		end
+		ply.hgFakeUpSpawning = nil
+	end)
 
 	if IsValid(ragdoll) then
 		local phys = ragdoll:GetPhysicsObject()

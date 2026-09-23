@@ -216,8 +216,44 @@ local function GivePooledPrimary(ply, pool, reserveClips)
     return primary
 end
 
+-- The stock SWAT player class hard-forces a male SWAT model. That breaks
+-- female appearances in VIC mode, so female Chud Protectors stay on the
+-- normal appearance class while male Protectors keep the existing SWAT look.
+local function IsFemaleChudProtector(ply)
+    if not IsValid(ply) then return false end
+
+    local appearance = ply.CurAppearance or ply.CachedAppearance
+    local modelName = istable(appearance) and appearance.AModel or nil
+
+    if hg and hg.Appearance then
+        local femaleModels = hg.Appearance.PlayerModels and hg.Appearance.PlayerModels[2]
+        if femaleModels and modelName and femaleModels[modelName] then
+            return true
+        end
+
+        local femaleByModel = hg.Appearance.FuckYouModels and hg.Appearance.FuckYouModels[2]
+        if femaleByModel and femaleByModel[ply:GetModel()] then
+            return true
+        end
+    end
+
+    if isfunction(ThatPlyIsFemale) then
+        return ThatPlyIsFemale(ply)
+    end
+
+    return isstring(modelName) and string.StartWith(string.lower(modelName), "female")
+end
+
 local function GiveChudProtectorLoadout(ply)
-    ply:SetPlayerClass("swat")
+    if IsFemaleChudProtector(ply) then
+        -- Default class preserves the player's selected female model/clothes/name.
+        ply:SetPlayerClass("default")
+        if isfunction(ApplyAppearance) then
+            ApplyAppearance(ply, nil, nil, nil, true)
+        end
+    else
+        ply:SetPlayerClass("swat")
+    end
     GiveSling(ply)
     GiveFlashlightInventory(ply)
 
@@ -620,6 +656,22 @@ local function PickSpawnAnchor(points, radius)
     return nil, {}
 end
 
+-- VIC + Chud Defense points are linked spatially. Once a VIC spawn is chosen,
+-- the closest valid Chud Defense point becomes the bodyguard anchor for that
+-- round. This lets mappers place multiple VIC/Defense pairs around a map
+-- without needing a separate numeric link ID in the point editor.
+local function PickLinkedSpawnAnchor(origin, points, radius)
+    if not isvector(origin) then
+        return PickSpawnAnchor(points, radius)
+    end
+
+    local valid = GetValidAreaPoints(points or {}, radius or SPAWN_CLUSTER_RADIUS)
+    if #valid <= 0 then return nil, {} end
+
+    local sorted = SortVectorsByDistance(origin, valid)
+    return sorted[1], sorted
+end
+
 local function BuildClusterPositions(anchor, count, sourcePoints, fallbackPoints, clusterRadius)
     local positions = {}
     local taken = {}
@@ -693,49 +745,205 @@ local function TeleportPlayersToCluster(players, anchor, sourcePoints, fallbackP
     end
 end
 
-local function SetupRoundSpawnGroups(president, bodyguards, citizens)
-    local presidentGroup = {}
-    if IsValid(president) then
-        presidentGroup[#presidentGroup + 1] = president
-    end
+local function GetEditorSpawnEntries(name)
+    local raw = zb.GetMapPoints and zb.GetMapPoints(name) or nil
+    if not istable(raw) then return {} end
 
-    for _, ply in ipairs(bodyguards or {}) do
-        if IsValid(ply) then
-            presidentGroup[#presidentGroup + 1] = ply
+    local out = {}
+
+    -- Point Editor data is authoritative here. Do not run these positions
+    -- through the large-area task validator; mappers may intentionally place
+    -- a spawn indoors, near walls, or in a narrow room.
+    for _, point in pairs(raw) do
+        if isvector(point) then
+            out[#out + 1] = {
+                pos = point,
+                ang = Angle(0, 0, 0)
+            }
+        elseif istable(point) and isvector(point.pos) then
+            out[#out + 1] = {
+                pos = point.pos,
+                ang = isangle(point.ang) and point.ang or Angle(0, 0, 0)
+            }
         end
     end
+
+    return out
+end
+
+local function PickEditorSpawn(entries)
+    if not istable(entries) or #entries <= 0 then return nil end
+    return entries[math.random(#entries)]
+end
+
+local function GetClosestEditorSpawn(origin, entries)
+    if not isvector(origin) or not istable(entries) or #entries <= 0 then
+        return PickEditorSpawn(entries)
+    end
+
+    local best
+    local bestDist
+
+    for _, entry in ipairs(entries) do
+        if not entry or not isvector(entry.pos) then continue end
+
+        local dist = origin:DistToSqr(entry.pos)
+        if not bestDist or dist < bestDist then
+            best = entry
+            bestDist = dist
+        end
+    end
+
+    return best
+end
+
+local function ApplyExactEditorSpawn(ply, entry)
+    if not IsValid(ply) or not entry or not isvector(entry.pos) then return false end
+
+    -- The Point Editor trace already stores the intended floor position.
+    -- A tiny Z lift avoids feet clipping without moving the spawn elsewhere.
+    ply:SetPos(entry.pos + Vector(0, 0, 2))
+
+    if isangle(entry.ang) then
+        ply:SetEyeAngles(Angle(0, entry.ang.y, 0))
+    end
+
+    return true
+end
+
+local function TeleportEditorGroup(players, anchorEntry, entries)
+    if not istable(players) or #players <= 0 then return true end
+    if not anchorEntry or not isvector(anchorEntry.pos) then return false end
+
+    local nearby = {}
+    local maxDistSqr = SPAWN_CLUSTER_RADIUS * SPAWN_CLUSTER_RADIUS
+
+    for _, entry in ipairs(entries or {}) do
+        if entry and isvector(entry.pos) and anchorEntry.pos:DistToSqr(entry.pos) <= maxDistSqr then
+            nearby[#nearby + 1] = entry
+        end
+    end
+
+    table.sort(nearby, function(a, b)
+        return anchorEntry.pos:DistToSqr(a.pos) < anchorEntry.pos:DistToSqr(b.pos)
+    end)
+
+    local yaw = isangle(anchorEntry.ang) and anchorEntry.ang.y or 0
+
+    for i, ply in ipairs(players) do
+        if not IsValid(ply) then continue end
+
+        local exact = nearby[i]
+        if exact then
+            ApplyExactEditorSpawn(ply, exact)
+        elseif hg and hg.tpPlayer then
+            -- Additional teammates spiral around the linked editor anchor.
+            hg.tpPlayer(anchorEntry.pos + Vector(0, 0, 2), ply, math.Clamp(i + 1, 1, 24), yaw)
+        else
+            ply:SetPos(anchorEntry.pos + Vector(i * 48, 0, 2))
+        end
+    end
+
+    return true
+end
+
+local function SetupRoundSpawnGroups(president, bodyguards, citizens)
+    local presidentPlayers = {}
+    if IsValid(president) then
+        presidentPlayers[1] = president
+    end
+
+    local defenderPlayers = {}
+    for _, ply in ipairs(bodyguards or {}) do
+        if IsValid(ply) then
+            defenderPlayers[#defenderPlayers + 1] = ply
+        end
+    end
+
+    local attackerPlayers = {}
+    for _, ply in ipairs(citizens or {}) do
+        if IsValid(ply) then
+            attackerPlayers[#attackerPlayers + 1] = ply
+        end
+    end
+
+    -- Pick one VIC spawn, then bind it to the nearest Chud Defense spawn.
+    -- This lets mappers create multiple VIC/Defense pairs around a map without
+    -- needing a separate numeric link ID in the Point Editor.
+    local vicEntries = GetEditorSpawnEntries("VIC_SPAWN")
+    local defenseEntries = GetEditorSpawnEntries("VIC_CHUD_DEFENSE_SPAWN")
+    local selectedVIC = PickEditorSpawn(vicEntries)
+    local selectedDefense = selectedVIC and GetClosestEditorSpawn(selectedVIC.pos, defenseEntries)
+        or PickEditorSpawn(defenseEntries)
 
     local tPoints, ctPoints = GetTCTSpawnPoints()
     local generalPoints = GetGeneralTaskPoints()
 
-    local presidentAnchor, presidentPool
-    local citizenAnchor, citizenPool
+    -- Legacy fallbacks for maps that do not have VIC-mode editor points.
+    local defenderFallbackAnchor, defenderFallbackPool
+    local attackerFallbackAnchor, attackerFallbackPool
 
     if #ctPoints > 0 and #tPoints > 0 then
-        presidentAnchor, presidentPool = PickSpawnAnchor(ctPoints, SPAWN_CLUSTER_RADIUS)
-        citizenAnchor, citizenPool = PickSpawnAnchor(tPoints, SPAWN_CLUSTER_RADIUS)
+        defenderFallbackAnchor, defenderFallbackPool = PickSpawnAnchor(ctPoints, SPAWN_CLUSTER_RADIUS)
+        attackerFallbackAnchor, attackerFallbackPool = PickSpawnAnchor(tPoints, SPAWN_CLUSTER_RADIUS)
     else
         local generalAnchor, generalPool = PickSpawnAnchor(generalPoints, SPAWN_CLUSTER_RADIUS)
-        presidentAnchor = generalAnchor
-        presidentPool = generalPool
+        defenderFallbackAnchor = generalAnchor
+        defenderFallbackPool = generalPool
 
         if isvector(generalAnchor) and #generalPool > 1 then
-            citizenAnchor = GetFarthestPoint(
+            attackerFallbackAnchor = GetFarthestPoint(
                 generalAnchor,
                 generalPool,
                 SPAWN_GROUP_MIN_DISTANCE * SPAWN_GROUP_MIN_DISTANCE
             )
         end
 
-        if not isvector(citizenAnchor) then
-            citizenAnchor = generalPool[math.random(math.max(#generalPool, 1))]
+        if not isvector(attackerFallbackAnchor) and #generalPool > 0 then
+            attackerFallbackAnchor = generalPool[math.random(#generalPool)]
         end
 
-        citizenPool = generalPool
+        attackerFallbackPool = generalPool
     end
 
-    TeleportPlayersToCluster(presidentGroup, presidentAnchor, presidentPool, generalPoints, SPAWN_CLUSTER_RADIUS)
-    TeleportPlayersToCluster(citizens or {}, citizenAnchor, citizenPool, generalPoints, SPAWN_CLUSTER_RADIUS)
+    -- VIC: exact Point Editor spawn wins whenever one exists.
+    if selectedVIC then
+        ApplyExactEditorSpawn(president, selectedVIC)
+    else
+        TeleportPlayersToCluster(
+            presidentPlayers,
+            defenderFallbackAnchor,
+            defenderFallbackPool,
+            generalPoints,
+            SPAWN_CLUSTER_RADIUS
+        )
+    end
+
+    -- Chud Defense: use the point linked to the chosen VIC by proximity.
+    -- If no Chud Defense point exists, still keep the defenders beside the VIC.
+    if selectedDefense then
+        TeleportEditorGroup(defenderPlayers, selectedDefense, defenseEntries)
+    elseif selectedVIC then
+        TeleportEditorGroup(defenderPlayers, selectedVIC, {})
+    else
+        TeleportPlayersToCluster(
+            defenderPlayers,
+            defenderFallbackAnchor,
+            defenderFallbackPool,
+            generalPoints,
+            SPAWN_CLUSTER_RADIUS
+        )
+    end
+
+    -- Angry Chuds no longer have a custom editor point; use the normal attacker
+    -- spawn/fallback behavior.
+    TeleportPlayersToCluster(
+        attackerPlayers,
+        attackerFallbackAnchor,
+        attackerFallbackPool,
+        generalPoints,
+        SPAWN_CLUSTER_RADIUS
+    )
 end
 
 local function BuildStayTask()
@@ -852,10 +1060,11 @@ local function BuildPropTask()
 end
 
 function MODE.SelectRandomTask()
+    -- Prop-dragging tasks are intentionally disabled. Keep the VIC objectives
+    -- focused on movement / hold-area tasks only.
     local builders = {
         BuildStayTask,
-        BuildMoveTask,
-        BuildPropTask
+        BuildMoveTask
     }
 
     table.Shuffle(builders)
@@ -1068,6 +1277,7 @@ end
 
 function MODE:RoundStart()
     self.roundDone = false
+    self.roundTimedOut = false
     self.presidentTaskWon = false
     self.tasksDone = 0
     self.tasksRequiredCount = 0
@@ -1189,6 +1399,7 @@ function MODE:Intermission()
     game.CleanUpMap()
 
     self.roundDone = false
+    self.roundTimedOut = false
     self.presidentTaskWon = false
     self:TaskClearArea()
 
@@ -1225,6 +1436,7 @@ function MODE:ShouldRoundEnd()
     end
 
     if self.roundEndAt and CurTime() >= self.roundEndAt then
+        self.roundTimedOut = true
         return true
     end
 
@@ -1251,6 +1463,12 @@ function MODE:GetWinner()
 
     if self.presidentTaskWon then
         return 1
+    end
+
+    -- Reaching the round timer is a true draw. Nobody wins simply because
+    -- time expired, regardless of whether tasks were optional or required.
+    if self.roundTimedOut then
+        return 2
     end
 
     if self.taskShouldEnd then
@@ -1376,14 +1594,16 @@ function MODE:EndRound()
             if ply == president or ply:Team() == 1 then
                 winners[#winners + 1] = ply
             end
-        else
+        elseif winnerTeam == 0 then
             if ply ~= president and ply:Team() == 0 then
                 winners[#winners + 1] = ply
             end
         end
     end
 
-    if winnerTeam == 1 then
+    if winnerTeam == 2 then
+        PrintMessage(HUD_PRINTTALK, "Time expired. The VIC round ends in a draw!")
+    elseif winnerTeam == 1 then
         if byTasks then
             PrintMessage(HUD_PRINTTALK, "The President side wins by completing the tasks!")
         else
@@ -1397,6 +1617,7 @@ function MODE:EndRound()
         net.WriteEntity(IsValid(president) and president or NULL)
         net.WriteBool(winnerTeam == 1)
         net.WriteBool(byTasks)
+        net.WriteBool(winnerTeam == 2)
     net.Broadcast()
 
     timer.Simple(ROUND_RESULTS_DELAY, function()
@@ -1410,7 +1631,7 @@ function MODE:EndRound()
                 else
                     if ply.GiveSkill then ply:GiveSkill(-math.Rand(0.05, 0.1)) end
                 end
-            else
+            elseif winnerTeam == 0 then
                 if ply ~= president and ply:Team() == 0 then
                     if ply.GiveExp then ply:GiveExp(math.random(150, 200)) end
                     if ply.GiveSkill then ply:GiveSkill(math.Rand(0.2, 0.3)) end
@@ -1418,6 +1639,7 @@ function MODE:EndRound()
                     if ply.GiveSkill then ply:GiveSkill(-math.Rand(0.05, 0.1)) end
                 end
             end
+            -- Draws intentionally award no win XP and apply no loss penalty.
         end
 
         hook.Run("hg.RoundEnd", participants, winners)

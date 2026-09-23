@@ -435,14 +435,14 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 		ply.FrictionGainMul = 0.01
 		ply.FrictionLoseMul = 0.2
 
-		ply.SpeedGainMul = 240 * weightmul * (ply.organism.superfighter and ply.PlayerClassName ~= "juggernaut" and 5 or 1) * (ply:GetNWInt("SpeedGainClassMul", 1) or 1)
+		ply.SpeedGainMul = 240 * weightmul * (ply.organism.superfighter and ply.PlayerClassName ~= "juggernaut" and ply.PlayerClassName ~= "chudbeast" and zb.CROUND ~= "chudbeasts" and 5 or 1) * (ply:GetNWInt("SpeedGainClassMul", 1) or 1)
 		ply.SpeedGainMul = ply.SpeedGainMul * hg_movement_speed_gain_mul:GetFloat()
 
 		ply.SpeedLoseMul = 10000
 		ply.SpeedLoseMul = ply.SpeedLoseMul * hg_movement_speed_lose_mul:GetFloat()
 
 		ply.SpeedSharpLoseMul = 0.007
-		ply.InertiaBlend = 2000 * weightmul * (ply.organism.superfighter and ply.PlayerClassName ~= "juggernaut" and 100 or 1)
+		ply.InertiaBlend = 2000 * weightmul * (ply.organism.superfighter and ply.PlayerClassName ~= "juggernaut" and ply.PlayerClassName ~= "chudbeast" and zb.CROUND ~= "chudbeasts" and 100 or 1)
 		ply.DuckingSlowdown = ply.DuckingSlowdown or 0
 		-- ply.InertiaBlend = 15 * weightmul * ply.CurrentFrictionMul
 		local inertia_blend_mul = 1
@@ -639,19 +639,25 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 		k = k * math_Clamp((org.temperature and (1 - (org.temperature - 38) * 0.25) or 1), 0.5, 1)
 		k = k * math_Clamp((org.temperature and ((org.temperature - 35) * 0.25 + 1) or 1), 0.5, 1)
 		k = k * math_Clamp(math_Round((org.stamina and org.stamina[1] or 180), 0) / 120, hg_movement_stamina_debuff:GetFloat(), 1)
-		k = k * math_Clamp(5 / ((org.immobilization or 0) + 1), 0.25, 1)
 		k = k * math_Clamp((org.blood or 0) / 5000, 0, 1)
-		k = k * math_Clamp(10 / ((org.shock or 0) + 1), 0.25, 1)
 		k = k * (math_min(math_Round((org.adrenaline or 0), 1) / 24, 0.3) + 1)
-		k = k * math_Clamp((org.lleg and org.lleg >= 0.5 and math_max(1 - org.lleg, 0.6) or 1) * (org.lleg and org.rleg >= 0.5 and math_max(1 - org.rleg, 0.6) or 1) * ((org.analgesia * 1 + 1)), 0, 1)
-		k = k * (org.llegdislocation and 0.75 or 1) * (org.rlegdislocation and 0.75 or 1)
-		k = k * (org.pelvis == 1 and 0.4 or 1)
+
+		local chudBeastNoDamageSlow = ply.PlayerClassName == "chudbeast" or (zb and zb.CROUND == "chudbeasts")
+		if not chudBeastNoDamageSlow then
+			k = k * math_Clamp(5 / ((org.immobilization or 0) + 1), 0.25, 1)
+			k = k * math_Clamp(10 / ((org.shock or 0) + 1), 0.25, 1)
+			k = k * math_Clamp((org.lleg and org.lleg >= 0.5 and math_max(1 - org.lleg, 0.6) or 1) * (org.lleg and org.rleg >= 0.5 and math_max(1 - org.rleg, 0.6) or 1) * ((org.analgesia * 1 + 1)), 0, 1)
+			k = k * (org.llegdislocation and 0.75 or 1) * (org.rlegdislocation and 0.75 or 1)
+			k = k * (org.pelvis == 1 and 0.4 or 1)
+		end
 		local carryent = ply:GetNetVar("carryent")
 		local carryent2 = ply:GetNetVar("carryent2")
 		local validCarryEnt = IsValid(carryent)
 		local validCarryEnt2 = IsValid(carryent2)
 		k = k * ((validCarryEnt or validCarryEnt2) and math_Clamp(50 / math_max(ply:GetNetVar("carrymass", 0) + ply:GetNetVar("carrymass2", 0), 1), 0.5, 1) or 1)
-		k = k * math_Clamp(20 / ((org.pain or 0) + 1), 0.01, 1)
+		if not chudBeastNoDamageSlow then
+			k = k * math_Clamp(20 / ((org.pain or 0) + 1), 0.01, 1)
+		end
 		//k = k * (ishgweapon(wep) and not wep:IsPistolHoldType() and not wep:ReadyStance() and 0.75 or 1)
 
 		local slwdwn = ply:GetNetVar("slowDown", 0)
@@ -787,7 +793,7 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 		mv:SetMaxSpeed(inertia_len)
 		mv:SetMaxClientSpeed(inertia_len)
 		ply:SetMaxSpeed(math_max(100, inertia_len))
-		ply:SetJumpPower(DEFAULT_JUMP_POWER * math_min(k, 1.1) * (not tauntStopMoving and 1 or 0) * (ply.organism.superfighter and ply.PlayerClassName ~= "juggernaut" and 1.5 or 1) * (ply.JumpPowerMul or 1))
+		ply:SetJumpPower(DEFAULT_JUMP_POWER * math_min(k, 1.1) * (not tauntStopMoving and 1 or 0) * (ply.organism.superfighter and ply.PlayerClassName ~= "juggernaut" and ply.PlayerClassName ~= "chudbeast" and zb.CROUND ~= "chudbeasts" and 1.5 or 1) * (ply.JumpPowerMul or 1))
 
 		if(CLIENT)then
 			local fwangs = math_rad(GetViewPunchAngles2()[2] + GetViewPunchAngles3()[2])

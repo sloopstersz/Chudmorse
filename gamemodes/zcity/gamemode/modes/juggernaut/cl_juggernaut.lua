@@ -115,15 +115,259 @@ end)
 function MODE:RenderScreenspaceEffects()
 end
 
+
+-- Survival-horror style Fat Chud vital monitor.
+-- Drawn entirely in Lua so there are no GIF/material dependencies to maintain.
+surface.CreateFont("ZB_JuggernautVitalsTitle", {
+    font = "Trebuchet MS",
+    size = 18,
+    weight = 900,
+    antialias = true
+})
+
+surface.CreateFont("ZB_JuggernautVitalsHP", {
+    font = "Trebuchet MS",
+    size = 22,
+    weight = 900,
+    antialias = true
+})
+
+surface.CreateFont("ZB_JuggernautVitalsSmall", {
+    font = "Trebuchet MS",
+    size = 14,
+    weight = 700,
+    antialias = true
+})
+
+local VITALS_W = 330
+local VITALS_H = 108
+local VITALS_MARGIN_X = 24
+local VITALS_MARGIN_Y = 24
+
+local ecgShape = {
+    {0.00, 0.00},
+    {0.12, 0.00},
+    {0.17, 0.10},
+    {0.22, 0.00},
+    {0.28, -0.12},
+    {0.32, 1.00},
+    {0.36, -0.38},
+    {0.41, 0.00},
+    {0.56, 0.00},
+    {0.63, 0.18},
+    {0.71, 0.00},
+    {1.00, 0.00}
+}
+
+local function sampleECG(t)
+    t = t % 1
+
+    for i = 1, #ecgShape - 1 do
+        local a = ecgShape[i]
+        local b = ecgShape[i + 1]
+
+        if t >= a[1] and t <= b[1] then
+            local span = b[1] - a[1]
+            local frac = span > 0 and ((t - a[1]) / span) or 0
+            return Lerp(frac, a[2], b[2])
+        end
+    end
+
+    return 0
+end
+
+local function findFatChud()
+    local teamPlayers = team.GetPlayers(1)
+
+    -- Prefer the actual class when it has replicated to this client.
+    for _, target in ipairs(teamPlayers) do
+        if not IsValid(target) then continue end
+
+        if target.GetPlayerClass and target:GetPlayerClass() == "juggernaut" then
+            return target
+        end
+
+        if target.PlayerClassName == "juggernaut" then
+            return target
+        end
+    end
+
+    -- During the Juggernaut mode, team 1 is reserved for the Fat Chud.
+    for _, target in ipairs(teamPlayers) do
+        if IsValid(target) then return target end
+    end
+end
+
+local function getVitalsColor(hpFrac, alive)
+    if not alive or hpFrac <= 0 then
+        return Color(110, 25, 25), "FLATLINE"
+    elseif hpFrac <= 0.30 then
+        return Color(235, 55, 45), "DANGER"
+    elseif hpFrac <= 0.65 then
+        return Color(225, 165, 45), "CAUTION"
+    end
+
+    return Color(80, 225, 105), "FINE"
+end
+
+local function isJuggernautClass(ply)
+    if not IsValid(ply) or not ply:IsPlayer() then return false end
+
+    if ply.PlayerClassName == "juggernaut" then
+        return true
+    end
+
+    return ply.GetPlayerClass and ply:GetPlayerClass() == "juggernaut"
+end
+
+local function isJuggernautRoundActive()
+    if not zb or zb.ROUND_STATE ~= 1 then return false end
+
+    local currentMode = zb.CROUND_MAIN or zb.CROUND
+    return currentMode == "juggernaut"
+end
+
+local function drawJuggernautHealthMonitor(privateJuggernaut)
+    local jug
+
+    if isJuggernautRoundActive() then
+        -- In the real Juggernaut gamemode, everyone gets the Fat Chud's vitals.
+        jug = findFatChud()
+    else
+        -- Outside the mode (for example, when the class is assigned through
+        -- the context menu), only the Juggernaut client draws their own vitals.
+        if not isJuggernautClass(privateJuggernaut) then return end
+        jug = privateJuggernaut
+    end
+
+    if not IsValid(jug) then return end
+
+    local maxHP = math.max(jug:GetMaxHealth(), 1)
+    local hp = math.Clamp(jug:Health(), 0, maxHP)
+    local hpFrac = math.Clamp(hp / maxHP, 0, 1)
+    local alive = jug:Alive() and hp > 0
+
+    local baseColor, status = getVitalsColor(hpFrac, alive)
+
+    -- Lower health makes the monitor dimmer while the pulse itself accelerates.
+    local brightness = Lerp(hpFrac, 0.52, 1.00)
+    local monitorColor = Color(
+        math.floor(baseColor.r * brightness),
+        math.floor(baseColor.g * brightness),
+        math.floor(baseColor.b * brightness),
+        245
+    )
+
+    local w = math.min(VITALS_W, ScrW() * 0.38)
+    local h = VITALS_H
+    local x = ScrW() - w - VITALS_MARGIN_X
+    local y = ScrH() - h - VITALS_MARGIN_Y
+
+    -- Outer monitor housing.
+    draw.RoundedBox(4, x, y, w, h, Color(9, 11, 10, 235))
+    surface.SetDrawColor(48, 54, 50, 245)
+    surface.DrawOutlinedRect(x, y, w, h, 2)
+    surface.SetDrawColor(monitorColor.r, monitorColor.g, monitorColor.b, 100)
+    surface.DrawOutlinedRect(x + 3, y + 3, w - 6, h - 6, 1)
+
+    local vitalsName = "FAT CHUD"
+    if not isJuggernautRoundActive() then
+        -- Context-menu Juggernaut: show the existing RP/display name, not Steam username.
+        local displayName = jug.GetPlayerName and jug:GetPlayerName() or jug:GetNWString("PlayerName", "")
+        if displayName and displayName ~= "" then
+            vitalsName = displayName
+        end
+    end
+
+    draw.SimpleText(vitalsName .. " // VITALS", "ZB_JuggernautVitalsTitle", x + 12, y + 8, Color(215, 220, 215), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+    draw.SimpleText(status, "ZB_JuggernautVitalsSmall", x + w - 12, y + 10, monitorColor, TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
+
+    local graphX = x + 12
+    local graphY = y + 34
+    local graphW = w - 24
+    local graphH = 48
+
+    surface.SetDrawColor(5, 14, 9, 235)
+    surface.DrawRect(graphX, graphY, graphW, graphH)
+
+    -- Faint ECG grid.
+    surface.SetDrawColor(monitorColor.r, monitorColor.g, monitorColor.b, 18)
+    for gx = graphX, graphX + graphW, 16 do
+        surface.DrawLine(gx, graphY, gx, graphY + graphH)
+    end
+    for gy = graphY, graphY + graphH, 12 do
+        surface.DrawLine(graphX, gy, graphX + graphW, gy)
+    end
+
+    local centerY = graphY + graphH * 0.55
+    local amplitude = graphH * 0.34
+
+    if alive then
+        -- Healthy: about 52 BPM. Near-death: about 135 BPM.
+        local beatPeriod = Lerp(hpFrac, 60 / 135, 60 / 52)
+        local phase = (CurTime() / beatPeriod) % 1
+        local samples = math.max(70, math.floor(graphW / 2))
+        local previousX, previousY
+
+        surface.SetDrawColor(monitorColor.r, monitorColor.g, monitorColor.b, 235)
+
+        for i = 0, samples do
+            local screenFrac = i / samples
+            -- Show a little over two cardiac cycles across the monitor.
+            local waveT = (screenFrac * 2.15 + phase) % 1
+            local value = sampleECG(waveT)
+            local px = graphX + screenFrac * graphW
+            local py = centerY - value * amplitude
+
+            if previousX then
+                surface.DrawLine(previousX, previousY, px, py)
+            end
+
+            previousX, previousY = px, py
+        end
+    else
+        surface.SetDrawColor(monitorColor.r, monitorColor.g, monitorColor.b, 180)
+        surface.DrawLine(graphX, centerY, graphX + graphW, centerY)
+    end
+
+    -- Numeric HP plus a thin physical-health bar under the ECG.
+    local hpText = string.format("%d / %d HP", math.floor(hp + 0.5), math.floor(maxHP + 0.5))
+    draw.SimpleText(hpText, "ZB_JuggernautVitalsHP", x + 12, y + h - 8, monitorColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_BOTTOM)
+
+    local barW = 118
+    local barH = 5
+    local barX = x + w - barW - 12
+    local barY = y + h - 17
+    surface.SetDrawColor(28, 31, 29, 255)
+    surface.DrawRect(barX, barY, barW, barH)
+    surface.SetDrawColor(monitorColor.r, monitorColor.g, monitorColor.b, 220)
+    surface.DrawRect(barX, barY, barW * hpFrac, barH)
+end
+
+-- Context-menu / manually assigned Juggernaut class: private self-only vitals.
+-- The active Juggernaut round is handled by MODE:HUDPaint below for everyone.
+hook.Add("HUDPaint", "ZB_JuggernautPrivateVitals", function()
+    if isJuggernautRoundActive() then return end
+
+    local ply = LocalPlayer()
+    if not isJuggernautClass(ply) then return end
+
+    drawJuggernautHealthMonitor(ply)
+end)
+
 function MODE:HUDPaint()
     local ply = LocalPlayer()
     if not IsValid(ply) then return end
 
     local elapsed = CurTime() - introStartTime
-    if elapsed < 0 then return end
+    if elapsed < 0 then
+        drawJuggernautHealthMonitor()
+        return
+    end
 
     if elapsed > JUG_INTRO_DURATION then
         stopIntroSound()
+        drawJuggernautHealthMonitor()
         return
     end
 

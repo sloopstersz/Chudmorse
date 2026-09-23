@@ -11,6 +11,12 @@ end
 
 local halfValue2 = util.halfValue2
 local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet, nodmgchange)
+	-- Chud Beasts keeps normal health damage, but completely disables the
+	-- organism fracture system for this gamemode.
+	if zb and zb.CROUND == "chudbeasts" and org.isPly then
+		return 1, vector_origin
+	end
+
 	local crush = isCrush(dmgInfo)
 	
 	if dmgInfo:IsDamageType(DMG_SLASH) and dmg > 1.5 then

@@ -316,7 +316,6 @@ hook.Add("PlayerDeathThink", "spectNetwork", function(ply)
 					hg.send_organism(ent.organism, ply)
 				end
 			end
-			local entr = hg.GetCurrentCharacter(ent)
 			local pos = ent:GetPos()
 			
 			if ply.viewmode ~= 3 then

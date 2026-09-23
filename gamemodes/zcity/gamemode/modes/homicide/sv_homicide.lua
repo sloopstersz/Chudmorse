@@ -872,6 +872,7 @@ function MODE:Intermission()
 	end
 
 	self.saved.PoliceTime = CurTime() + math.min(self.Types[self.Type].PoliceTime * (#player.GetAll() / 4),self.Types[self.Type].PoliceTime * 2.2)
+	SetGlobalFloat("HMCD_PoliceArrivalTime", self.saved.PoliceTime)
 	self.PoliceSpawned = false
 	self.PoliceAllowed = self.Types[self.Type].PoliceAllowed
 
@@ -1398,6 +1399,7 @@ end
 util.AddNetworkString("hmcd_roundend")
 
 function MODE:EndRound()
+	SetGlobalFloat("HMCD_PoliceArrivalTime", 0)
 	timer.Remove("HMCDSpawnSWAT")
 	timer.Remove("SpawnAdditionalPolice")
     timer.Remove("SpawnAdditionalNationalGuard")

@@ -643,6 +643,29 @@ if SERVER then
                         return featured, NameOf, RoleFor
                 end
 
+		-- Chud Beasts is a last-player-standing mode. Always feature its
+		-- surviving winner as the Remorse MVP instead of showing the old ZCity
+		-- player leaderboard.
+		if round and round.name == "chudbeasts" then
+			local winner = BestByValue(plys, function(p)
+				if p:Alive() and not (p.organism and p.organism.incapacitated) then
+					return (p.RSStats.kills or 0) * 1000 + math.floor(p.RSStats.damageDealt or 0) + 1
+				end
+			end)
+
+			if not IsValid(winner) then
+				winner = BestByValue(plys, function(p)
+					return (p.RSStats.kills or 0) * 1000 + math.floor(p.RSStats.damageDealt or 0)
+				end)
+			end
+
+			if IsValid(winner) then
+				featured[1] = { ply = winner, key = "mvp", value = winner.RSStats.kills or 0 }
+			end
+
+			return featured, NameOf, RoleFor
+		end
+
 		-- Traitor victory: the MVP is automatically the traitor with the most kills.
 		local haveMVP = false
 		if TraitorsWon() then

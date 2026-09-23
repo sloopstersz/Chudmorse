@@ -24,7 +24,8 @@ local ZB_FORCED_MODE_POOL = {
         ["event"] = true,
         ["riot"] = true,
         ["juggernaut"] = true,
-        ["president"] = true
+        ["president"] = true,
+        ["chudbeasts"] = true
 }
 local ZB_NO_BACK_TO_BACK_MODES = {
         ["dm"] = true,

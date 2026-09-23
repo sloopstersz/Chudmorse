@@ -5,7 +5,7 @@ CLASS.PanicImmune = true
 
 local BULLDOZER_MODEL = "models/mark2580/payday2/pd2_bulldozer_player.mdl"
 
-function CLASS.On(self)
+function CLASS.On(self, data)
     if CLIENT then return end
 
     -- Fat Chud has an exclusive custom voice pack. Stop any normal human
@@ -19,23 +19,64 @@ function CLASS.On(self)
     self.lastPhr = nil
     self.phrCld = 0
 
-    ApplyAppearance(self, nil, nil, nil, true)
+    local contextAssigned = istable(data) and data.contextJuggernaut == true
+    -- Server-side marker used by Juggernaut recovery logic. Context-menu
+    -- Juggernauts get limb/organ regrowth without being treated as the
+    -- real round Juggernaut for global round-only modifiers.
+    self.ContextJuggernaut = contextAssigned
+    local preservedDisplayName = contextAssigned and (data.displayName or self:GetNWString("PlayerName", "")) or nil
+    local preservedModel = contextAssigned and data.model or nil
+    local preservedSkin = contextAssigned and data.skin or nil
+    local preservedBodygroups = contextAssigned and data.bodygroups or nil
 
-    local Appearance = self.CurAppearance or hg.Appearance.GetRandomAppearance()
-    self:SetNWString("PlayerName", "Fat Chud")
-    self:SetModel(BULLDOZER_MODEL)
-    self:SetSubMaterial()
+    local function restoreContextIdentity()
+        if not contextAssigned or not IsValid(self) then return end
 
-    Appearance.AAttachments = "none"
-    Appearance.AColthes = ""
-    self:SetNetVar("Accessories", "none")
-    self.CurAppearance = Appearance
+        -- Keep the RP/display name, not the Steam/account username.
+        self:SetNWString("PlayerName", preservedDisplayName or "")
+
+        if preservedModel and preservedModel ~= "" then
+            self:SetModel(preservedModel)
+        end
+        if preservedSkin ~= nil then
+            self:SetSkin(preservedSkin)
+        end
+        if preservedBodygroups then
+            for id, value in pairs(preservedBodygroups) do
+                self:SetBodygroup(id, value)
+            end
+        end
+    end
+
+    if contextAssigned then
+        -- Context-menu class assignment keeps the exact current identity/model.
+        -- Do not run the normal Juggernaut appearance replacement here.
+        restoreContextIdentity()
+    else
+        -- Real Juggernaut gamemode keeps the canonical Fat Chud identity.
+        ApplyAppearance(self, nil, nil, nil, true)
+
+        local Appearance = self.CurAppearance or hg.Appearance.GetRandomAppearance()
+        self:SetNWString("PlayerName", "Fat Chud")
+        self:SetModel(BULLDOZER_MODEL)
+        self:SetSubMaterial()
+
+        Appearance.AAttachments = "none"
+        Appearance.AColthes = ""
+        self:SetNetVar("Accessories", "none")
+        self.CurAppearance = Appearance
+    end
 
     timer.Simple(0.1, function()
         if not IsValid(self) then return end
 
-        -- Re-assert the Bulldozer model after appearance/playerclass setup.
-        self:SetModel(BULLDOZER_MODEL)
+        if contextAssigned then
+            -- Re-assert after delayed appearance/playerclass hooks finish.
+            restoreContextIdentity()
+        else
+            self:SetModel(BULLDOZER_MODEL)
+        end
+
         self:SetMaxHealth(350)
         self:SetHealth(350)
 
@@ -90,6 +131,7 @@ end
 
 function CLASS.Off(self)
     if CLIENT then return end
+    self.ContextJuggernaut = nil
     if self.organism then
         self.organism.superfighter = false
         self.organism.recoilmul = 1

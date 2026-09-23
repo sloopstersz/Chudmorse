@@ -214,27 +214,35 @@ if SERVER then
     end, 2, "name; message"}
 
 local VIP_MODEL_WHITELIST = {
-    ["models/gacommissions/tungtungtungsahur.mdl"] = true,
-    ["models/nikita488/player/joker.mdl"] = true,
-    ["models/blop/expie/expie.mdl"] = true,
-    ["models/player/skeleton.mdl"] = true,
-    ["models/player/big_boss.mdl"] = true,
-    ["models/player/corpse1.mdl"] = true,
-    ["models/player/charple.mdl"] = true,
-    ["models/dannio/pm/rizzler_costco.mdl"] = true,
-    ["models/player/efeber/tonysop.mdl"] = true,
-    ["models/player/spook01/male_01.mdl"] = true,
-    ["models/dannio/pm/aj_costco.mdl"] = true,
-    ["models/player/h3_masterchief_player.mdl"] = true,
-    ["models/deadspace2023/dsrisaaclv3.mdl"] = true,
-    ["models/bindycot/player/po.mdl"] = true,
-    ["models/player/ntwffelixkranken.mdl"] = true,
-    ["models/player/ntwfrosemary.mdl"] = true,
-    ["models/i6nis/freddy_player.mdl"] = true,
-    ["models/i6nis/bonnie_player.mdl"] = true,
-    ["models/i6nis/chica_player.mdl"] = true,
-    ["models/i6nis/foxy_player.mdl"] = true
-}
+		["models/gacommissions/tungtungtungsahur.mdl"] = true,
+		["models/nikita488/player/joker.mdl"] = true,
+		["models/blop/expie/expie.mdl"] = true,
+		["models/player/skeleton.mdl"] = true,
+		["models/player/big_boss.mdl"] = true,
+		["models/tctgosling.mdl"] = true,
+		["models/player/corpse1.mdl"] = true,
+		["models/player/charple.mdl"] = true,
+		["models/player/amir/amir_v2.mdl"] = true,
+		["models/splinks/hotline_miami/jacket/player_jacket.mdl"] = true,
+		["models/player/vin_diesel/slow.mdl"] = true,
+		["models/cheddar/cyberpunk/trauma_team/tt_pilot.mdl"] = true,
+		["models/cheddar/cyberpunk/trauma_team/tt_medic.mdl"] = true,
+		["models/cheddar/cyberpunk/trauma_team/tt_guard.mdl"] = true,
+		["models/dannio/pm/rizzler_costco.mdl"] = true,
+		["models/player/efeber/tonysop.mdl"] = true,
+		["models/player/spook01/male_01.mdl"] = true,
+		["models/dannio/pm/aj_costco.mdl"] = true,
+		["models/player/h3_masterchief_player.mdl"] = true,
+		["models/deadspace2023/dsrisaaclv3.mdl"] = true,
+		["models/pechenko_121/doomslayerfull.mdl"] = true,
+		["models/player/group01/clark_playermodel.mdl"] = true,
+		["models/bindycot/player/po.mdl"] = true,
+		["models/player/ntwffelixkranken.mdl"] = true,
+		["models/i6nis/freddy_player.mdl"] = true,
+        ["models/i6nis/bonnie_player.mdl"] = true,
+        ["models/i6nis/chica_player.mdl"] = true,
+        ["models/i6nis/foxy_player.mdl"] = true
+	}
 
 	local function NormalizeSetModelPath(mdl)
 		mdl = string.Trim(string.lower(tostring(mdl or "")))
@@ -337,9 +345,11 @@ local VIP_MODEL_WHITELIST = {
 	COMMANDS.setmodel = {function(ply, args)
 		local group = string.lower(ply:GetUserGroup() or "user")
 		local isVIP = group == "vip"
+		local isModerator = group == "moderator" or group == "mod"
 		local isAdmin = ply:IsAdmin()
+		local canModerateModels = isModerator or isAdmin
 
-		if not isVIP and not isAdmin then
+		if not isVIP and not canModerateModels then
 			ply:ChatPrint("You do not have permission to use this command.")
 			return
 		end
@@ -352,7 +362,8 @@ local VIP_MODEL_WHITELIST = {
 		local target = ply
 		local requestedModel = args[1]
 
-		-- Admins can target another player. VIPs can only target themselves.
+		-- Only admins can target another player. VIPs and moderators can only
+		-- change their own model.
 		if isAdmin and #args > 1 then
 			local matches = player.GetListByName(args[1])
 			target = matches and matches[1] or nil
@@ -384,7 +395,7 @@ local VIP_MODEL_WHITELIST = {
 
 		-- VIPs may use only explicitly whitelisted custom models or the built-in
 		-- models registered by Z-City's appearance system.
-		if not isAdmin and not VIP_MODEL_WHITELIST[mdl] and not zcityAppearanceName then
+		if not canModerateModels and not VIP_MODEL_WHITELIST[mdl] and not zcityAppearanceName then
 			ply:ChatPrint("That model is not available for VIPs.")
 			return
 		end

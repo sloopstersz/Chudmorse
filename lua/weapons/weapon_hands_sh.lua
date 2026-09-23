@@ -884,11 +884,15 @@ function SWEP:ApplyForce()
 
 		local vec = target - TargetPos
 		local len, mul = vec:Length(), phys:GetMass()
+		local isChudBeast = ply.PlayerClassName == "chudbeast"
+			or (zb and zb.CROUND == "chudbeasts")
 
 		vec:Normalize()
 
 		if (ply.organism and ply.organism.superfighter) then
-			mul = mul * 5
+			-- Chud Beasts still get enough strength to hold another player,
+			-- but avoid the full Superfighter force that launches them on release.
+			mul = mul * (isChudBeast and 4 or 5)
 		end
 
 		if (ply.organism and ply:IsBerserk()) then
@@ -898,7 +902,8 @@ function SWEP:ApplyForce()
 		local avec = vec * len * 8 - phys:GetVelocity()
 
 		local Force = avec * mul
-		local ForceMagnitude = math.min(Force:Length(), 3000) * (1 / math.max(phys:GetVelocity():Dot(vec) / 25, 1))
+		local maxCarryForce = isChudBeast and 1500 or 3000
+		local ForceMagnitude = math.min(Force:Length(), maxCarryForce) * (1 / math.max(phys:GetVelocity():Dot(vec) / 25, 1))
 
 		Force = Force:GetNormalized() * ForceMagnitude
 
@@ -1166,6 +1171,30 @@ function SWEP:SetCarrying(ent, bone, pos, dist)
 			owner:SetNetVar("carrymass",self.CarryEnt:GetPhysicsObjectNum(self.CarryBone):GetMass())
 		end
 	else
+		-- The Superfighter grab controller can build up a large amount of
+		-- velocity while holding a player. Clamp that stored velocity when a
+		-- Chud Beast releases a player ragdoll so the 4x/1500 carry settings do
+		-- not turn into an extreme throw.
+		if SERVER and IsValid(self.CarryEnt) then
+			local isChudBeast = owner.PlayerClassName == "chudbeast"
+				or (zb and zb.CROUND == "chudbeasts")
+			local carriedPlayer = RagdollOwner(self.CarryEnt)
+
+			if isChudBeast and IsValid(carriedPlayer) and carriedPlayer:IsPlayer() then
+				local releaseSpeedCap = 220
+
+				for physIndex = 0, self.CarryEnt:GetPhysicsObjectCount() - 1 do
+					local physObj = self.CarryEnt:GetPhysicsObjectNum(physIndex)
+					if not IsValid(physObj) then continue end
+
+					local velocity = physObj:GetVelocity()
+					if velocity:LengthSqr() > releaseSpeedCap * releaseSpeedCap then
+						physObj:SetVelocity(velocity:GetNormalized() * releaseSpeedCap)
+					end
+				end
+			end
+		end
+
 		if IsValid(self.CarryEnt) and self.CarryEnt:GetCustomCollisionCheck() then
 			self.CarryEnt:CollisionRulesChanged()
 			owner:CollisionRulesChanged()

@@ -47,6 +47,19 @@ module[1] = function(org)
 end
 
 module[2] = function(owner, org, timeValue)
+	local chudBeastPainImmune = IsValid(owner) and owner:IsPlayer() and (
+		owner.PlayerClassName == "chudbeast"
+		or (zb and zb.CROUND == "chudbeasts")
+	)
+	if chudBeastPainImmune then
+		org.pain = 0
+		org.avgpain = 0
+		org.painadd = 0
+		org.painlessen = 0
+		org.nearpainlimit = false
+		return
+	end
+
 	local adrenalineMul = min(max(1 + org.adrenaline, 1), 1.2)
 	local adrenaline = org.adrenaline
 	local analgesiaMul = (org.analgesia * 4 + 1)

@@ -6,6 +6,7 @@ local LEG_KICK_DAMAGE_MUL = 0.85
 local LEG_KICK_RAG_FORCE_MUL = 650
 local LEG_KICK_PROP_FORCE_MUL = 90
 local LEG_KICK_PLAYER_PUSH = 85
+local CHUD_BEAST_LEG_KICK_PLAYER_PUSH = 400
 local LEG_KICK_FAKE_CHANCE = 0.65
 local LEG_KICK_TRACE_RANGE = 28
 local LEG_KICK_TRACE_SIZE = Vector(5, 5, 5)
@@ -332,7 +333,10 @@ function PLAYER:LegAttack()
                     dmginfo:SetDamage(dmg)
                     local ragForceMul = isCurbstomp and CURBSTOMP_RAG_FORCE_MUL or LEG_KICK_RAG_FORCE_MUL
                     local propForceMul = isCurbstomp and CURBSTOMP_PROP_FORCE_MUL or LEG_KICK_PROP_FORCE_MUL
-                    local playerPush = isCurbstomp and CURBSTOMP_PLAYER_PUSH or LEG_KICK_PLAYER_PUSH
+                    local isChudBeastKicker = self.PlayerClassName == "chudbeast"
+                        or (zb and zb.CROUND == "chudbeasts")
+                    local playerPush = isCurbstomp and CURBSTOMP_PLAYER_PUSH
+                        or (isChudBeastKicker and CHUD_BEAST_LEG_KICK_PLAYER_PUSH or LEG_KICK_PLAYER_PUSH)
                     local force = normal * dmg * ragForceMul
 
                     dmginfo:SetDamageForce(force)

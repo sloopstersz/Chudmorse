@@ -59,6 +59,13 @@ module[2] = function(owner, org, timeValue)
 		elseif (owner:OnGround() or owner:WaterLevel() >= 2) and walk and not owner:InVehicle() and owner.hg_isSprinting and org.stamina[1] > 20 then
 			stamina.sub = (owner:WaterLevel() >= 2 and 2 or 1) * (velLen ^ 0.5) * 1.51 
 		end
+
+		-- Chud Beasts can sprint without spending stamina. This clears only
+		-- sprint movement drain; attack and other stamina costs are added below.
+		if owner.hg_isSprinting and (owner.PlayerClassName == "chudbeast"
+			or (zb and zb.CROUND == "chudbeasts")) then
+			stamina.sub = 0
+		end
 	end
 
 	if org.superfighter then

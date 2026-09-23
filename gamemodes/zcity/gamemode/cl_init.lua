@@ -102,6 +102,15 @@ local keydownattack
 local keydownattack2
 local keydownreload
 
+local function FormatPoliceArrivalTime(timeLeft)
+	timeLeft = math.max(timeLeft or 0, 0)
+	local wholeSeconds = math.floor(timeLeft)
+	local minutes = math.floor(wholeSeconds / 60)
+	local seconds = wholeSeconds % 60
+	local hundredths = math.floor((timeLeft - wholeSeconds) * 100)
+	return string.format("%02d:%02d:%02d", minutes, seconds, hundredths)
+end
+
 hook.Add("HUDPaint","FUCKINGSAMENAMEUSEDINHOOKFUCKME",function()
     if zb and zb.CROUND == "realish" then return end
     if LocalPlayer():Alive() then return end
@@ -117,8 +126,20 @@ hook.Add("HUDPaint","FUCKINGSAMENAMEUSEDINHOOKFUCKME",function()
 	surface.DrawText(txt)
 	local txt = "In-game name: "..spect:GetPlayerName()
 	local w, h = surface.GetTextSize(txt)
-	surface.SetTextPos(ScrW() / 2 - w / 2, ScrH() / 8 * 7 + h)
-	surface.DrawText(txt)
+		surface.SetTextPos(ScrW() / 2 - w / 2, ScrH() / 8 * 7 + h)
+		surface.DrawText(txt)
+
+		-- Keep this tied to the same valid player-spectating state as the name
+		-- display. viewmode 3 is freecam and must never show the timer.
+		if zb and zb.CROUND == "hmcd" and viewmode ~= 3 and IsValid(spect) then
+			local policeArrivalTime = GetGlobalFloat("HMCD_PoliceArrivalTime", 0)
+			if policeArrivalTime > 0 then
+				local timerText = "POLICE ARRIVAL TIMER: " .. FormatPoliceArrivalTime(policeArrivalTime - CurTime())
+				local timerW = surface.GetTextSize(timerText)
+				surface.SetTextPos(ScrW() / 2 - timerW / 2, ScrH() / 8 * 7 + h * 2)
+				surface.DrawText(timerText)
+			end
+		end
 end)
 
 hook.Add("HG_CalcView", "zzzzzzzUwU", function(ply, pos, angles, fov)

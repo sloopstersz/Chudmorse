@@ -1139,7 +1139,26 @@ function PANEL:AddSelect( pParent, strTitle, tbl )
             luaMenu.panelparrent:SetSize(ScrW(), ScrH())
             luaMenu.panelparrent:MoveToFront()
             luaMenu.panelparrent.Paint = function(this, w, h) end
-            btn.Func(luaMenu,luaMenu.panelparrent)
+
+            -- Route the two large content pages explicitly. This prevents a stale
+            -- callback/panel from ever sending Achievements to Information (or vice versa).
+            luaMenu.ActiveMenuPage = strTitle
+            if strTitle == "Achievements" then
+                if hg.DrawAchievmentsMenu then
+                    hg.DrawAchievmentsMenu(luaMenu.panelparrent)
+                else
+                    ErrorNoHalt("[Chudmorse] Achievements page renderer is missing.\n")
+                end
+            elseif strTitle == "Information" then
+                if hg.DrawInformation then
+                    hg.DrawInformation(luaMenu.panelparrent)
+                else
+                    ErrorNoHalt("[Chudmorse] Information page renderer is missing.\n")
+                end
+            else
+                btn.Func(luaMenu,luaMenu.panelparrent)
+            end
+
             curent_panel = string.lower(strTitle)
             luaMenu.SwitchingPanel = false
         end

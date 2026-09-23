@@ -852,7 +852,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	if not organism.brain then stopthings() return end
 	local org = organism
 	local panicClass = lply.GetPlayerClass and lply:GetPlayerClass()
-	local panicImmune = panicClass and panicClass.PanicImmune == true or false
+	local panicImmune = (panicClass and panicClass.PanicImmune == true)
+		or (zb and zb.CROUND == "chudbeasts")
 
 	updateSeizureEffects(org)
 	

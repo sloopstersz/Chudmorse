@@ -189,6 +189,7 @@ DMusic:AddSequence( "splinter_cell", "Penthouse", Music )
 if SERVER then
     util.AddNetworkString("DMusic")
     function DMusic:AddPanic(ply,ammout)
+        if zb and zb.CROUND == "chudbeasts" then return end
         if IsValid(ply) and ply:IsPlayer() and ply.GetPlayerClass then
             local class = ply:GetPlayerClass()
             if class and class.PanicImmune then return end

@@ -254,6 +254,38 @@ hg.GetPlayerClassPhrases = GetPlayerClassPhrases
 
 local mClamp, mRandom = math.Clamp, math.random
 
+local chudBeastPhrases = {
+	"chudbeasts/voices/chud1.mp3",
+	"chudbeasts/voices/chud2.mp3",
+	"chudbeasts/voices/chud3.mp3",
+	"chudbeasts/voices/chud4.mp3",
+	"chudbeasts/voices/chud5.mp3",
+	"chudbeasts/voices/chud6.mp3"
+}
+
+local function IsChudBeastVoice(ply)
+	if not IsValid(ply) or not ply:IsPlayer() then return false end
+	if ply.PlayerClassName == "chudbeast" then return true end
+
+	-- Every living fighter is a Chud Beast during the actual mode, even though
+	-- the round does not replace their persistent player class.
+	return zb and zb.CROUND == "chudbeasts" and zb.ROUND_STATE == 1 and ply:Alive()
+end
+
+local function PlayChudBeastPhrase(ply)
+	if not IsChudBeastVoice(ply) or not ply:Alive() then return end
+	if ply.organism and ply.organism.otrub then return end
+	if (ply.phrCld or 0) > CurTime() then return end
+
+	local phrase = chudBeastPhrases[mRandom(#chudBeastPhrases)]
+	local ent = hg.GetCurrentCharacter(ply)
+	if not IsValid(ent) then ent = ply end
+
+	ent:EmitSound(phrase, 85, 100, 1, CHAN_VOICE)
+	ply.phrCld = CurTime() + math.max(SoundDuration(phrase) or 0, 2)
+	ply.lastPhr = phrase
+end
+
 -- Fat Chud uses the custom Dozer pack for normal Phrase voice lines.
 -- Pain/burn/berserk scream systems stay unchanged.
 local function IsJuggernautVoiceExclusive(ply)
@@ -296,6 +328,10 @@ util.AddNetworkString("hg_phrase")
 net.Receive("hg_phrase", function(len, ply)
 	if IsJuggernautVoiceExclusive(ply) then return end
 	if (ply.phrCld or 0) > CurTime() then return end
+	if IsChudBeastVoice(ply) then
+		PlayChudBeastPhrase(ply)
+		return
+	end
 	local result = hook.Run("HG_CanDoPhrase", ply, cmd, args) // return here true to reject phrase 
 	if result then return end
 
@@ -453,6 +489,7 @@ end)
 
 local function canPainScream(ply)
 	if !IsValid(ply) or !ply:IsPlayer() or !ply:Alive() then return false end
+	if ply.PlayerClassName == "chudbeast" or (zb and zb.CROUND == "chudbeasts") then return false end
 	local org = ply.organism
 	if !org or org.otrub or ply:WaterLevel() >= 3 then return false end
 
@@ -620,6 +657,7 @@ end)
 
 hook.Add("PreHomigradDamage","BurnScream", function( ent, dmgInfo )
 	local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
+	if IsValid(ply) and (ply.PlayerClassName == "chudbeast" or (zb and zb.CROUND == "chudbeasts")) then return end
 
 	if dmgInfo:IsDamageType(DMG_BURN) and IsValid(ply) and ply:IsPlayer() 
 	and ply.organism and !ply.organism.otrub and ply:Alive() then
@@ -672,6 +710,10 @@ end)
 concommand.Add("hg_phrase_context",function(ply, cmd, args)
 	if !IsValid(ply) then return end
 	if IsJuggernautVoiceExclusive(ply) then return end
+	if IsChudBeastVoice(ply) then
+		PlayChudBeastPhrase(ply)
+		return
+	end
 	local result = hook.Run("HG_CanDoPhrase", ply, cmd, args) // return here true to reject phrase 
 	if result then return end
 

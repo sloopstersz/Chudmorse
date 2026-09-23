@@ -300,6 +300,7 @@ if CLIENT then
             ["gwars"] = true,
             ["criresp"] = true,
             ["event"] = true,
+            ["chudbeasts"] = true,
         }
         
         for i, mode in SortedPairsByMemberValue(zb.availableModes,"canlaunch",true) do

@@ -1435,20 +1435,22 @@ function hg.DrawLoadoutMenu(parentPanel)
     local cardPointsY = 0.5
     local cardDescY = 0.62
 
-    local cardData = {
+     local cardData = {
         {
             roleId = "hero",
-            title = "HERO",
+            title = "Gun Owning Chud",
             desc = "Pick the gunner weapon",
             points = "16 POINTS",
-            align = "left"
+            align = "left",
+            color = Color(160, 0, 191)
         },
         {
             roleId = "traitor",
-            title = "TRAITOR",
+            title = "Evil Chud",
             desc = "Pick the traitor weapon",
             points = "30 POINTS",
-            align = "right"
+            align = "right",
+            color = Color(191, 0, 0)
         }
     }
 

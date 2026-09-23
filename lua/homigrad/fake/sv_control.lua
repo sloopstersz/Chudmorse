@@ -1460,7 +1460,64 @@ hook.Add("Think", "Fake", function()
 			end
 		end
 
-		if ply:KeyDown(IN_DUCK) and !ply:InVehicle() and not fakeKickActive then
+		-- Judge dropkick for the Chud Beasts round and the context-menu
+		-- Chud Beast playerclass. Everyone else remains blocked.
+		local chudBeastsRound = zb and zb.CROUND == "chudbeasts" and zb.ROUND_STATE == 1
+		local contextChudBeast = ply.PlayerClassName == "chudbeast"
+		local chudDropkickAllowed = chudBeastsRound or contextChudBeast
+		local dropkickOrigin = IsValid(spine) and spine:GetPos() or ragdoll:GetPos()
+		local dropkickGroundTrace = util.TraceLine({
+			start = dropkickOrigin,
+			endpos = dropkickOrigin - vector_up * 40,
+			filter = {ply, ragdoll},
+			mask = MASK_SOLID
+		})
+		local chudDropkicking = chudDropkickAllowed
+			and org.canmove
+			and not ply:InVehicle()
+			and ply:KeyDown(IN_DUCK)
+			and ply:KeyDown(IN_ATTACK)
+			and ply:KeyDown(IN_ATTACK2)
+			and not dropkickGroundTrace.Hit
+
+		if chudDropkicking and not ragdoll.isChudDropkicking then
+			ragdoll.chudDropkickHits = {}
+			ragdoll.dropkickAchievementHit = false
+		end
+		ragdoll.isChudDropkicking = chudDropkicking
+
+		if chudDropkicking then
+			local legAng1 = Angle(0, 0, 0)
+			legAng1:Set(angles)
+			legAng1:RotateAroundAxis(angles:Right(), 75)
+			legAng1:RotateAroundAxis(angles:Forward(), -100)
+			legAng1:RotateAroundAxis(angles:Up(), -70)
+
+			local legAng2 = Angle(0, 0, 0)
+			legAng2:Set(legAng1)
+			local calfAng1 = Angle(0, 0, 0)
+			local calfAng2 = Angle(0, 0, 0)
+			calfAng1:Set(legAng1)
+			calfAng2:Set(legAng2)
+			calfAng1:RotateAroundAxis(angles:Right(), 20)
+			calfAng2:RotateAroundAxis(angles:Right(), 20)
+
+			local foot1 = Angle(0, 0, 0)
+			local foot2 = Angle(0, 0, 0)
+			foot1:Set(calfAng1)
+			foot2:Set(calfAng2)
+			foot1:RotateAroundAxis(angles:Right(), 90)
+			foot2:RotateAroundAxis(angles:Right(), 90)
+
+			shadowControl(ragdoll, 11, 0.001, legAng1, 600, 200)
+			shadowControl(ragdoll, 8, 0.001, legAng2, 600, 200)
+			shadowControl(ragdoll, 13, 0.001, foot1, 600, 200)
+			shadowControl(ragdoll, 14, 0.001, foot2, 600, 200)
+			shadowControl(ragdoll, 12, 0.001, calfAng1, 600, 200)
+			shadowControl(ragdoll, 9, 0.001, calfAng2, 600, 200)
+		end
+
+		if ply:KeyDown(IN_DUCK) and !ply:InVehicle() and not fakeKickActive and not chudDropkicking then
 			if org.canmove and org.spine1 < hg.organism.fake_spine1 then
 				local head = ragdoll:GetPhysicsObject(ragdoll:TranslateBoneToPhysBone(ragdoll:LookupBone("ValveBiped.Bip01_Head1")))
 				local angle = -(-angles2)
@@ -1581,6 +1638,94 @@ hook.Add("Think", "Fake", function()
 			end
 		end*/
 	end
+end)
+
+hook.Add("Ragdoll Collide", "ChudBeasts_DropkickDamage", function(ragdoll, data)
+	local ply = hg.RagdollOwner(ragdoll)
+	if not IsValid(ply) or not ply:Alive() then return end
+
+	-- Re-check permission on collision so changing away from the context class
+	-- or leaving the Chud Beasts round immediately disables stored kick state.
+	local chudBeastsRound = zb and zb.CROUND == "chudbeasts" and zb.ROUND_STATE == 1
+	local contextChudBeast = ply.PlayerClassName == "chudbeast"
+	if not chudBeastsRound and not contextChudBeast then
+		ragdoll.isChudDropkicking = false
+		return
+	end
+	if not ragdoll.isChudDropkicking then return end
+
+	local hitEnt = data.HitEntity
+	if not IsValid(hitEnt) or hitEnt == game.GetWorld() or hitEnt == ragdoll then return end
+
+	local physObj = data.PhysObject
+	if not IsValid(physObj) then return end
+
+	local physBone = -1
+	for index = 0, ragdoll:GetPhysicsObjectCount() - 1 do
+		if ragdoll:GetPhysicsObjectNum(index) == physObj then
+			physBone = index
+			break
+		end
+	end
+	if physBone < 0 then return end
+
+	local bone = ragdoll:TranslatePhysBoneToBone(physBone)
+	if bone < 0 then return end
+
+	local boneName = ragdoll:GetBoneName(bone)
+	local dropkickBones = {
+		["ValveBiped.Bip01_L_Foot"] = true,
+		["ValveBiped.Bip01_R_Foot"] = true,
+		["ValveBiped.Bip01_L_Calf"] = true,
+		["ValveBiped.Bip01_R_Calf"] = true,
+		["ValveBiped.Bip01_L_Thigh"] = true,
+		["ValveBiped.Bip01_R_Thigh"] = true
+	}
+	if not dropkickBones[boneName] then return end
+
+	ragdoll.chudDropkickHits = ragdoll.chudDropkickHits or {}
+	if (ragdoll.chudDropkickCooldown or 0) > CurTime() then return end
+	if (ragdoll.chudDropkickHits[hitEnt] or 0) > CurTime() then return end
+
+	local oldVelocity = data.OurOldVelocity or vector_zero
+	local attackerPhys = ragdoll:GetPhysicsObject()
+	local attackerSpeed = IsValid(attackerPhys) and attackerPhys:GetVelocity():Length() or ragdoll:GetVelocity():Length()
+	local speed = math.max(oldVelocity:Length(), attackerSpeed)
+	if speed < 260 then return end
+
+	ragdoll.chudDropkickHits[hitEnt] = CurTime() + 0.5
+	ragdoll.chudDropkickCooldown = CurTime() + 0.8
+
+	local damage = math.Clamp((speed - 180) / 8, 12, 60)
+	local direction = oldVelocity:LengthSqr() > 1 and oldVelocity:GetNormalized() or ply:GetAimVector()
+	local damageInfo = DamageInfo()
+	damageInfo:SetDamage(damage)
+	damageInfo:SetDamageType(DMG_CLUB)
+	damageInfo:SetAttacker(ply)
+	damageInfo:SetInflictor(ragdoll)
+	damageInfo:SetDamagePosition(physObj:GetPos())
+	damageInfo:SetDamageForce(direction * damage * 50)
+
+	local targetPly = hg.RagdollOwner(hitEnt) or (hitEnt:IsPlayer() and hitEnt)
+	if IsValid(targetPly) and targetPly:IsPlayer() then
+		local hitgroup = boneName:find("R_") and HITGROUP_RIGHTLEG or HITGROUP_LEFTLEG
+		hook.Run("HomigradDamage", targetPly, damageInfo, hitgroup, hg.GetCurrentCharacter(targetPly), damage * 0.1)
+
+		if targetPly.organism then
+			local speedMul = math.Clamp((speed - 260) / 420, 0, 1)
+			targetPly.organism.painadd = targetPly.organism.painadd + 8 + speedMul * 22
+			targetPly.organism.shock = math.min((targetPly.organism.shock or 0) + 8 + speedMul * 32, 95)
+		end
+
+		if not ragdoll.dropkickAchievementHit and targetPly ~= ply then
+			ragdoll.dropkickAchievementHit = true
+			hook.Run("HG_PlayerDropkicked", ply, targetPly)
+		end
+	else
+		hitEnt:TakeDamageInfo(damageInfo)
+	end
+
+	ragdoll:EmitSound("kickland" .. math.random(1, 2) .. ".mp3", 75, math.random(95, 110))
 end)
 
 hook.Add("PlayerDeath", "homigrad-fake-control", function(ply)

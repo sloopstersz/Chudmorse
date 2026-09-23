@@ -11,6 +11,23 @@ MODE.Chance = 0.05
 MODE.shouldfreeze = true
 MODE.ROUND_TIME = 510
 
+-- VIC-mode ZBattle Point Editor spawns. VIC + Chud Defense are paired
+-- spatially: the nearest Chud Defense point to the selected VIC point is used.
+-- Angry Chuds use the normal attacker/random spawn behavior.
+zb = zb or {}
+zb.Points = zb.Points or {}
+
+zb.Points.VIC_SPAWN = zb.Points.VIC_SPAWN or {}
+zb.Points.VIC_SPAWN.Color = Color(255, 215, 70)
+zb.Points.VIC_SPAWN.Name = "VIC Spawn"
+
+zb.Points.VIC_CHUD_DEFENSE_SPAWN = zb.Points.VIC_CHUD_DEFENSE_SPAWN or {}
+zb.Points.VIC_CHUD_DEFENSE_SPAWN.Color = Color(80, 150, 255)
+zb.Points.VIC_CHUD_DEFENSE_SPAWN.Name = "Chud Defense Spawn"
+
+-- Remove the retired Angry Chud Point Editor group even on Lua hot reloads.
+zb.Points.VIC_ANGRY_CHUD_SPAWN = nil
+
 MODE.BodyguardFraction = 0.35
 
 MODE.TaskAreaRadius = 300

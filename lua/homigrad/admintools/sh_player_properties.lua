@@ -450,6 +450,30 @@ local function GiveContextJuggernautLoadout(ply)
     end)
 end
 
+local function GiveContextChudBeastLoadout(ply)
+    if CLIENT or not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
+
+    -- Match the melee-only Chud Beasts round loadout.
+    ply:StripWeapons()
+    ply:RemoveAllAmmo()
+
+    local inv = ply:GetNetVar("Inventory", {})
+    inv["Weapons"] = inv["Weapons"] or {}
+    inv["Weapons"]["hg_sling"] = true
+    ply:SetNetVar("Inventory", inv)
+
+    local hands = ply:Give("weapon_hands_sh")
+    ply:Give("weapon_walkie_talkie")
+
+    if IsValid(hands) then
+        ply:SelectWeapon(hands:GetClass())
+    end
+
+    if zb and zb.GiveRole then
+        zb.GiveRole(ply, "Chud Beast", Color(190, 15, 15))
+    end
+end
+
 properties.Add( "setplayerclass", {
 	MenuLabel = "Set player class", -- Name to display on the context menu
 	Order = 15, -- The order to display this property relative to other properties
@@ -477,10 +501,30 @@ properties.Add( "setplayerclass", {
 
 		ent = hg.RagdollOwner(ent) or hg.GetCurrentCharacter(ent) or ent
 		if IsValid(ent) and ent:IsPlayer() and player.classList[class] then
-			ent:SetPlayerClass(class)
+			local classData
+
+			if class == "juggernaut" then
+				-- Context-menu Juggernaut is a gameplay/class override only.
+				-- Snapshot the existing RP/display identity before the class is applied.
+				classData = {
+					contextJuggernaut = true,
+					displayName = ent:GetNWString("PlayerName", ""),
+					model = ent:GetModel(),
+					skin = ent:GetSkin(),
+					bodygroups = {}
+				}
+
+				for id = 0, ent:GetNumBodyGroups() - 1 do
+					classData.bodygroups[id] = ent:GetBodygroup(id)
+				end
+			end
+
+			ent:SetPlayerClass(class, classData)
 
 			if class == "juggernaut" then
 				GiveContextJuggernautLoadout(ent)
+			elseif class == "chudbeast" then
+				GiveContextChudBeastLoadout(ent)
 			end
 		end
 	end,
@@ -491,7 +535,7 @@ properties.Add( "setplayerclass", {
 			-- Do not expose the legacy VICTIM class in the context menu.
 			if string.lower(name or "") == "victim" then continue end
 
-			local opt = submenu:AddOption(name)
+			local opt = submenu:AddOption(name == "chudbeast" and "Chud Beast" or name)
 			opt:SetRadio(true)
 			opt:SetChecked(ent.PlayerClassName == name)
 			opt:SetIsCheckable(true)

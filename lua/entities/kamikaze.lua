@@ -163,12 +163,12 @@ local function FCDroneApplyIEDDisorientation(source, pos, blastDis)
     end
 end
 
-local function FCDroneSpawnIEDShrapnel(source, pos, attacker, blastDamage)
+local function FCDroneSpawnIEDShrapnel(source, pos, attacker)
     if not IsValid(source) then return end
 
-    local phys = source:GetPhysicsObject()
-    local mass = IsValid(phys) and phys:GetMass() or 30
-    local fragmentCount = math.Clamp(math.Round(mass * 20), 180, 700)
+    -- Match the regular grenade: its base entity uses 300 * 3 fragments,
+    -- 40 damage, and only fires a fragment when its trace can hit an entity.
+    local fragmentCount = 300 * 3
 
     local co = coroutine.create(function()
         for i = 1, fragmentCount do
@@ -178,11 +178,19 @@ local function FCDroneSpawnIEDShrapnel(source, pos, attacker, blastDamage)
             dir.z = dir.z > 0 and math.abs(dir.z - 0.5) or -math.abs(dir.z + 0.5)
             dir:Normalize()
 
+            local tr = util.QuickTrace(pos, dir * 10000, source)
+            if not tr.Hit or tr.HitSky or tr.HitWorld then
+                if i % 35 == 0 then
+                    coroutine.yield()
+                end
+                continue
+            end
+
             local bullet = {
                 Dir = dir,
                 Src = pos,
                 Force = 0.01,
-                Damage = blastDamage,
+                Damage = 40,
                 AmmoType = "Metal Debris",
                 Attacker = IsValid(attacker) and attacker or source,
                 Distance = 205,
@@ -320,7 +328,7 @@ function ENT:TriggerDroneExplosion(user)
         self:SetSolid(SOLID_NONE)
         self:SetMoveType(MOVETYPE_NONE)
 
-        FCDroneSpawnIEDShrapnel(self, entPos, attacker, blastDamage)
+        FCDroneSpawnIEDShrapnel(self, entPos, attacker)
 
         timer.Simple(0.65, function()
             if IsValid(self) then
