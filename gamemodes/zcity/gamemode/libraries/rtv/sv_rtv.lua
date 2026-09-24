@@ -36,6 +36,7 @@ local blacklist = {
     ["gm_renostruct_v2_night"] = true, ["gm_city_of_silence"] = true, ["ttt_hogwarts"] = true,
     ["hmcd_gonka"] = true, ["hmcd_bloodring"] = true, ["gm_br_complex"] = true, ["gm_br_pitfalls"] = true,
 	["gm_fork"] = true, ["gm_shenanigans"] = true,  ["gm_bigcity"] = true, ["gm_bigcity_improved"] = true,
+    ["gm_everpine_mall"] = true, ["gm_wrong_goings"] = true,
 }
 
 local allowedPrefix = {

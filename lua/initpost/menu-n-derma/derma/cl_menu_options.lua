@@ -333,6 +333,12 @@ local info_social_links = {
         subtitle = "A Popular Z-City Content Creator's Community.",
         url = "https://discord.gg/SzTQAMeqa4",
         icon = Material("vgui/farten.png", "smooth")
+    },
+   {
+        title = "zergmorse (EU)",
+        subtitle = "A EU Server hosting a version of Chudmorse.",
+        url = "https://discord.gg/cAwPmgD7qu",
+        icon = Material("vgui/zerg.png", "smooth")
     }
 }
 local info_social_icon_size = MenuUnit(24)
