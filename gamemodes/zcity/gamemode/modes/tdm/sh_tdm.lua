@@ -12,6 +12,7 @@ zb.Points.HMCD_TDM_T.Color = Color(150,95,0)
 zb.Points.HMCD_TDM_T.Name = "HMCD_TDM_T"
 
 MODE.PrintName = "Team Deathmatch"
+MODE.DisableMental = true
 
 --[[
     ["weapon_hk_usp"] = {

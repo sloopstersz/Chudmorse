@@ -183,6 +183,68 @@ hg.settings:AddOpt("View","hg_leancam_mul", "Lean camera mul", true, nil, "int")
 hg.settings:AddOpt("View","hg_gun_cam", "Gun camera (WIP Admin only)")
 hg.settings:AddOpt("Sound","hg_dmusic", "Dynamic Music")
 hg.settings:AddOpt("Sound","hg_quietshots", "Enable/Disable Quietshoot Sounds")
+CreateClientConVar("chud_barry_music", "0", true, false, "Toggle all sounds in Barry's sound pack", 0, 1)
+hg.settings:AddOpt("Sound", "chud_barry_music", "Enable Barry's full sound pack", nil, nil, "bool")
+
+-- Confirm without changing the saved setting until Yes is pressed.
+function hg.settings:ConfirmBarryMusic(value, onApplied)
+    if not value then
+        if IsValid(self.BarryConfirmation) then self.BarryConfirmation:Close() end
+        RunConsoleCommand("chud_barry_music", "0")
+        if onApplied then onApplied(false) end
+        return
+    end
+    if IsValid(self.BarryConfirmation) then self.BarryConfirmation:MakePopup() return end
+    local frame = vgui.Create("DFrame")
+    self.BarryConfirmation = frame
+    local scale = math.min(1, ScrW() / 430, ScrH() / 260)
+    frame:SetSize(math.floor(406 * scale), math.floor(226 * scale))
+    frame:Center()
+    frame:SetTitle("")
+    frame:ShowCloseButton(false)
+    frame:SetDraggable(false)
+    frame:MakePopup()
+    frame:DoModal()
+    surface.CreateFont("ChudBarryConfirmation", {font = "Verily Serif Mono", size = math.floor(25 * scale), weight = 400})
+    surface.CreateFont("ChudBarryConfirmationSmall", {font = "Verily Serif Mono", size = math.floor(13 * scale), weight = 400})
+    frame.Paint = function(_, w, h)
+        surface.SetDrawColor(12, 12, 16, 252)
+        surface.DrawRect(0, 0, w, h)
+        surface.SetDrawColor(75, 75, 80, 210)
+        surface.DrawOutlinedRect(0, 0, w, h, 1)
+        surface.SetDrawColor(155, 30, 30)
+        surface.DrawRect(0, 0, w, math.max(2, 3 * scale))
+        draw.SimpleText("SOUND PACK", "ChudBarryConfirmationSmall", w / 2, 17 * scale, Color(160, 160, 160), TEXT_ALIGN_CENTER)
+        draw.SimpleText("Are you sure you", "ChudBarryConfirmation", w / 2, 45 * scale, Color(225, 225, 225), TEXT_ALIGN_CENTER)
+        draw.SimpleText("want to do this?", "ChudBarryConfirmation", w / 2, 74 * scale, Color(225, 225, 225), TEXT_ALIGN_CENTER)
+    end
+    local function Button(label, x, accept)
+        local button = vgui.Create("DButton", frame)
+        button:SetPos(x * scale, 126 * scale)
+        button:SetSize(118 * scale, 67 * scale)
+        button:SetText("")
+        button.Paint = function(self, w, h)
+            local hovered = self:IsHovered()
+            surface.SetDrawColor(hovered and 55 or 24, hovered and 22 or 24, hovered and 24 or 29, 245)
+            surface.DrawRect(0, 0, w, h)
+            surface.SetDrawColor(hovered and 155 or 65, hovered and 30 or 65, hovered and 30 or 70)
+            surface.DrawOutlinedRect(0, 0, w, h, 1)
+            draw.SimpleText(label, "ChudBarryConfirmation", w / 2, h / 2, Color(225, 225, 225), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        end
+        button.OnCursorEntered = function() surface.PlaySound("ui/rem_hover.wav") end
+        button.DoClick = function()
+            surface.PlaySound(SOUND_SETTINGS_CLICK)
+            if accept then
+                RunConsoleCommand("chud_barry_music", value and "1" or "0")
+                if onApplied then onApplied(value) end
+            end
+            frame:Close()
+        end
+    end
+    Button("YES", 43, true)
+    Button("NO", 253, false)
+end
+
 
 
 function hg.CreateCategory(ctgName, ParentPanel, yPos)
@@ -708,6 +770,13 @@ function SettingsRefreshContent()
             end
             function toggle:DoClick()
                 local newValue = not convar:GetBool()
+                if convarName == "chud_barry_music" and newValue then
+                    hg.settings:ConfirmBarryMusic(newValue, function(confirmed)
+                        if IsValid(self) then targetProgress = confirmed and 1 or 0 end
+                    end)
+                    surface.PlaySound(SOUND_SETTINGS_CLICK)
+                    return
+                end
                 if convar.GetName then
                     RunConsoleCommand(convar:GetName(), newValue and "1" or "0")
                 end
@@ -1756,6 +1825,21 @@ function InfoRefreshContent()
         kdValue:SetText("0.00")
         kdValue:SizeToContents()
 
+        local playtimePanel = vgui.Create("DPanel", statsGrid)
+        playtimePanel.Paint = kdPanel.Paint
+        local playtimeTitle = vgui.Create("DLabel", playtimePanel)
+        playtimeTitle:SetPos(MenuUnit(12), MenuUnit(10))
+        playtimeTitle:SetFont("ZCity_Menu_Settings_Tiny")
+        playtimeTitle:SetTextColor(settings_color_text_dim)
+        playtimeTitle:SetText("PLAYTIME")
+        playtimeTitle:SizeToContents()
+        local playtimeValue = vgui.Create("DLabel", playtimePanel)
+        playtimeValue:SetPos(MenuUnit(12), MenuUnit(30))
+        playtimeValue:SetFont("ZCity_Menu_Settings_Small")
+        playtimeValue:SetTextColor(settings_color_text)
+        playtimeValue:SetText("0.0 hours")
+        playtimeValue:SizeToContents()
+
         statsGrid.PerformLayout = function(self, w, h)
             local gap = MenuUnit(8)
             local columns = w < MenuUnit(520) and 1 or 2
@@ -1766,6 +1850,7 @@ function InfoRefreshContent()
                 allCards[#allCards + 1] = statCard.panel
             end
             allCards[#allCards + 1] = kdPanel
+            allCards[#allCards + 1] = playtimePanel
 
             for i, pnl in ipairs(allCards) do
                 local row = math.floor((i - 1) / columns)
@@ -1901,6 +1986,9 @@ function InfoRefreshContent()
             local kd = statValues.Kills / math.max(effectiveDeaths, 1)
             kdValue:SetText(string.format("%.2f", kd))
             kdValue:SizeToContents()
+            local seconds = math.max(ply:GetNWFloat("ChudPlaytimeSeconds", 0), 0)
+            playtimeValue:SetText(string.format("%.1f hours", seconds / 3600))
+            playtimeValue:SizeToContents()
 
             local obtained = InfoGetObtainedAchievements()
             local signature = tostring(#obtained)
@@ -2246,10 +2334,6 @@ function InfoRefreshContent()
         contributorsTitle:SetTextColor(settings_color_whitey)
         contributorsTitle:SetContentAlignment(5)
         contributorsTitle:SetText("CONTRIBUTORS")
-        contributorsTitle.Paint = function(self, w, h)
-            surface.SetDrawColor(0, 0, 0, 220)
-            surface.DrawRect(0, 0, w, h)
-        end
 
         CreateCreditRow(contributors, MenuUnit(205))
 

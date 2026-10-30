@@ -87,31 +87,34 @@ if (SERVER) then
 		end;
 	end;
 	
-	net.Receive("NetStreamDS", function(length, player)
+	net.Receive("NetStreamDS", function(length, player)		
+		if not IsValid(player) then return end;
+		if ((player.nsDataStreamCD or 0) > CurTime()) then return end;
+		player.nsDataStreamCD = CurTime() + 1;
+		
 		local NS_DS_NAME = net.ReadString();
 		local NS_DS_LENGTH = net.ReadUInt(32);
-		local NS_DS_DATA = net.ReadData(NS_DS_LENGTH);
 		
-		if (NS_DS_NAME and NS_DS_DATA and NS_DS_LENGTH) then
+		if (NS_DS_NAME and NS_DS_LENGTH) then
+			if (!isstring(NS_DS_NAME) or NS_DS_NAME == "" or !isnumber(NS_DS_LENGTH) or NS_DS_LENGTH <= 0 or NS_DS_LENGTH > 8192) then return end;
+			
 			player.nsDataStreamName = NS_DS_NAME;
 			player.nsDataStreamData = "";
 			
-			if (player.nsDataStreamName and player.nsDataStreamData) then
-				player.nsDataStreamData = NS_DS_DATA;
-								
-				if (netstream.stored[player.nsDataStreamName]) then
-					local bStatus, value = pcall(pon.decode, player.nsDataStreamData);
-					
-					if (bStatus) then
-						netstream.stored[player.nsDataStreamName](player, unpack(value));
-					else
-						ErrorNoHalt("NetStream: '"..NS_DS_NAME.."'\n"..value.."\n");
-					end;
-				end;
+			local NS_DS_DATA = net.ReadData(NS_DS_LENGTH);
+			player.nsDataStreamData = NS_DS_DATA;
+									
+			local stored = netstream.stored[NS_DS_NAME];
+			if (type(stored) == "function") then
+				local bStatus, value = pcall(pon.decode, player.nsDataStreamData);
 				
-				player.nsDataStreamName = nil;
-				player.nsDataStreamData = nil;
+				if (bStatus and istable(value)) then
+					stored(player, unpack(value));
+				end;
 			end;
+			
+			player.nsDataStreamName = nil;
+			player.nsDataStreamData = nil;
 		end;
 		
 		NS_DS_NAME, NS_DS_DATA, NS_DS_LENGTH = nil, nil, nil;

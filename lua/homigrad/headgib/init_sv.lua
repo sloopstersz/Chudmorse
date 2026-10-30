@@ -586,6 +586,7 @@ function hg.FullBodyExplode(target, force, dmgInfo)
 	local ent = target
 	local org = ent.organism
 	local owner = ent:IsRagdoll() and hg.RagdollOwner(ent) or nil
+	if IsValid(owner) and owner:Alive() and owner.FakeRagdoll != ent then owner = nil end
 	if not org and IsValid(owner) then org = owner.organism end
 	if org and org.godmode then return end
 	if not hg.CanFullBodyGib(ent, org, owner) then return end
@@ -634,6 +635,7 @@ function hg.TrackFullBodyRagdollRemove(rag)
 		local org = data and data.org or ent.organism
 		if org and (org.godmode or org.fullbodyexploded) then return end
 		local owner = data and data.owner
+		if IsValid(owner) and owner:Alive() and owner.FakeRagdoll != ent then owner = nil end
 		if not hg.CanFullBodyGib(ent, org, owner, true) then return end
 
 		local pos = data and data.pos or IsValid(ent) and ent:GetPos() or vector_origin

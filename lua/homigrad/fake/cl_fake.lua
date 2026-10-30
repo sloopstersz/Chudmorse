@@ -29,10 +29,6 @@ end)
 
 local diff = Angle()
 hook.Add("InputMouseApply", "fakeCameraAngles", function(cmd, x, y, angle)
-    -- This hook returns true below and can run before the drone's own hook.
-    -- Give the pilot's raw mouse delta to the drone before normal body camera logic.
-    if FreakCityDrone and FreakCityDrone.ApplyMouseInput
-        and FreakCityDrone.ApplyMouseInput(cmd, x, y) then return true end
 	local tbl = {}
 	local cc = GetCoolCameraBool()
 	if cc then
@@ -99,7 +95,6 @@ local rollang = 0
 local ctime
 local vecUpX, vecUpY, vecUpZ = Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)
 hook.Add("HG.InputMouseApply", "fakeCameraAngles2", function(tbl)
-	if not IsValid(lply) then return end
 	if IsValid(follow) and ctime != CurTime() then
 		ctime = CurTime()
 
@@ -111,15 +106,12 @@ hook.Add("HG.InputMouseApply", "fakeCameraAngles2", function(tbl)
 	local y = tbl.y
 	local angle = tbl.angle
 
-	if not IsValid(lply) then return end
 	local wep = lply:GetActiveWeapon()
-	if not IsValid(wep) then wep = {} end
 
-	local consmul = 0
-	if lply.organism then consmul = 1 - hg.CalculateConsciousnessMul() end
+	local consmul = 1 - hg.CalculateConsciousnessMul()
 
-	if lply.organism and (wep.weight or wep.visualweight) and ((wep.weight and wep.weight > 0 or wep.visualweight and wep.visualweight > 0) or lply.organism.larmamputated or consmul > 0.3) then
-		ViewPunch3(Angle(-y / 50 / 16, x / 50 / 16, 0) * math.min(((wep.visualweight ~= nil and wep.visualweight > 0) and wep.visualweight) or wep.weight, 10) / 3 / (1 - consmul * 0.5) * (lply.organism and lply.organism.larmamputated and 4 or 1) * (lply.organism and lply.organism.rarmamputated and 2 or 1))
+	if (wep.weight or wep.visualweight) and ((wep.weight and wep.weight > 0 or wep.visualweight and wep.visualweight > 0) or lply.organism.larmamputated or consmul > 0.3) then
+		ViewPunch3(Angle(-y / 50 / 16, x / 50 / 16, 0) * math.min(((wep.visualweight ~= nil and wep.visualweight > 0) and wep.visualweight) or wep.weight, 10) / 3 / (1 - consmul * 0.5) * (lply.organism.larmamputated and 4 or 1) * (lply.organism.rarmamputated and 2 or 1))
 	end
 
 	ViewPunch4(Angle(y / 50 / 16, -x / 50 / 16, -x / 50 / 1) * 0.1)
@@ -136,7 +128,7 @@ hook.Add("HG.InputMouseApply", "fakeCameraAngles2", function(tbl)
 		follow = follow or lply
 	end]]
 
-	if lply:InVehicle() and not IsValid(follow) then
+	if lply:InVehicle() and not IsValid(follow) and !(hg.NoCameraInCar(lply:GetVehicle()) or hg.NoFakeInCar(lply:GetVehicle())) then
 		tbl.override_angle = true
 		tbl.angle = angle_zero
 		return true
@@ -206,7 +198,7 @@ end)
 
 fakeTimer = fakeTimer or nil
 local hg_cshs_fake = CreateConVar("hg_cshs_fake", "0", FCVAR_ARCHIVE, "Toggle C'SHS-like ragdoll camera view", 0, 1)
-local hg_firstperson_death = { GetBool = function() return false end }
+local hg_firstperson_death = CreateClientConVar("hg_firstperson_death", "0", true, false, "Toggle first-person death camera view", 0, 1)
 local hg_firstperson_ragdoll = CreateConVar("hg_firstperson_ragdoll", "0", FCVAR_ARCHIVE, "Toggle first-person ragdoll camera view", 0, 1)
 local hg_fov = CreateClientConVar("hg_fov", "70", true, false, "Change first-person field of view", 75, 120)
 local hg_gopro = CreateClientConVar("hg_gopro", "0", true, false, "Toggle GoPro-like camera view", 0, 1)
@@ -220,6 +212,7 @@ local angleZero = Angle(0,0,0)
 local deathlerp = 0
 local tblfollow = {}
 local lerpasad = 0
+local hg_allow_gopro = GetConVar("hg_allow_gopro_pos")
 CalcView = function(ply, origin, angles, fov, znear, zfar)
 	if GetViewEntity() ~= (ply or LocalPlayer()) then return end
 	local oldorigin = -(-origin)
@@ -408,8 +401,8 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 	
 	if ply.organism and ply.organism.otrub then view.angles = att_Ang end
 
-	if hg_gopro:GetBool() then
-		return SpecCam(follow, origin, angles, fov, znear, zfar)
+	if hg_gopro:GetBool() and hg_allow_gopro:GetBool() then
+		return GoProCam(follow, origin, angles, fov, znear, zfar)
 	end
 
 	hook.Run("PostHGCalcView", ply, view)
@@ -768,120 +761,3 @@ hook.Add("Move","PushAwayRagdolls",function(ply) --// lagging
 		ent.pushCooldown = CurTime() + 0.1
     end
 end)]]
-
-surface.CreateFont("HGWoundHoldPrompt", {
-	font = "Courier Prime",
-	size = 22,
-	weight = 500,
-	antialias = true,
-	extended = true
-})
-
-local woundHoldPromptFade = 0
-local woundHoldPromptText = "[E + SPACE] to hold your wound"
-local woundHoldPromptActive = false
-
-hook.Add("HUDPaint", "HG_WoundHoldPrompt", function()
-	local ply = LocalPlayer()
-	if not IsValid(ply) or not ply:Alive() then
-		woundHoldPromptFade = 0
-		return
-	end
-
-	local wounds = ply.wounds
-	local arterialwounds = ply.arterialwounds
-	local hasWounds = wounds and #wounds > 0 or arterialwounds and #arterialwounds > 0
-	local inFake = IsValid(ply.FakeRagdoll)
-	local hasBothArms = not (ply.organism and (ply.organism.larmamputated or ply.organism.rarmamputated))
-	local shouldShow = inFake and hasWounds and hasBothArms and not (ply.organism and ply.organism.otrub)
-
-	woundHoldPromptFade = LerpFT(0.12, woundHoldPromptFade, shouldShow and 1 or 0)
-	if woundHoldPromptFade <= 0.01 then return end
-
-	local active = ply:GetNWBool("hg_hold_wound_manual", false)
-	if shouldShow then
-		woundHoldPromptActive = active
-		woundHoldPromptText = active and "Holding wound" or "[E + SPACE] to hold your wound"
-	end
-
-	local flash = woundHoldPromptActive and (0.5 + 0.5 * math.sin(CurTime() * 10)) or 0
-	local alphaMul = woundHoldPromptFade
-	local color = woundHoldPromptActive and Color(225, 225, 225, 220 * alphaMul) or Color(225, 225, 225, 170 * alphaMul)
-	local outlineColor = Color(0, 0, 0, 255 * alphaMul)
-
-	if woundHoldPromptActive then
-		local v = flash * 255
-		local inv = 255 - v
-		outlineColor = Color(inv, inv, inv, 255 * alphaMul)
-	end
-
-	draw.SimpleTextOutlined(woundHoldPromptText, "HGWoundHoldPrompt", ScrW() * 0.5, ScrH() - 62, color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, outlineColor)
-end)
-
-
--- Dedicated-server get-up restoration. Entity handles can arrive after a net
--- message, so keep the index and wait for the matching owned weapon.
-local getupWeaponRestore
-net.Receive("ChudmorseGetupWeapon", function()
-    local token = net.ReadUInt(32)
-    if not net.ReadBool() then
-        if getupWeaponRestore and getupWeaponRestore.token == token then
-            getupWeaponRestore = nil
-        end
-        return
-    end
-    getupWeaponRestore = {
-        token = token,
-        index = net.ReadUInt(16),
-        class = net.ReadString(),
-        expires = net.ReadFloat()
-    }
-end)
-
--- Observe actual weapon-selection input instead of a nonexistent CUserCmd getter.
--- Do not consume the bind: the normal weapon selector must still handle it.
-hook.Add("PlayerBindPress", "ChudmorseCancelGetupWeapon", function(ply, bind, pressed)
-    if not pressed or ply ~= LocalPlayer() or not getupWeaponRestore then return end
-    bind = string.lower(string.Trim(bind or ""))
-    if not (string.match(bind, "^slot%d+$") or bind == "invnext" or bind == "invprev"
-        or bind == "lastinv" or string.match(bind, "^use%s+weapon_")) then return end
-    local token = getupWeaponRestore.token
-    getupWeaponRestore = nil
-    net.Start("ChudmorseCancelGetupWeapon")
-    net.WriteUInt(token, 32)
-    net.SendToServer()
-end)
-
-hook.Add("StartCommand", "ChudmorseRestoreGetupWeapon", function(ply, cmd)
-    local pending = getupWeaponRestore
-    if not pending or ply ~= LocalPlayer() then return end
-    if not ply:Alive() or CurTime() > pending.expires then
-        getupWeaponRestore = nil
-        return
-    end
-    -- The server clears its Lua ragdoll reference before the one-second get-up
-    -- animation. A remote client must wait for the networked state to catch up.
-    if IsValid(ply:GetNWEntity("FakeRagdoll")) or IsValid(ply.FakeRagdoll) then
-        if pending.standing then getupWeaponRestore = nil end
-        return
-    end
-    pending.standing = true
-    local wep = Entity(pending.index)
-    if not IsValid(wep) or wep:GetClass() ~= pending.class or wep:GetOwner() ~= ply then
-        -- Wait for initial replication, but never re-equip a weapon later dropped.
-        if pending.acquired then getupWeaponRestore = nil end
-        return
-    end
-    pending.acquired = true
-    if ply.organism and ply.organism.larmamputated and ply.organism.rarmamputated then
-        getupWeaponRestore = nil
-        return
-    end
-    local active = ply:GetActiveWeapon()
-    local hands = hg.GetHandsWeaponClass and hg.GetHandsWeaponClass(ply) or "weapon_hands_sh"
-    if IsValid(active) and active ~= wep and active:GetClass() ~= hands then
-        getupWeaponRestore = nil
-        return
-    end
-    if active ~= wep then cmd:SelectWeapon(wep) end
-end)

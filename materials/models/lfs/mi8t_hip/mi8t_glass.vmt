@@ -1,0 +1,10 @@
+"VertexlitGeneric"
+{
+	"$basetexture" "models\lfs\mi8t_hip/ru_the_mi8t_glass_c"
+	"$translucent" "1"
+	"$surfaceprop" "Metal"
+	"$nocull" 1
+	"$envmapmask" "models\lfs\mi8t_hip/ru_the_mi8t_glass_b"
+	"$envmap" "env_cubemap"					
+	"$envmaptint" "[ .2 .2 .2 ]"	
+}

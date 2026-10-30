@@ -7,6 +7,7 @@ local menu_music_flags = "noblock noplay"
 local menu_music_volume = 0.25
 local menu_music_fade_speed = 1.8
 local menu_music_station
+local menu_music_generation = 0
 local menu_music_station_path
 local menu_music_station_lerp = 0
 local menu_music_pending_station
@@ -33,6 +34,7 @@ local function PlayTypewriterSound()
 end
 
 local function StopMainMenuMusic()
+    menu_music_generation = menu_music_generation + 1
     if menu_music_station then
         menu_music_station:Stop()
         menu_music_station = nil
@@ -48,6 +50,12 @@ local function StopMainMenuMusic()
     menu_music_target_path = menu_music_default_path
 end
 
+cvars.AddChangeCallback("chud_barry_music", function()
+    local target = menu_music_target_path
+    StopMainMenuMusic()
+    menu_music_target_path = target
+end, "ChudBarryMenuMusic")
+
 local function QueueMainMenuMusic(owner, path)
     path = path or menu_music_default_path
     menu_music_target_path = path
@@ -56,9 +64,10 @@ local function QueueMainMenuMusic(owner, path)
     if menu_music_station and menu_music_station_path == path and not menu_music_pending_station then return end
     if menu_music_pending_station and menu_music_pending_path == path then return end
 
+    local generation = menu_music_generation
     sound.PlayFile(path, menu_music_flags, function(station)
         if not station then return end
-        if not IsValid(owner) or MainMenu ~= owner or menu_music_target_path ~= path then
+        if generation ~= menu_music_generation or not IsValid(owner) or MainMenu ~= owner or menu_music_target_path ~= path then
             station:Stop()
             return
         end

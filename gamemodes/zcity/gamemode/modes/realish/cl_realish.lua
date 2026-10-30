@@ -180,7 +180,6 @@ local function StopRoundMusic()
 end
 
 local function StartRoundMusic()
-	if GetGlobalFloat("Realish_DoomStart", 0) > 0 then return end
 	StopRoundMusic()
 
 	local ply = LocalPlayer()
@@ -272,10 +271,6 @@ local function UpdateMusicMix()
 end
 
 hook.Add("Think", "RealishHeroMusicMix", function()
-	if GetGlobalFloat("Realish_DoomStart", 0) > 0 then
-		StopRoundMusic() StopHeroMusicSound() heroMusicActive = false musicMix = 0
-		return
-	end
 	if zb.CROUND ~= "realish" or zb.ROUND_STATE ~= 1 then
 		if heroMusicActive then
 			heroMusicActive = false
@@ -981,16 +976,7 @@ local function AddChoice(parent, x, y, w, h, text, getSelected, selectFunc, subt
 	return button
 end
 
-local function FinalSpectator()
-    local ply = LocalPlayer()
-    if not IsValid(ply) or ply:Alive() then return false end
-    if ply:GetNWBool("Realish_IsHero", false) and ply:GetNWInt("Realish_HeroLives", 0) > 0 then return false end
-    local key = ply:Team() == 0 and "Realish_ATLAS_Lives" or "Realish_REVENANT_Lives"
-    return (ply:Team() == 0 or ply:Team() == 1) and GetGlobalInt(key, 50) <= 0
-end
-
 local function OpenMenu(force, customize, attachmentPage, heroMode, streakMode)
-	if FinalSpectator() then CloseMenu() return end
 	if zb.CROUND ~= "realish" then return end
 	if not IsValid(LocalPlayer()) then return end
 	customize = customize or false
@@ -2322,7 +2308,7 @@ local tilts = introTextTilts or {}
 	if livesAlpha <= 1 then return end
 
 	local alpha = math.floor(livesAlpha)
-	if ply:Alive() then DrawKillstreakHUD(alpha) end
+	DrawKillstreakHUD(alpha)
 	local w = ScrW()
 	local atlas = GetGlobalInt("Realish_ATLAS_Lives", 50)
 	local revenant = GetGlobalInt("Realish_REVENANT_Lives", 50)
@@ -2473,7 +2459,6 @@ hook.Add("Think", "Realish_DeathMenu", function()
 		StartRoundMusic()
 	end
 
-	if FinalSpectator() then CloseMenu() return end
 	if not ply:Alive() then
 		if deployUntil > CurTime() then
 			CloseMenu()
@@ -2673,5 +2658,3 @@ hook.Add("HUDPaint", "RealishHitNotifications", function()
 		draw.SimpleText(n.text, "RealishMedium", textX, y + realishNotifH * 0.5, Color(245, 245, 245, 255 * alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	end
 end)
-
-include("realish_doom/cl_doom.lua")

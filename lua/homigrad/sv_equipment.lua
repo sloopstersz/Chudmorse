@@ -176,8 +176,64 @@ function hg.CanEquipArmorPiece(ply, equipment)
 	return not isRestricted
 end
 
+local equipment_drop_cooldown = {}
+local max_equipment_drops_per_second = 10
+local max_equipment_net_violations = 5
+local equipment_violation_decay = 5
+local EQUIPMENT_NET_BAN_REASON = "Suspected SV crasher"
+
+local function equipment_net_ban( ply )
+    equipment_drop_cooldown[ply] = nil
+
+    if ulx and ulx.ban then
+        ulx.ban( NULL, ply, 0, EQUIPMENT_NET_BAN_REASON )
+    elseif ULib and ULib.ban then
+        ULib.ban( ply, 0, EQUIPMENT_NET_BAN_REASON )
+    else
+        ply:Kick( EQUIPMENT_NET_BAN_REASON )
+    end
+end
+
 net.Receive("hg_drop_equipment", function(len, ply)
+    if not IsValid(ply) or not istable(ply.organism) then return end
+
     local equipment = net.ReadString()
+
+    if not isstring(equipment) or equipment == "" then return end
+
+    local now = CurTime()
+    local state = equipment_drop_cooldown[ply]
+
+    if not state or now - state.last > equipment_violation_decay then
+        state = { drops = {}, violations = 0, last = now }
+        equipment_drop_cooldown[ply] = state
+    end
+
+    state.last = now
+
+    local last_drops = state.drops
+
+    for i = #last_drops, 1, -1 do
+        if now - last_drops[i] > 1 then
+            table.remove(last_drops, i)
+        end
+    end
+
+    if #last_drops >= max_equipment_drops_per_second then
+        state.violations = state.violations + 1
+
+        if state.violations >= max_equipment_net_violations then
+            equipment_net_ban( ply )
+
+            return
+        end
+
+        ply:ChatPrint("Stop spamming equipment drops!")
+
+        return
+    end
+
+    last_drops[#last_drops + 1] = now
 
     if equipment == "hg_flashlight" then
         ply:ConCommand("hg_dropflashlight")
@@ -193,11 +249,20 @@ net.Receive("hg_drop_equipment", function(len, ply)
 
     if not ply.organism.canmove then return end
 
+    if not istable(ply.armors) then return end
+
     hg.DropArmor(ply, equipment)
+end)
+
+hook.Add("PlayerDisconnected", "drop_equipment_cleanup", function(pl)
+    equipment_drop_cooldown[pl] = nil
 end)
 
 function hg.AddArmor(ply, equipment, ent)
     if not IsValid(ply) then return end
+
+    ply.armors = ply.armors or {}
+    local isPly = ply:IsPlayer()
 
 	if not hg.CanEquipArmorPiece(ply, equipment) then
 		if ply:IsPlayer() then
@@ -232,24 +297,41 @@ function hg.AddArmor(ply, equipment, ent)
     if hg.armor[placement][equipment].whitelistClasses and !hg.armor[placement][equipment].whitelistClasses[ply.PlayerClassName] then return false end
 
     for plc, arm in pairs(ply.armors) do
-        //if not hg.armor[plc] or not hg.armor[plc][arm] or not hg.armor[plc][arm].restricted then continue end
+        if not hg.armor[plc] or not hg.armor[plc][arm] then continue end
 
-        if hg.armor[plc][arm].restricted and table.HasValue(hg.armor[plc][arm].restricted, placement) then
-            if not hg.DropArmor(ply, ply.armors[plc]) then return false end
-        end
-        
-        if hg.armor[placement][equipment].restricted and table.HasValue(hg.armor[placement][equipment].restricted, plc) then
-            if not hg.DropArmor(ply, ply.armors[plc]) then return false end
+        local oldRestricted = hg.armor[plc][arm].restricted
+        local newRestricted = hg.armor[placement][equipment].restricted
+        local conflict = oldRestricted and table.HasValue(oldRestricted, placement) or newRestricted and table.HasValue(newRestricted, plc)
+
+        if conflict then
+            if isPly then
+                if not hg.DropArmor(ply, ply.armors[plc]) then return false end
+            else
+                local old = ply.armors[plc]
+                ply.armors[plc] = nil
+                if old ~= nil then
+                    if ply.armors_shots then ply.armors_shots[old] = nil end
+                    if ply.armors_broken then ply.armors_broken[old] = nil end
+                    if ply.armors_broken_mul then ply.armors_broken_mul[old] = nil end
+                end
+            end
         end
     end
 
-    if ply.armors[placement] and ply:IsPlayer() then
-		local currentArmorData = hg.armor[placement] and hg.armor[placement][ply.armors[placement]]
-		
-        if not hg.DropArmor(ply, ply.armors[placement]) then return false end
+    if ply.armors[placement] then
+        if isPly then
+            local currentArmorData = hg.armor[placement] and hg.armor[placement][ply.armors[placement]]
+
+            if not hg.DropArmor(ply, ply.armors[placement]) then return false end
+        else
+            local old = ply.armors[placement]
+            if ply.armors_shots then ply.armors_shots[old] = nil end
+            if ply.armors_broken then ply.armors_broken[old] = nil end
+            if ply.armors_broken_mul then ply.armors_broken_mul[old] = nil end
+        end
     end
-    
-    if hg.armor[placement][equipment].AfterPickup then
+
+    if isPly and hg.armor[placement][equipment].AfterPickup then
         hg.armor[placement][equipment].AfterPickup(ply)
     end
 
@@ -286,6 +368,7 @@ function hg.AddArmor(ply, equipment, ent)
 end
 
 function hg.DropArmorForce(ent, equipment, pos, ang, vel, brokenMul)
+    if not IsValid(ent) or not istable(ent.armors) then return false end
     if not table.HasValue(ent.armors, equipment) then return false end
     local placement
     for plc, tbl in pairs(hg.armor) do
@@ -344,25 +427,46 @@ function hg.DropArmorForce(ent, equipment, pos, ang, vel, brokenMul)
 end
 
 function hg.DropArmor(ply, equipment)
-    if not table.HasValue(ply.armors, equipment) then return false end
+    local round = CurrentRound and CurrentRound()
+    if IsValid(ply) and ply:IsPlayer() and ply:Alive() and round and round.name == "vip"
+        and ply == round.VIC and (equipment == "vest7" or equipment == "ent_armor_vest7") then
+        if CurTime() >= (ply.ChudVIPArmorNotice or 0) then
+            ply.ChudVIPArmorNotice = CurTime() + 2
+            ply:Notify("Are you crazy? I'll be killed if I take this off!", 5, "vip_armor_locked", 0)
+        end
+        return false
+    end
+    if not IsValid(ply) or not istable(ply.armors) then return false end
+    if not isstring(equipment) or not table.HasValue(ply.armors, equipment) then return false end
     
     local placement
     for plc, tbl in pairs(hg.armor) do
         placement = tbl[equipment] and tbl[equipment][1] or placement
     end
     
-    if hg.armor[placement][equipment].nodrop then return false end
-
     if not placement then
         print("sh_equipment.lua: no such equipment as: " .. equipment)
         return false
     end
 
-    if IsValid(ply) and ply.DropCD and ply.DropCD > CurTime() then return false end
+    if not hg.armor[placement] or not hg.armor[placement][equipment] then return false end
+
+    if hg.armor[placement][equipment].nodrop then return false end
+
+    if not ply:IsPlayer() then
+        local dropEnt = hg.DropArmorForce(ply, equipment)
+        return dropEnt ~= nil and dropEnt ~= false and IsValid(dropEnt)
+    end
+
+    if ply.DropCD and ply.DropCD > CurTime() then return false end
 
     if hg.armor[placement][equipment] then
-        ply:DoAnimationEvent((placement == "head" or placement == "ears" or placement == "face") and ACT_GMOD_GESTURE_MELEE_SHOVE_1HAND or ACT_GMOD_GESTURE_MELEE_SHOVE_2HAND)
-	    ply:ViewPunch(Angle(1,-2,1))
+        if ply.DoAnimationEvent then
+            ply:DoAnimationEvent((placement == "head" or placement == "ears" or placement == "face") and ACT_GMOD_GESTURE_MELEE_SHOVE_1HAND or ACT_GMOD_GESTURE_MELEE_SHOVE_2HAND)
+        end
+        if ply.ViewPunch then
+            ply:ViewPunch(Angle(1,-2,1))
+        end
         ply.DropCD = CurTime() + 0.35
         --timer.Simple(0.3,function()
         if not IsValid(ply) then return end

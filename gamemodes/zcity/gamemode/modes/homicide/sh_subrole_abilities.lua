@@ -1,3 +1,17 @@
+-- Keep these mode callbacks inactive while another mode is running.
+local modeHookAPI = hook
+local hook = setmetatable({}, {__index = modeHookAPI})
+function hook.Add(event, id, callback)
+    modeHookAPI.Add(event, "" .. id, function(...)
+        local active = zb and (zb.CROUND_MAIN or zb.CROUND)
+        if active ~= "hmcd" then return end
+        return callback(...)
+    end)
+end
+function hook.Remove(event, id)
+    modeHookAPI.Remove(event, "" .. id)
+end
+
 local MODE = MODE
 MODE.NetSize_ChemicalResistanceBits = 8
 local chemical_degrade_speeds = {
@@ -93,6 +107,7 @@ end
 
 function MODE.BreakOtherNeck(ply, other_ply, aim_ent)
 	if(other_ply:Alive())then
+		if SERVER then hook.Run("ChudAchievementNeckSnap", ply, other_ply) end
 		other_ply:Kill()
 		other_ply:ViewPunch(Angle(0, 0, -10))
 		

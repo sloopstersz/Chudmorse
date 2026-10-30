@@ -234,8 +234,9 @@ util.AddNetworkString("hg_pointshop_send_notificate")
 
 function PLUGIN:NET_BuyItem( ply, uid )
     if not util.IsBinaryModuleInstalled("mysqloo") then return end
+    if not isstring( uid ) or uid == "" then return end
+    if not hg.PointShop.Items[uid] then return end
     if hg.PointShop.Items[uid].ISDONATE then return end
-    if not hg.PointShop.Items[uid] then print(ply, "[PS-ZCity] The player is trying to buy invalid item.", "UID: "..uid ) return end
     if ply:PS_HasItem( uid ) then PLUGIN:NET_SendPointShopVars( ply ) return end
 
     local yes = false
@@ -258,19 +259,29 @@ function PLUGIN:NET_GetBuyedItems( ply )
     PLUGIN:NET_SendPointShopVars( ply )
 end
 
-net.Receive("hg_pointshop_net",function( _, ply )
-    if ply.PSNetCD and ply.PSNetCD > CurTime() then return end
+local netHandlers = {
+    ["BuyItem"] = function( ply, uid ) PLUGIN:NET_BuyItem( ply, uid ) end,
+    ["GetBuyedItems"] = function( ply ) PLUGIN:NET_GetBuyedItems( ply ) end,
+    ["SendPointShopVars"] = function( ply ) PLUGIN:NET_SendPointShopVars( ply ) end
+}
 
-    ply.PSNetCD = CurTime() + 0.01
+net.Receive("hg_pointshop_net",function( _, ply )
+    if ( ply.PSNetCD or 0 ) > CurTime() then return end
+
+    ply.PSNetCD = CurTime() + 1
 
     local str = net.ReadString()
-    local funcstring = PLUGIN[ "NET_" .. str ]
+    local func = istable( netHandlers ) and netHandlers[ str ]
 
-    if not funcstring then print(ply, "[PS-ZCity] Player trying to call an invalid function!", "NAME: "..str ) return end
+    if not func then return end
+
     local vars = net.ReadTable()
-    if table.Count(vars) > 5 then print(ply, "[PS-ZCity] The player is trying to send a bunch of vars to the net.", "NAME: "..str ) return end
+    if not istable( vars ) or table.Count( vars ) > 4 then return end
+    for k in pairs( vars ) do
+        if not isnumber( k ) then return end
+    end
 
-    funcstring( PLUGIN, ply, unpack(vars) )
+    func( ply, unpack( vars ) )
 end)
 
 hook.Add("HG_PlayerSay","OpenPointShop",function(ply, txtTbl, txt)

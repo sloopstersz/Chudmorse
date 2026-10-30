@@ -60,6 +60,7 @@ MODE.LootTable = {
 		{3,"ent_ammo_4.6x30mm"},
 		{3,"weapon_bigconsumable"},
 		{3,"weapon_painkillers"},
+		{3,"weapon_antidepressants"},
 		{3,"weapon_bigbandage_sh"},
 		
         {2,"weapon_medkit_sh"},
@@ -84,6 +85,7 @@ MODE.LootTable = {
         
         {8,"weapon_bigconsumable"},
 		{7,"weapon_painkillers"},
+		{7,"weapon_antidepressants"},
 		{6,"weapon_bigbandage_sh"},
         {5,"weapon_morphine"},
         {5,"weapon_naloxone"},

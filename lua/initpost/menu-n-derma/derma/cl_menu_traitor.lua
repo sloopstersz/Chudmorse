@@ -157,7 +157,7 @@ local RoleConfigs = {
             ["assassin"] = {cost = 15, name = "Assassin", desc = "Better gun control and more endurance."},
             ["damned"] = {cost = 30, name = "Damned", desc = "You start with nothing."},
             ["chemist"] = {cost = 10, name = "Chemist", desc = "Detect chemicals in the air."},
-            ["fox"] = {cost = 10, name = "Technician", desc = "Track police calls. Use the Hack Tablet to shock phones and activate map traps."}
+            ["fox"] = {cost = 5, name = "Technician", desc = "Scan and activate map traps through the radial menu."}
   },
         items = {
 		    ["weapon_pm9"] = {cost = 12, name = "PM9 Evil Gun"},
@@ -172,7 +172,6 @@ local RoleConfigs = {
             ["weapon_hg_shuriken"] = {cost = 1, name = "Shuriken"},
             ["weapon_hg_smokenade_tpik"] = {cost = 2, name = "Smoke Grenade"},
             ["weapon_traitor_ied"] = {cost = 5, name = "IED"},
-            ["weapon_dronecontroller_ful"] = {cost = 5, name = "FPV Drone", desc = "Cannot be selected with the IED."},
             ["weapon_traitor_poison1"] = {cost = 2, name = "Tetrodotoxin Syringe"},
             ["weapon_traitor_poison2"] = {cost = 2, name = "VX vial"},
             ["weapon_traitor_poison3"] = {cost = 4, name = "Cyanide Canister"},
@@ -385,8 +384,8 @@ exclusions = {
 			["hero_m1911compact_ammo"] = {cost = 2, name = "M1911 Extra Ammo", parent = "weapon_m1911compact", desc = "Do you all even read these?"},
 			["hero_m1911compact_laser"] = {cost = 2, name = "M1911 Laser", parent = "weapon_m1911compact", attachment = "laser5", desc = "I'm gonna rip xeno apart..."},
 			["hero_fn45_ammo"] = {cost = 2, name = "FNX-45 Extra Ammo", parent = "weapon_fn45", desc = "I need more boollets"},
-			["hero_fn45_laser"] = {cost = 2, name = "FNX-45 Laser", parent = "weapon_fn45", desc = "yea"},
-			["hero_fn45_silencer"] = {cost = 2, name = "FNX-45 Suppressor", parent = "weapon_fn45", desc = "Something silent?"},
+			["hero_fn45_laser"] = {cost = 2, name = "FNX-45 Laser", parent = "weapon_fn45", attachment = "laser5", desc = "yea"},
+			["hero_fn45_silencer"] = {cost = 2, name = "FNX-45 Suppressor", parent = "weapon_fn45", attachment = "supressor4", desc = "Something silent?"},
         },
        addonOrder = {
             ["weapon_px4beretta"] = {"hero_px4_silencer", "hero_px4_ammo"},

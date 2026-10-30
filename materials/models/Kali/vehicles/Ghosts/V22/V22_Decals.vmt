@@ -1,0 +1,11 @@
+"VertexlitGeneric"
+{
+
+	"$basetexture" "models\Kali\vehicles\Ghosts\V22\V22_Glass_C"
+	"$halflambert" "1"				
+	"$nocull" 1
+
+	"$translucent" 1		
+}
+
+

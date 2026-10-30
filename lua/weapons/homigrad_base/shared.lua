@@ -1263,7 +1263,7 @@ function SWEP:CoreStep()
 		--self:WorldModel_Transform()
 	end]]
 
-	if owner:IsPlayer() and hg_slings:GetBool() and (zb.CROUND and zb.CROUND == "hmcd" or gamemod == "sandbox") then
+	if owner:IsPlayer() and hg_slings:GetBool() and (zb.CROUND and (zb.CROUND == "hmcd" or zb.CROUND == "framed") or gamemod == "sandbox") then
 		local inv = owner:GetNetVar("Inventory")
 		local noSling = inv and (not inv["Weapons"] or not inv["Weapons"]["hg_sling"])
 

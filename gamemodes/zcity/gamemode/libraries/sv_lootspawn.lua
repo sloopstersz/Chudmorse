@@ -196,6 +196,9 @@ local string_lower = string.lower
 local string_find = string.find
 function hg.GenerateLoot(ply,ent,func)
 	local curRound, rtype = CurrentRound()
+    if curRound.name == "chaos" and curRound.GenerateChaosLoot then
+        return curRound:GenerateChaosLoot(ply, ent, func)
+    end
 	
 	local should = curRound.LootSpawn
 	
@@ -345,6 +348,14 @@ function hg.GenerateLoot(ply,ent,func)
 end
 
 local functions = {
+    -- Non-inventory SENT items appear beside the opened container.
+    ["ChaosEntities"] = function(container, class)
+        local item = ents.Create(class)
+        if not IsValid(item) then return end
+        item:SetPos(container:GetPos() + Vector(0, 0, 32))
+        item.IsSpawned, item.init = true, true
+        item:Spawn()
+    end,
     ["Weapons"] = function(ent, wep)
 		local weapon = weapons.Get(wep)
 		--if not weapon then return end
@@ -434,21 +445,38 @@ hook.Add("ZB_InventoryChecked", "LootSpawn", function(ply, ent)
 
 	ent.was_opened = true
 
+	local curRound = CurrentRound()
+	if curRound.EmptyBoxChance and math.Rand(0, 1) < curRound.EmptyBoxChance then
+		ent:SetNetVar("Armor", ent.armors)
+		ent:SetNetVar("Inventory", ent.inventory)
+		return
+	end
+
 	local chance = hg.loot_amount[lootData[1]] or {0,1}
 	local amount = math.random(chance[1],chance[2])
+
+	local mul = curRound.LootAmountMul
+	if mul and mul < 1 then
+		amount = math.floor(amount * mul + (math.random() < (amount * mul % 1) and 1 or 0))
+	end
 	
+    local hadLoot = false
 	for i = 0,amount-1 do
 		local entName, AmmoCount, Tab = hg.GenerateLoot(ply,ent)
 		if entName then
+            hadLoot = true
+            if Tab ~= "ChaosEntities" then
 			entName = string.Replace(entName,"ent_att_","")
 			entName = string.Replace(entName,"ent_armor_","")
 			entName = string.Replace(entName,"ent_ammo_","")
+            end
 			functions[Tab](ent,entName,AmmoCount)
 		end
 	end
 
 	ent:SetNetVar("Armor", ent.armors)
 	ent:SetNetVar("Inventory", ent.inventory)
+    if hadLoot then hook.Run("ChudAchievementLootBox", ply, ent) end
 end)
 
 hg.loot_amount = {
@@ -719,6 +747,8 @@ hook.Add("Boxes Think", "SpawnBoxes", function()
 		--huy.stats = stats--длина и тип спавна лута (для рп дополнения...)
 		return
 	end
+
+	if round.LootLooseSkip and math.Rand(0, 1) < round.LootLooseSkip then return end
 
 	local entName, AmmoCount, Tab = hg.GenerateLoot()
 	//print(entName)

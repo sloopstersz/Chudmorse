@@ -223,6 +223,7 @@ hook.Add('Player Spawn','Swarm',function(p)
 end)
 
 hook.Add('CanPlayerSuicide','Swarm',function(p) 
+    if ZZIsZombie and ZZIsZombie(p) then return end
 	if(p.SwarmPerc>10 and p.Swm)then
 		p:ChatPrint("You can't.")
 		return false

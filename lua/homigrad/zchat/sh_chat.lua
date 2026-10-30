@@ -87,6 +87,8 @@ if CLIENT then
 		local text = net.ReadString()
 		local bWhisper = net.ReadBool()
 
+		if not IsValid(speaker) or not speaker:IsPlayer() then return end
+
 		speaker.ChatWhisper = bWhisper
 
 		CHAT_SPEAKER = speaker

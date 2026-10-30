@@ -108,6 +108,7 @@ function SWEP:DoPoison(tr)
 
 	local ent = ents.Create("ent_hg_cyanide_canister")
 	ent:SetPos(owner:IsNPC() and owner:EyePos() or tr.HitPos)
+	ent.ChudCyanideOwner = owner
 	ent:Spawn()
 
     self:Remove()
@@ -117,6 +118,7 @@ end
 if SERVER then
     hook.Add("Org Clear", "RemovePoison3", function(org)
         org.poison3 = nil
+        org.ChudCyanideOwner = nil
 		org.poison3notificate = nil
     end)
 

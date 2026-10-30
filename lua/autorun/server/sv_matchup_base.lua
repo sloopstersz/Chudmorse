@@ -4,45 +4,6 @@ WWE.moves = WWE.moves or {}
 WWE.Config       = WWE.Config or {}
 WWE.Config.Reach = 100
 WWE.Config.Hull  = 16
-
-local WWE_ADMIN_GROUPS = {
-    admin = true,
-    superadmin = true,
-}
-
-local WWE_DENIED_GROUPS = {
-    vip = true,
-    mod = true,
-    moderator = true,
-    moderators = true,
-}
-
--- Keep WWE restricted to actual admin ranks. ULX custom ranks are supported
--- through their inheritance chain, while VIP/moderator ranks stay denied even
--- if their ULX group inherits permissions from admin.
-function WWE.HasAdminAccess(ply)
-    if not IsValid(ply) or not ply:IsPlayer() then return false end
-
-    local group = string.lower(tostring(ply:GetUserGroup() or "user"))
-    local groups = ULib and ULib.ucl and ULib.ucl.groups
-    local visited = {}
-
-    while group ~= "" and not visited[group] do
-        if WWE_DENIED_GROUPS[group] then return false end
-        if WWE_ADMIN_GROUPS[group] then return true end
-
-        visited[group] = true
-        local groupData = groups and groups[group]
-        local parent = groupData and groupData.inherit_from
-        if not isstring(parent) or parent == "" then break end
-
-        group = string.lower(parent)
-    end
-
-    -- Preserve compatibility on servers without ULib.
-    if not groups then return ply:IsAdmin() end
-    return false
-end
 -- эть нахуй бля наёбка 
 local ENTITY = FindMetaTable("Entity")
 ENTITY.RealGetVelocity = ENTITY.RealGetVelocity or ENTITY.GetVelocity
@@ -164,8 +125,6 @@ function WWE.RegisterMove(name, def)
 end
 
 function WWE.RunMove(ply, name)
-    if not WWE.HasAdminAccess(ply) then return false end
-
     local move = WWE.moves[name]
     if not move then return false end
     if not WWE.CanGrapple(ply) then return false end
@@ -192,10 +151,7 @@ end
 
 concommand.Add("wwe_move", function(ply, cmd, args)
     if not IsValid(ply) then return end
-    if not WWE.HasAdminAccess(ply) then
-        ply:ChatPrint("[WWE] This command is restricted to admins.")
-        return
-    end
+    if zb.CROUND ~= "event" and not ply:IsAdmin() then ply:ChatPrint("damn something's wrong") return end
     local name = args[1]
     if not name or name == "" then
         ply:ChatPrint("[WWE] Usage: wwe_move <move>")
@@ -210,10 +166,7 @@ end)
 
 concommand.Add("wwe_taunt", function(ply, cmd, args)
     if not IsValid(ply) then return end
-    if not WWE.HasAdminAccess(ply) then
-        ply:ChatPrint("[WWE] This command is restricted to admins.")
-        return
-    end
+    if zb.CROUND ~= "event" and not ply:IsAdmin() then ply:ChatPrint("damn something's wrong") return end
     local name = args[1]
     if not name or name == "" then
         ply:ChatPrint("[WWE] Usage: wwe_taunt <taunt>")

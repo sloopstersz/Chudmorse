@@ -1,5 +1,8 @@
 if SERVER then
 	AddCSLuaFile()
+	function SWEP:OnDrop()
+		if self._carpetSpent then self:Remove() end
+	end
 end
 
 SWEP.Base = "weapon_carpetbomber"

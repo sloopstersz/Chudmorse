@@ -1,419 +1,221 @@
-MODE.name = "juggernaut"
-MODE.PrintName = "juggernaut"
+if not SERVER then return end
+local MODE = MODE
 
-MODE.OverideSpawnPos = true
-MODE.LootSpawn = false
-MODE.ForBigMaps = false
-MODE.Chance = 0.03
-
-local victimWeapons1 = {
-    "weapon_toz106",
-    "weapon_musket",
-    "weapon_winchester",
-    "weapon_mini14",
-    "weapon_m16a1",
-    "weapon_mp5",
-    "weapon_skorpion"
-}
-
--- Scared Chud long guns that should spawn with sling support.
--- Skorpion is intentionally excluded because it is the compact sidearm-style primary.
-local victimWeaponsWithSling = {
-    ["weapon_toz106"] = true,
-    ["weapon_musket"] = true,
-    ["weapon_winchester"] = true,
-    ["weapon_mini14"] = true,
-    ["weapon_m16a1"] = true,
-    ["weapon_mp5"] = true
-}
-
-local victimWeapons2 = {
-	"weapon_glock17",
-	"weapon_m9beretta",
+local survivorWeapons = {
 	"weapon_hk_usp",
 	"weapon_makarov",
-	"weapon_p22"
+	"weapon_revolver2",
+	"weapon_pl15",
+	"weapon_m1911",
+	"weapon_fn45",
+	"weapon_tec9",
+	"weapon_p22",
+	"weapon_cz75",
+	"weapon_flintlock",
+	"weapon_doublebarrel_short",
+	"weapon_toz106",
+	"weapon_mac11",
+	"weapon_skorpion",
+	"weapon_ruger",
 }
 
-local victimConsumables = {
-    "weapon_bigconsumable",
-    "weapon_smallconsumable",
-    "weapon_bandage_sh",
-    "weapon_hg_smokenade_tpik",
-}
 
-local juggernautLoadout = {
-    weapons = {
-        {class = "weapon_pkm", extraMags = 2, sling = true},
-        {class = "weapon_deagle_annihilator", extraMags = 4},
-        {class = "weapon_hg_pipebomb_tpik"}
-    },
-    armor = {
-        "ent_armor_vest5",
-        "ent_armor_mask1",
-        "ent_armor_helmet5",
-        "ent_armor_headphones1"
-    },
-    curPluv = "pluvberet"
-}
+util.AddNetworkString("rem_juggernaut_intro")
+util.AddNetworkString("rem_juggernaut_end")
+resource.AddFile("sound/rem_juggernaut.mp3")
+resource.AddFile("models/arty/codmw2022/mp/dmz/alqatala/juggernaut/juggernaut_pm.mdl")
 
-function MODE.GuiltCheck(Attacker, Victim, add, harm, amt)
-    return 1, true
+local function AddMaterials(directory)
+	local files, folders = file.Find(directory .. "/*", "GAME")
+	for _, name in ipairs(files) do
+		if string.GetExtensionFromFilename(name) == "vmt" or string.GetExtensionFromFilename(name) == "vtf" then
+			resource.AddFile(directory .. "/" .. name)
+		end
+	end
+	for _, name in ipairs(folders) do
+		AddMaterials(directory .. "/" .. name)
+	end
+end
+AddMaterials("materials/arty/codmw2022/mp/dmz/alqatala/juggernaut")
+AddMaterials("materials/arty/codmw2022/shared")
+
+local function Participants()
+	local result = {}
+	for _, ply in player.Iterator() do
+		if ply:Team() ~= TEAM_SPECTATOR then result[#result + 1] = ply end
+	end
+	return result
 end
 
-util.AddNetworkString("juggernaut_start")
+function MODE:CanLaunch()
+	return #Participants() >= 2
+end
 
 function MODE:Intermission()
-    game.CleanUpMap()
- 
-	for i, ply in player.Iterator() do
-		if ply:Team() == TEAM_SPECTATOR then continue end
- 
-		ply:SetupTeam(ply:Team())
+	game.CleanUpMap()
+	self.Winner = nil
+	self.MissingModelWarning = nil
+	self.Players = Participants()
+	table.Shuffle(self.Players)
+    local assigned = ChudTakeNextModeRole and ChudTakeNextModeRole("juggernaut", self.Players)
+    if IsValid(assigned) then
+        for i, ply in ipairs(self.Players) do
+            if ply == assigned then
+                self.Players[1], self.Players[i] = self.Players[i], self.Players[1]
+                break
+            end
+        end
+    end
+	self.Juggernaut = self.Players[1]
+	for i, ply in ipairs(self.Players) do
+		ply:SetPlayerClass()
+		ApplyAppearance(ply)
+		ply:SetupTeam(i == 1 and 1 or 0)
+		ply:Freeze(false) -- Preparation holds movement without freezing view angles.
+	end
+end
+
+function MODE:GiveEquipment()
+	for _, ply in ipairs(self.Players or {}) do
+		if IsValid(ply) and ply:Alive() then
+			local isJuggernaut = ply == self.Juggernaut
+			ply:StripWeapons()
+			ply:RemoveAllAmmo()
+			local hands = hg.GetHandsWeaponClass and hg.GetHandsWeaponClass(ply) or "weapon_hands_sh"
+			ply:Give(hands)
+			ply:SelectWeapon(hands)
+			ply:SetMaxHealth(isJuggernaut and 350 or 100)
+			ply:SetHealth(ply:GetMaxHealth())
+			zb.GiveRole(ply, isJuggernaut and "Juggernaut" or "Scared Chud", Color(190, 30, 30))
+			if isJuggernaut then
+				ply:SetPlayerClass("chud_juggernaut")
+				if util.IsValidModel(self.JuggernautModel) then
+					ply:SetModel(self.JuggernautModel)
+				elseif not self.MissingModelWarning then
+					self.MissingModelWarning = true
+					local message = "[Juggernaut] Missing model: " .. self.JuggernautModel
+					ErrorNoHalt(message .. "\n")
+					ply:ChatPrint(message .. ". Install the model content on the server and clients.")
+				end
+				ply:SetBodyGroups("000000000000")
+				ply:SetSubMaterial()
+				ply:SetNetVar("Accessories", "none")
+				ply:SetNetVar("AccessoryColors", {})
+				ply:SetNWString("BandageGlovesMdl", "")
+				ply:SetPlayerColor(Vector(1, 1, 1))
+				ply:SetNWVector("PlayerColor", Vector(1, 1, 1))
+				-- Verified in the supplied MDL: group 11, value 1 is the empty mesh.
+				ply:SetBodygroup(11, 1)
+			end
+			if isJuggernaut then
+				local inv = ply:GetNetVar("Inventory", {})
+				inv.Weapons = inv.Weapons or {}
+				inv.Weapons.hg_sling = true
+				ply:SetNetVar("Inventory", inv)
+				for _, armor in ipairs({
+					"ent_armor_vest5",
+					"ent_armor_mask1",
+					"ent_armor_headphones1",
+					"ent_armor_helmet5",
+				}) do
+					hg.AddArmor(ply, armor)
+				end
+				for _, class in ipairs({ "weapon_pkm", "weapon_deagle_annihilator" }) do
+					local weapon = ply:Give(class)
+					if IsValid(weapon) then
+						local clip = weapon:GetMaxClip1()
+						local ammo = weapon:GetPrimaryAmmoType()
+						if clip > 0 then weapon:SetClip1(clip) end
+						if clip > 0 and ammo >= 0 then ply:GiveAmmo(clip * 3, ammo, true) end
+					end
+				end
+				for _, class in ipairs({
+					"weapon_hg_pipebomb_tpik",
+					"weapon_bigbandage_sh",
+					"weapon_betablock",
+					"weapon_medkit_sh",
+					"weapon_fentanyl",
+				}) do
+					ply:Give(class)
+				end
+			else
+				local inv = ply:GetNetVar("Inventory", {})
+				inv.Weapons = inv.Weapons or {}
+				inv.Weapons.hg_sling = true
+				ply:SetNetVar("Inventory", inv)
+				local class = survivorWeapons[math.random(#survivorWeapons)]
+				local weapon = ply:Give(class, true)
+				if IsValid(weapon) then
+					local clip, ammo = weapon:GetMaxClip1(), weapon:GetPrimaryAmmoType()
+					-- One loaded magazine plus two spare magazines.
+					if clip > 0 then weapon:SetClip1(clip) end
+					if clip > 0 and ammo >= 0 then ply:SetAmmo(clip * 2, ammo) end
+					ply:SelectWeapon(class)
+				end
+				ply:Give("weapon_medkit_sh")
+			end
+			net.Start("rem_juggernaut_intro")
+			net.WriteBool(isJuggernaut)
+			net.WriteFloat(self.IntroDuration or 8)
+			net.Send(ply)
+		end
+	end
+	-- Start on the next engine tick instead of waiting for the round polling timer.
+	timer.Simple(0, function()
+		if CurrentRound() == self and zb.ROUND_STATE == 0 then zb:RoundStart() end
+	end)
+end
+
+function MODE:RoundStart()
+	for _, ply in ipairs(self.Players or {}) do
+		if IsValid(ply) then ply:Freeze(false) end
 	end
 end
 
 function MODE:CheckAlivePlayers()
-    local acPlayers = {}
-    local chigurPlayers = {}
- 
-    for _, ply in ipairs(team.GetPlayers(0)) do
-        if ply:Alive() and not ply:GetNetVar("handcuffed", false) then
-            table.insert(chigurPlayers, ply)
-        end
-    end
- 
-    for _, ply in ipairs(team.GetPlayers(1)) do
-        if ply:Alive() and not ply:GetNetVar("handcuffed", false) then
-            table.insert(acPlayers, ply)
-        end
-    end
- 
-    return {acPlayers, chigurPlayers}
-end
-
-function MODE:EndRound()
-    -- Prevent the five-minute reinforcement timer from carrying into another round.
-    timer.Remove("JuggernautSpawnNationalGuard")
-
-    -- Legacy Z-City results menu removed. Remorse handles the normal round transition.
+	local sides = { {}, {} }
+	for _, ply in ipairs(self.Players or {}) do
+		if
+			IsValid(ply)
+			and ply:Team() ~= TEAM_SPECTATOR
+			and ply:Alive()
+			and not ply:GetNetVar("handcuffed", false)
+			and not (ply.organism and ply.organism.incapacitated)
+		then
+			local side = ply == self.Juggernaut and 1 or 2
+			sides[side][#sides[side] + 1] = ply
+		end
+	end
+	return sides
 end
 
 function MODE:ShouldRoundEnd()
-    local endround, winner = zb:CheckWinner(self:CheckAlivePlayers())
-    return endround
+	local ended, winner = zb:CheckWinner(self:CheckAlivePlayers())
+	if ended then self.Winner = winner end
+	return ended
 end
 
-local function GetNationalGuardCandidates()
-    local available = {}
-
-    for _, ply in player.Iterator() do
-        -- National Chud reinforcements are dead Scared Chuds only.
-        -- This prevents the Juggernaut from respawning as Guard if they die.
-        if ply:Team() ~= 0 then continue end
-        if ply:Alive() then continue end
-        if ply:Team() == TEAM_SPECTATOR then continue end
-        if (ply.afkTime2 or 0) > 60 then continue end
-
-        available[#available + 1] = ply
-    end
-
-    return available
+function MODE:EndRound()
+	hook.Run("ChudAchievementJuggernautResult", self.Juggernaut, self.Winner)
+	for _, ply in ipairs(self.Players or {}) do
+		if IsValid(ply) then
+			ply:Freeze(false)
+			if ply.PlayerClassName == "chud_juggernaut" then ply:SetPlayerClass() end
+			ply:SetMaxHealth(100)
+			if ply:Alive() then ply:SetHealth(math.min(ply:Health(), 100)) end
+		end
+	end
+	net.Start("rem_juggernaut_end")
+	net.WriteUInt(self.Winner or 3, 2)
+	net.Broadcast()
 end
 
-function MODE:EquipNationalGuard(ply, index)
-    ply:SetPlayerClass("nationalguard")
-
-    local gun
-    if index == 1 then
-        gun = ply:Give("weapon_m249")
-    else
-        gun = ply:Give("weapon_m4a1")
-    end
-
-    if IsValid(gun) then
-        ply:GiveAmmo(gun:GetMaxClip1() * 3, gun:GetPrimaryAmmoType(), true)
-    end
-
-    local pistol = ply:Give("weapon_m9beretta")
-    if IsValid(pistol) then
-        ply:GiveAmmo(pistol:GetMaxClip1() * 3, pistol:GetPrimaryAmmoType(), true)
-    end
-
-    ply:Give("weapon_combatknife")
-    ply:Give("weapon_handcuffs")
-    ply:Give("weapon_handcuffs_key")
-    ply:Give("weapon_walkie_talkie")
-    ply:Give("weapon_bandage_sh")
-    ply:Give("weapon_medkit_sh")
-
-    local taser = ply:Give("weapon_taser")
-    if IsValid(taser) then
-        ply:GiveAmmo(taser:GetMaxClip1() * 3, taser:GetPrimaryAmmoType(), true)
-    end
-
-    hg.AddArmor(ply, {"vest4", "helmet1"})
-
-    local inv = ply:GetNetVar("Inventory") or {}
-    inv["Weapons"] = inv["Weapons"] or {}
-    inv["Weapons"]["hg_flashlight"] = true
-    inv["Weapons"]["hg_sling"] = true
-    ply:SetNetVar("Inventory", inv)
-
-    ply:SetNetVar("CurPluv", "pluvberet")
-
-    local hands = ply:Give("weapon_hands_sh")
-    if IsValid(hands) then
-        ply:SetActiveWeapon(hands)
-    end
-
-    zb.GiveRole(ply, "National Chud", Color(60, 90, 0))
+-- Registered by Chudmorse's mode loader; never runs for other gamemodes.
+function MODE:PreHomigradDamage(ply, damage)
+	if IsValid(ply) and ply == self.Juggernaut then damage:ScaleDamage(0.3) end
 end
 
-function MODE:SpawnNationalGuard()
-    local candidates = GetNationalGuardCandidates()
-    if #candidates == 0 then return 0 end
-
-    table.Shuffle(candidates)
-
-    local count = math.min(#candidates, 6)
-    local spawned = 0
-    local basepos
-
-    for i = 1, count do
-        local ply = candidates[i]
-        if not IsValid(ply) then continue end
-
-        ply.isPolice = true
-        ply.isTraitor = false
-        ply.isGunner = false
-
-        -- Keep Guard on the Scared Chud side for Juggernaut win logic.
-        ply:SetupTeam(0)
-        ply:Spawn()
-        -- GM:PlayerSpawn may auto-balance a respawning player; force Guard back to the Chud side.
-        ply:SetTeam(0)
-
-        if not basepos then
-            -- National Chuds use the normal random spawn system.
-            basepos = zb:GetRandomSpawn()
-
-            if basepos then
-                ply:SetPos(basepos)
-            end
-        elseif basepos then
-            hg.tpPlayer(basepos, ply, i)
-        end
-
-        self:EquipNationalGuard(ply, spawned + 1)
-        spawned = spawned + 1
-    end
-
-    return spawned
+function MODE:CanSpawn()
+	return false
 end
-
-function MODE:RoundStart()
-    timer.Remove("JuggernautSpawnNationalGuard")
-
-    timer.Create("JuggernautSpawnNationalGuard", 300, 1, function()
-        if zb.ROUND_STATE ~= 1 then return end
-
-        local current = CurrentRound()
-        if not current or current.name ~= "juggernaut" then return end
-
-        local spawned = current:SpawnNationalGuard()
-        if spawned > 0 then
-            PrintMessage(HUD_PRINTTALK, "National Chuds have arrived.")
-            EmitSound("snd_jack_hmcd_heli2.mp3", vector_origin, 0, CHAN_AUTO, 1, 125, 0, 100)
-        end
-    end)
-end
-
-function MODE:GiveEquipment()
-    local players = {}
-    for _, ply in player.Iterator() do
-        if ply:Team() ~= TEAM_SPECTATOR then
-            players[#players + 1] = ply
-        end
-    end
-
-    table.Shuffle(players)
-
-    local numPlayers = #players
-    if numPlayers < 3 then return end
-
-    -- Superadmins can queue a specific player as the next Fat Chud from the scoreboard menu.
-    -- Move that player to the final slot, which is the slot this mode already reserves for Juggernaut.
-    local forcedJuggernautSteamID = zb.NextSpecialRoleTargets and zb.NextSpecialRoleTargets.juggernaut
-    if forcedJuggernautSteamID then
-        for index, candidate in ipairs(players) do
-            if IsValid(candidate) and candidate:SteamID() == forcedJuggernautSteamID then
-                table.remove(players, index)
-                players[#players + 1] = candidate
-                break
-            end
-        end
-
-        -- Consume the request when a Juggernaut round starts.
-        zb.NextSpecialRoleTargets.juggernaut = nil
-    end
-
-    local numac = 1
-    local numkillers = numPlayers - numac
-
-    for i = 1, numkillers do
-        local ply = players[i]
-        ply:SetupTeam(0)
-        ply:SetPlayerClass("terrorist")
-        zb.GiveRole(ply, "Scared Chud", Color(190, 0, 0))
-        ply:Give("weapon_hands_sh")
-		ply:Give("weapon_medkit_sh")
-        ply:SetNetVar("CurPluv", "pluvmajima")
-        ply:Give(victimConsumables[math.random(#victimConsumables)])
-    
-        local victimWeapons1_choice = victimWeapons1[math.random(#victimWeapons1)]
-        local wep1 = ply:Give(victimWeapons1_choice)
-
-        -- Every Scared Chud rifle/long gun receives sling support.
-        if victimWeaponsWithSling[victimWeapons1_choice] then
-            local inv = ply:GetNetVar("Inventory", {})
-            inv["Weapons"] = inv["Weapons"] or {}
-            inv["Weapons"]["hg_sling"] = true
-            ply:SetNetVar("Inventory", inv)
-
-            if IsValid(wep1) then
-                wep1.sling = true
-            end
-        end
-        
-        local victimWeapons2_choice = victimWeapons2[math.random(#victimWeapons2)]
-        local wep2 = ply:Give(victimWeapons2_choice)
-        
-        if IsValid(wep1) then
-            local ammoType = wep1:GetPrimaryAmmoType()
-            local maxClip = wep1:GetMaxClip1()
-            if ammoType and ammoType >= 0 and maxClip and maxClip > 0 then
-                -- Scared Chuds get 3 reserve primary magazines total (2 more than before).
-                ply:GiveAmmo(maxClip * 3, ammoType, true)
-            end
-        end
-        
-        if IsValid(wep2) then
-            local ammoType = wep2:GetPrimaryAmmoType()
-            local maxClip = wep2:GetMaxClip1()
-            if ammoType and ammoType >= 0 and maxClip and maxClip > 0 then
-                ply:GiveAmmo(maxClip, ammoType, true)
-            end
-            ply:SelectWeapon(wep2:GetClass())
-        end
-        
-        hg.AddArmor(ply, "ent_armor_vest1")
-		hg.AddArmor(ply, "ent_armor_helmet7")
-    end
-    
-    for i = numkillers + 1, numPlayers do
-        local ply = players[i]
-        ply:SetupTeam(1)
-        ply:SetPlayerClass("juggernaut")
-        zb.GiveRole(ply, "Fat Chud", Color(0, 0, 190))
- 
-        local inv = ply:GetNetVar("Inventory", {})
-        inv["Weapons"] = inv["Weapons"] or {}
-        inv["Weapons"]["hg_sling"] = true
-        ply:SetNetVar("Inventory", inv)
- 
-        local hands = ply:Give("weapon_hands_sh")
-        if IsValid(hands) then ply:SelectWeapon(hands:GetClass()) end
-
-        -- Juggernaut/Fat Chud starts with a medkit.
-        ply:Give("weapon_medkit_sh")
-
-        ply:SetNetVar("CurPluv", juggernautLoadout.curPluv)
-
-        for _, weaponInfo in ipairs(juggernautLoadout.weapons) do
-            local wep = ply:Give(weaponInfo.class)
-
-            if IsValid(wep) then
-                local ammoType = wep:GetPrimaryAmmoType()
-                local maxClip = wep:GetMaxClip1()
-
-                -- extraMags is reserve ammo only; the weapon already spawns with a loaded magazine.
-                if weaponInfo.extraMags and weaponInfo.extraMags > 0 and ammoType and ammoType >= 0 and maxClip and maxClip > 0 then
-                    ply:GiveAmmo(maxClip * weaponInfo.extraMags, ammoType, true)
-                end
-
-                if weaponInfo.sling then
-                    wep.sling = true
-                end
-            end
-        end
-
-        for _, armorName in ipairs(juggernautLoadout.armor) do
-            hg.AddArmor(ply, armorName)
-        end
-
-        ply:SelectWeapon("weapon_deagle_annihilator")
-        
-        timer.Simple(0.2, function()
-            if not IsValid(ply) then return end
-            
-            ply:SetMaxHealth(350)
-            ply:SetHealth(350)
-            
-            if ply.armors then
-                ply.armors["head"] = "helmet5"
-                ply.armors["torso"] = "vest5"
-                ply.armors["face"] = "mask1"
-                ply.armors["ears"] = "headphones1"
-            end
-            
-            -- Keep normal tinnitus behavior; the Juggernaut's headphones provide hearing protection.
-            ply.noTinnitus = nil
-        end)
-    end
-
-    -- Start the intro only after all role/team assignments are finished.
-    -- Send the role explicitly so the client never has to race team replication.
-    for _, ply in player.Iterator() do
-        if ply:Team() == TEAM_SPECTATOR then continue end
-
-        net.Start("juggernaut_start")
-            net.WriteUInt(ply:Team() == 1 and 1 or 0, 1)
-        net.Send(ply)
-    end
-end
-
-function MODE:GetTeamSpawn()
-    -- Team 0 = Scared Chuds, Team 1 = Fat Chud.
-    -- Only the Fat Chud has a Juggernaut-specific editor point.
-    -- Scared Chuds keep the normal TDM spawn group.
-    local scared = zb.TranslatePointsToVectors(zb.GetMapPoints("HMCD_TDM_T"))
-    local fat = zb.TranslatePointsToVectors(zb.GetMapPoints("JUGGERNAUT_FAT_CHUD_SPAWN"))
-
-    if not fat or #fat == 0 then
-        fat = zb.TranslatePointsToVectors(zb.GetMapPoints("HMCD_TDM_CT"))
-    end
-
-    return scared, fat
-end
-
-function MODE:RoundThink()
-end
-
-function MODE:CanLaunch()
-    local activePlayers = 0
- 
-    for _, ply in player.Iterator() do
-        if ply:Team() ~= TEAM_SPECTATOR then
-            activePlayers = activePlayers + 1
-        end
-    end
-    
-    if activePlayers < 3 then
-        return false
-    end
- 
-    return true
-end
-
-return MODE
+function MODE:RoundThink() end

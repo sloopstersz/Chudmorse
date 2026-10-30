@@ -64,35 +64,13 @@ SWEP.FMStations = {
 	--end},
 }
 
--- Destruction belongs to the item and survives inventory transfers.
-function SWEP:IsRadioDestroyed()
-    return self.FoxRadioDestroyed == true or (self.GetNWBool and self:GetNWBool("FoxRadioDestroyed", false)) or false
-end
-function SWEP:GetInfo()
-    return {FoxRadioDestroyed = self:IsRadioDestroyed()}
-end
-function SWEP:SetInfo(info)
-    if SERVER and istable(info) and info.FoxRadioDestroyed then self:DestroyRadio() end
-end
-function SWEP:DestroyRadio()
-    if not SERVER then return end
-    self.FoxRadioDestroyed = true
-    self:SetNWBool("FoxRadioDestroyed", true)
-    self.isOn = false
-    self:SetIsOn(false)
-    self:SetInUsing(false)
-end
-
 function SWEP:BippSound(ent, pitch)
     ent:EmitSound("radio/voip_end_transmit_beep_0" .. math.random(1,8) .. ".wav", 35, pitch)
 end
 
 if SERVER then
     function SWEP:CanListen(output, input, isChat)
-        if not IsValid(output) or not IsValid(input) then return false end
-        local receiver = input:GetWeapon("weapon_walkie_talkie")
-        if self:IsRadioDestroyed() or not IsValid(receiver) or receiver:IsRadioDestroyed() then return false end
-		if !self.isOn or !receiver.isOn then
+		if !self.isOn or !input:GetWeapon("weapon_walkie_talkie").isOn then
 			return false
 		end
 		if(not IsValid(output) or not IsValid(input))then 
@@ -320,14 +298,6 @@ function SWEP:Step()
 end
 
 function SWEP:Think()
-    if self:IsRadioDestroyed() then
-        if CLIENT and self.FoxRadioSound then
-            self:StopSound(self.FoxRadioSound)
-            if IsValid(self.model) then self.model:StopSound(self.FoxRadioSound) end
-            self.FoxRadioSound = nil
-        end
-        return
-    end
 	local owner = self:GetOwner()
 
 	if CLIENT then
@@ -341,8 +311,6 @@ function SWEP:Think()
 				self.FM_EventCD = CurTime() + math.random(125,165)
 				local play, timeadd = Output()
 				timer.Simple(0.5,function()
-                    if not IsValid(self) or self:IsRadioDestroyed() or not self:GetIsOn() then return end
-                    self.FoxRadioSound = play
 					local ent = IsValid(self.model) and self.model or self
 					ent:EmitSound(play, 55, 100, 1, CHAN_AUTO, nil, 56)
 					self.FM_EventCD = self.FM_EventCD + timeadd
@@ -377,7 +345,6 @@ if SERVER then
 end
 
 function SWEP:PrimaryAttack()
-    if self:IsRadioDestroyed() then return end
 	if SERVER then return end
 	local tbl = {}
 	if self:GetIsOn() then
@@ -403,7 +370,6 @@ function SWEP:PrimaryAttack()
 end
 
 function SWEP:AdjustFrequency(numAdjust)
-    if self:IsRadioDestroyed() then return end
 	self.Frequency = math.Round(math.Clamp(self.Frequency + numAdjust, 87.5, 108),1)
 	self:SetHudFrequency(self.Frequency)
 
@@ -429,7 +395,7 @@ if CLIENT then
 end
 
 function SWEP:Initialize()
-	self.isOn = not self:IsRadioDestroyed()
+	self.isOn = true
 	self:SetIsOn(self.isOn)
 	self:SetHold(self.HoldType)
 	-- if SERVER then
@@ -441,7 +407,6 @@ function SWEP:SecondaryAttack()
 end
 
 function SWEP:Reload()
-    if self:IsRadioDestroyed() then return end
 	local owner = self:GetOwner()
 	if SERVER and (!self.turnOnCD or self.turnOnCD < CurTime()) then
 		self.turnOnCD = CurTime() + 0.5

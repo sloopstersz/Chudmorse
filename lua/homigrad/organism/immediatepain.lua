@@ -2,53 +2,34 @@ if SERVER then
     local painaddDrainRate = 16
     local adrenalinePainaddPassiveRate = 20
     local adrenalinePainaddPassiveCap = 2
-    local adrenalinePainaddPassiveMin = 15
-
-    local function clearChudBeastPain(owner, org)
-        local painImmune = IsValid(owner) and owner:IsPlayer() and (
-            owner.PlayerClassName == "chudbeast"
-            or (zb and zb.CROUND == "chudbeasts")
-        )
-        if not painImmune then return false end
-
-        org.avgpain = 0
-        org.painadd = 0
-        org.pain = 0
-        org.painlessen = 0
-        org.nearpainlimit = false
-        return true
-    end
+    local adrenalinePainaddPassiveMin = 1.5
 
     hook.Add("Org Think", "ImmediatePainApply", function(owner, org, timeValue)
-        if clearChudBeastPain(owner, org) then return end
         if not org.painadd or org.painadd <= 0 then return end
         local adrenaline = math.min(org.adrenaline or 0, adrenalinePainaddPassiveCap)
         local add = math.min(org.painadd, timeValue * painaddDrainRate)
         local passiveDrain = 0
         if adrenaline > adrenalinePainaddPassiveMin then
-            passiveDrain = math.min(org.painadd - add, timeValue * adrenalinePainaddPassiveRate * adrenaline)
+            passiveDrain = math.min(math.max(org.painadd - add, 0), timeValue * adrenalinePainaddPassiveRate * adrenaline)
         end
         local isHero = IsValid(owner) and owner:IsPlayer() and owner.RealishIsHero
         if isHero then
             org.avgpain = 0
             org.painadd = 0
             org.pain = 0
-            org.shock = 0
             return
         end
         org.avgpain = math.min(org.avgpain + add, 150)
         org.painadd = math.max(org.painadd - add - passiveDrain, 0)
-        local heroPainMul = 1
+        local heroPainMul = ZZPainMultiplier and ZZPainMultiplier(owner) or 1
         org.pain = org.avgpain * math.max(1 - (org.adrenaline or 0) / 4, 0.75) * math.max(1 - (org.analgesia or 0), 0) * heroPainMul
         org.pain = math.min(org.pain, 150)
     end, HOOK_MONITOR_HIGH)
     hook.Add("Org Think", "ImmediatePainDrainBoost", function(owner, org, timeValue)
-        if clearChudBeastPain(owner, org) then return end
         local isHero = IsValid(owner) and owner:IsPlayer() and owner.RealishIsHero
         if isHero then
             org.avgpain = 0
             org.pain = 0
-            org.shock = 0
             org.painadd = 0
             return
         end
@@ -58,7 +39,7 @@ if SERVER then
             extraSub = extraSub * math.max(0, 1 - org.naloxone * 0.5)
         end
         org.avgpain = math.max(org.avgpain - extraSub, 0)
-        local heroPainMul = 1
+        local heroPainMul = ZZPainMultiplier and ZZPainMultiplier(owner) or 1
         org.pain = org.avgpain * math.max(1 - (org.adrenaline or 0) / 4, 0.75) * math.max(1 - (org.analgesia or 0), 0) * heroPainMul
         org.pain = math.min(org.pain, 150)
     end, HOOK_MONITOR_LOW)

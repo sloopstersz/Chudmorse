@@ -237,113 +237,149 @@ local hullscale = Vector(1, 1, 1)
 
 util.AddNetworkString("ZB_ChooseSpecPly")
 
-net.Receive("ZB_ChooseSpecPly",function(len,ply)
-	if ply:Alive() then return end
-	
-	local key = net.ReadInt(32)
-	local tbl = zb:CheckAlive()
-	
-	if #tbl == 0 then return end
-	
-	ply.chosenspect = ply.chosenspect and isnumber(ply.chosenspect) and ply.chosenspect or 1
-	ply.viewmode = ply.viewmode or 1
-	
-	ply.chosenspect = math.Clamp(ply.chosenspect, 1, #tbl)
-	
-	if key == IN_ATTACK then
-		ply.chosenspect = ply.chosenspect + 1
-		if ply.chosenspect > #tbl then ply.chosenspect = 1 end
-		
-		net.Start("ZB_SpectatePlayer")
-		net.WriteEntity(tbl[ply.chosenspect] or NULL)
-		net.WriteEntity(tbl[ply.chosenspect == 1 and #tbl or ply.chosenspect - 1] or NULL)
-		net.WriteInt(ply.viewmode, 4)
-		net.Send(ply)
-	end
+-- Explicitly distribute both client entry points from the dedicated server.
+AddCSLuaFile("cl_init.lua")
+AddCSLuaFile("homigrad/cl_camera.lua")
+util.AddNetworkString("ChudSpectatorStateV2")
+util.AddNetworkString("ChudSpectatorInputV2")
+util.AddNetworkString("ChudSpectatorReadyV2")
 
-	if key == IN_ATTACK2 then
-		ply.chosenspect = ply.chosenspect - 1
-		if ply.chosenspect < 1 then ply.chosenspect = #tbl end
-		
-		net.Start("ZB_SpectatePlayer")
-		net.WriteEntity(tbl[ply.chosenspect] or NULL)
-		net.WriteEntity(tbl[ply.chosenspect == #tbl and 1 or ply.chosenspect + 1] or NULL)
-		net.WriteInt(ply.viewmode, 4)
-		net.Send(ply)
-	end
+local function SpectatorTargets(observer)
+    local targets = {}
+    for _, target in player.Iterator() do
+        if target ~= observer and target:Alive() and target:Team() ~= TEAM_SPECTATOR then
+            targets[#targets + 1] = target
+        end
+    end
+    table.sort(targets, function(a, b) return a:EntIndex() < b:EntIndex() end)
+    return targets
+end
 
-	if key == IN_RELOAD then
-		ply.viewmode = (ply.viewmode % 3) + 1  
-		
-		net.Start("ZB_SpectatePlayer")
-		net.WriteEntity(tbl[ply.chosenspect] or NULL)
-		net.WriteEntity(tbl[ply.chosenspect == 1 and #tbl or ply.chosenspect - 1] or NULL)
-		net.WriteInt(ply.viewmode, 4)
-		net.Send(ply)
-	end
-	
-	ply.chosenspect = math.Clamp(ply.chosenspect, 1, #tbl)
-	ply.chosenSpectEntity = tbl[ply.chosenspect]
-	
-	if ply.lastSpectTarget ~= ply.chosenSpectEntity then
-		ply.lastSpectTarget = ply.chosenSpectEntity
-	end
+local function UpdateSpectator(ply, key)
+    if not IsValid(ply) or ply:Alive() then return end
+    ply.ChudSpectating = true
+    local targets = SpectatorTargets(ply)
+    local previous = ply.chosenSpectEntity
+    local index = table.KeyFromValue(targets, previous)
+    local mode = math.Clamp(tonumber(ply.viewmode) or 1, 1, 3)
+    if #targets == 0 then
+        index, mode = nil, 3
+    else
+        if key == IN_ATTACK or key == IN_ATTACK2 then
+            if index then
+                index = ((index - 1 + (key == IN_ATTACK and 1 or -1)) % #targets) + 1
+            else
+                index = key == IN_ATTACK and 1 or #targets
+            end
+            -- Keep the chosen camera mode, as in version 3; R cycles modes.
+        else
+            index = index or math.Clamp(ply.chosenspect or 1, 1, #targets)
+            if key == IN_RELOAD then mode = mode % 3 + 1 end
+        end
+    end
+    local target = index and targets[index] or nil
+    ply.chosenspect = index or 1
+    ply.chosenSpectEntity = target
+    ply.viewmode = mode
+    ply:SetNWEntity("spect", target or NULL)
+    ply:SetNWInt("viewmode", mode)
+
+
+    if target ~= ply.lastSpectTarget or mode ~= ply.ChudLastSpectMode or (ply.ChudSpectatorSyncAt or 0) <= CurTime() then
+        net.Start("ChudSpectatorStateV2")
+        -- Indices resolve once distant targets enter the spectator's PVS.
+        net.WriteUInt(IsValid(target) and target:EntIndex() or 0, 16)
+        net.WriteUInt(IsValid(previous) and previous:EntIndex() or 0, 16)
+        net.WriteUInt(mode, 2)
+        net.Send(ply)
+        ply.lastSpectTarget = target
+        ply.ChudLastSpectMode = mode
+        ply.ChudSpectatorSyncAt = CurTime() + 1
+    end
+
+    -- The shared camera handles follow modes; the engine only handles free flight.
+    if ply:GetObserverMode() ~= OBS_MODE_ROAMING then ply:Spectate(OBS_MODE_ROAMING) end
+    local moveType = mode == 3 and MOVETYPE_NOCLIP or MOVETYPE_NONE
+    if ply:GetMoveType() ~= moveType then ply:SetMoveType(moveType) end
+    if target and mode ~= 3 then
+        local character = hg.GetCurrentCharacter(target)
+        ply:SetPos(IsValid(character) and character:GetPos() or target:GetPos())
+        if mode == 1 and target.organism and (ply.netsendtime or 0) < CurTime() then
+            ply.netsendtime = CurTime() + 1
+            hg.send_organism(target.organism, ply)
+        end
+    end
+
+end
+
+local function SafeUpdateSpectator(ply, key)
+    local ok, err = pcall(UpdateSpectator, ply, key)
+    if not ok and (ply.ChudSpectatorErrorAt or 0) <= CurTime() then
+        ply.ChudSpectatorErrorAt = CurTime() + 5
+        ErrorNoHalt("[Spectator] " .. tostring(err) .. "\n")
+    end
+end
+
+local function SpectatorInput(ply, key)
+    if not IsValid(ply) or ply:Alive() then return end
+    if key ~= IN_ATTACK and key ~= IN_ATTACK2 and key ~= IN_RELOAD then return end
+    ply.ChudSpectatorKeyTimes = ply.ChudSpectatorKeyTimes or {}
+    if (ply.ChudSpectatorKeyTimes[key] or 0) > CurTime() then return end
+    ply.ChudSpectatorKeyTimes[key] = CurTime() + 0.08
+    SafeUpdateSpectator(ply, key)
+end
+
+-- Console commands travel separately from addon net-message limits.
+concommand.Add("zb_spectator_input", function(ply, command, args)
+    SpectatorInput(ply, tonumber(args[1]))
 end)
 
-hook.Add("SetupPlayerVisibility", "spectPVS", function(ply, viewent)
-	if ply:Alive() then return end
-
-	local entity = ply.chosenSpectEntity
-
-	if IsValid(entity) and !entity:TestPVS(ply) then
-		AddOriginToPVS(entity:GetPos())
-	end
+net.Receive("ChudSpectatorInputV2", function(len, ply)
+    if len < 32 then return end
+    SpectatorInput(ply, net.ReadInt(32))
 end)
 
-hook.Add("PlayerDeathThink", "spectNetwork", function(ply)
-	if ply:Alive() then return end
-	//ply:Spectate(OBS_MODE_ROAMING)
+hook.Add("SetupPlayerVisibility", "spectPVS", function(ply)
+    if ply:Alive() or ply.viewmode == 3 then return end
+    local target = ply.chosenSpectEntity
+    if IsValid(target) then
+        AddOriginToPVS(target:EyePos())
+        local character = hg.GetCurrentCharacter(target)
+        if IsValid(character) then AddOriginToPVS(character:GetPos()) end
+    end
+end)
 
-	local ent = ply.chosenSpectEntity or player.GetAll()[1]
-	if IsValid(ply) then
-		ply:SetNWEntity("spect", ent)
-		ply:SetNWInt("viewmode", ply.viewmode or 1)
-		if IsValid(ent) then
-			if ent.organism and ply.viewmode == 1 then
-				if (ply.netsendtime or 0) < CurTime() then
-					ply.netsendtime = CurTime() + 1
+-- PlayerDeathThink hooks may return false to prevent respawning. Do not depend on
+-- their execution order for spectator networking, target recovery or movement.
+hook.Remove("PlayerDeathThink", "spectNetwork")
+timer.Create("ChudSharedSpectatorUpdate", 0.05, 0, function()
+    for _, ply in player.Iterator() do
+        if not ply:Alive() then
+            SafeUpdateSpectator(ply)
+        elseif ply.ChudSpectating then
+            ply.ChudSpectating = nil
+            ply.chosenSpectEntity, ply.lastSpectTarget, ply.ChudLastSpectMode = nil, nil, nil
+            ply.ChudNextSpectatorInput = nil
+            ply.ChudSpectatorKeyTimes = nil
+            ply.ChudSpectatorSyncAt = nil
+            ply:SetNWEntity("spect", NULL)
+            ply:SetNWInt("viewmode", 3)
+            ply:UnSpectate()
+            if ply:GetMoveType() == MOVETYPE_NONE then ply:SetMoveType(MOVETYPE_WALK) end
+        end
+    end
+end)
 
-					hg.send_organism(ent.organism, ply)
-				end
-			end
-			local pos = ent:GetPos()
-			
-			if ply.viewmode ~= 3 then
-				local currentPos = ply:GetPos()
-				local targetPos = pos
-				local distance = currentPos:Distance(targetPos)
-				
-				if distance > 100 or ply.lastSpectTarget ~= ent then
-					ply:SetPos(targetPos)
-					ply.lastSpectTarget = ent
-				end
-			end
-			--print(ply:GetPos())
-		end
-		
-		if ply.viewmode == 3 then
-			if ply:GetMoveType() ~= MOVETYPE_NOCLIP then
-				ply:SetMoveType(MOVETYPE_NOCLIP)
-			end
-			if ply:GetObserverMode() ~= OBS_MODE_ROAMING then
-				ply:Spectate(OBS_MODE_ROAMING)
-			end
-		else
-			if ply:GetMoveType() == MOVETYPE_NOCLIP then
-				ply:SetMoveType(MOVETYPE_WALK)
-			end
-		end
-	end
+net.Receive("ZB_ChooseSpecPly", function(len, ply)
+    if len >= 32 then SpectatorInput(ply, net.ReadInt(32)) end
+end)
+
+net.Receive("ChudSpectatorReadyV2", function(len, ply)
+    if not IsValid(ply) or ply:Alive() then return end
+    if (ply.ChudNextSpectatorReady or 0) > CurTime() then return end
+    ply.ChudNextSpectatorReady = CurTime() + 0.5
+    ply.ChudSpectatorSyncAt = 0
+    SafeUpdateSpectator(ply)
 end)
 
 function GM:PlayerDeathThink(ply)
@@ -351,26 +387,11 @@ function GM:PlayerDeathThink(ply)
 end
 
 function GM:PlayerDeath(ply)
-	ply.lastSpectTarget = nil
-	ply.chosenSpectEntity = nil
-	
-	ply:Spectate(OBS_MODE_ROAMING)
-	ply:SetHull(-hullscale,hullscale)
-	ply:SetHullDuck(-hullscale,hullscale)
-	
-
-	ply.chosenspect = ply:EntIndex()
-	ply.viewmode = 1 
-	
-	timer.Simple(0.1, function()
-		if IsValid(ply) and not ply:Alive() then
-			local alivePlayers = zb:CheckAlive()
-			if #alivePlayers > 0 then
-				ply.chosenSpectEntity = alivePlayers[1]
-				ply.chosenspect = 1
-			end
-		end
-	end)
+    ply.lastSpectTarget, ply.chosenSpectEntity, ply.ChudLastSpectMode = nil, nil, nil
+    ply.chosenspect, ply.viewmode = 1, 1
+    ply.ChudNextSpectatorInput = nil
+    ply.ChudSpectatorKeyTimes = nil
+    SafeUpdateSpectator(ply)
 end
 
 hg.addbot = hg.addbot or false
@@ -398,9 +419,17 @@ end
 
 util.AddNetworkString("ZB_SpecMode")
 net.Receive("ZB_SpecMode",function(len,ply)
-	local bool = net.ReadBool()
-
-	if hook.Run("ZB_SpecToggle", ply, bool) then return end
+    local bool = net.ReadBool()
+    if CurrentRound() and CurrentRound().name == "vip" then
+        if bool and ply:Team() ~= TEAM_SPECTATOR then
+            if ply:Alive() then ply:Kill() end
+            ply:SetTeam(TEAM_SPECTATOR)
+        elseif not bool and ply:Team() == TEAM_SPECTATOR then
+            -- Join the participant pool for the next round, without spawning.
+            ply:SetTeam(1)
+        end
+        return
+    end
 
 	local enable = !hook.Run("ZB_JoinSpectators", ply)
 

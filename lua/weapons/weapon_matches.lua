@@ -91,12 +91,12 @@ if CLIENT then
         table.insert(hg_firematch,eff)
         eff:SetControlPoint(0, ent:GetPos()+ ent:GetForward() * 15)
         eff:StartEmission()
-        timer.Simple(5,function()
+        timer.Simple(8,function()
             if IsValid(eff) then
                 eff:StopEmission()
             end
         end)
-        timer.Simple(6.5,function()
+        timer.Simple(9.5,function()
             if IsValid(eff) then
                 eff:StopEmissionAndDestroyImmediately()
                 table.RemoveByValue(hg_firematch,eff)
@@ -149,9 +149,9 @@ function SWEP:PrimaryAttack()
         if not IsValid(phys) then if IsValid(ent) then ent:Remove() end return end
 
         local velocity = owner:GetAimVector()
-        velocity = velocity * 100
+        velocity = velocity * 400
         velocity = velocity + (VectorRand() * 10)
-        phys:ApplyForceCenter(velocity)
+        phys:SetVelocity(velocity)
     end
 
     self:TakePrimaryAmmo(1)

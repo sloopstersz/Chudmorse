@@ -1,3 +1,17 @@
+-- Keep these mode callbacks inactive while another mode is running.
+local modeHookAPI = hook
+local hook = setmetatable({}, {__index = modeHookAPI})
+function hook.Add(event, id, callback)
+    modeHookAPI.Add(event, "" .. id, function(...)
+        local active = zb and (zb.CROUND_MAIN or zb.CROUND)
+        if active ~= "hmcd" then return end
+        return callback(...)
+    end)
+end
+function hook.Remove(event, id)
+    modeHookAPI.Remove(event, "" .. id)
+end
+
 local MODE = MODE
 
 --\\Neck Break

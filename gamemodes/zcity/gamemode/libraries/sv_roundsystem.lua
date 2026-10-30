@@ -13,7 +13,8 @@ local ZB_FORCED_TEMP_MODE_WEIGHTS = {
         ["hmcd"] = 0.85,
         ["dm"] = 0.1,
         ["tdm"] = 0.05,
-        ["riot"] = 0.05
+        ["riot"] = 0.05,
+        ["framed"] = 0.1
 }
 local ZB_FORCED_MODE_POOL = {
         ["hmcd"] = true,
@@ -25,8 +26,14 @@ local ZB_FORCED_MODE_POOL = {
         ["riot"] = true,
         ["juggernaut"] = true,
         ["president"] = true,
+        ["vip"] = true,
         ["bartvshomer"] = true,
-        ["chudbeasts"] = true
+        ["chudbeasts"] = true,
+        ["turfwars"] = true,
+        ["chaos"] = true,
+        ["hl2tdm"] = true,
+        ["zzombies"] = true,
+        ["framed"] = true
 }
 local ZB_NO_BACK_TO_BACK_MODES = {
         ["dm"] = true,
@@ -38,6 +45,7 @@ local ZB_NO_BACK_TO_BACK_MODES = {
 local ZB_HAS_CHANGELEVEL
 
 local function ZB_NormalizeModeKey(mode)
+        if mode == "chaos_standard" or mode == "chaos/chaos_standard" then return "chaos" end
         if mode == "standard" or mode == "homicide/standard" or mode == "hmcd/standard" then return "hmcd" end
 
         return mode
@@ -144,6 +152,10 @@ end
 
 function NextRound(round, direct)
     local requestedMode = zb.modes[round]
+    if requestedMode and requestedMode.VIPLaunchReason then
+        local reason = requestedMode:VIPLaunchReason()
+        if reason then PrintMessage(HUD_PRINTTALK, reason) print(reason) return false end
+    end
     if requestedMode and requestedMode.IsMapAllowed and not requestedMode:IsMapAllowed() then
         round = ZB_ResolveNextRound("hmcd")
     end
@@ -583,7 +595,8 @@ function zb.GetModesInfo()
 	local modesInfo = {}
 
 	for name, mode in pairs(zb.modes) do
-		if mode.IsMapAllowed and not mode:IsMapAllowed() then continue end
+		-- Show President before zpoint setup; CanLaunch supplies its red status.
+		if name ~= "president" and name ~= "vip" and mode.IsMapAllowed and not mode:IsMapAllowed() then continue end
 		if ZB_FORCE_LIMITED_MODE_POOL and !ZB_FORCED_MODE_POOL[name] then continue end
 		if name == "hmcd" then
 			table.insert(modesInfo, {
@@ -593,7 +606,7 @@ function zb.GetModesInfo()
 				forBigMaps = mode.ForBigMaps or false,
 				canlaunch = (mode:CanLaunch() and 1 or 0)
 			})
-		elseif mode.Types then
+		elseif mode.Types and mode.SubModes ~= false then
 			for name2, mode2 in pairs(mode.Types) do
 				table.insert(modesInfo, {
 					key = name2,
@@ -937,7 +950,7 @@ if SERVER then
 		if not ply:IsAdmin() then return end
 
 		local command = net.ReadString()
-		local modeKey = net.ReadString()
+		local modeKey = ZB_NormalizeModeKey(net.ReadString())
 		local addToQueue = net.ReadBool() or false
 		if command ~= "setmode" and command ~= "setforcemode" then return end
 		if not isstring(modeKey) or not zb.modes[modeKey] then ply:ChatPrint("Invalid game mode") return end

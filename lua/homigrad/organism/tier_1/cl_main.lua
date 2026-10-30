@@ -312,20 +312,22 @@ hook.Add("radialOptions", "DislocatedJoint", function()
             "Fix dislocation (leg)"
         }
         hg.radialOptions[#hg.radialOptions + 1] = tbl
-	else
-		local ent = hg.eyeTrace(lply).Entity
+	end
 
-		if ent.organism and (ent.organism.llegdislocation or ent.organism.rlegdislocation) then
-			local tbl = {
-				function()
-					lply.tried_fixing_limb = CurTime() + 0.5
-					RunConsoleCommand("hg_fixdislocation", 1, 1)
-				end,
-				"Fix "..ent:GetPlayerName().."'s dislocation (leg)"
-			}
-			hg.radialOptions[#hg.radialOptions + 1] = tbl
-		end
-    end
+	local ent = hg.eyeTrace(lply).Entity
+
+	if IsValid(ent) and ent.organism and ent.organism != org and (ent.organism.llegdislocation or ent.organism.rlegdislocation) then
+		local target = (IsValid(ent:GetNWEntity("ply")) and ent:GetNWEntity("ply")) or (ent.organism and ent.organism.owner) or ent
+		local tbl = {
+			function()
+			lply.tried_fixing_limb = CurTime() + 0.5
+			RunConsoleCommand("hg_fixdislocation", 1, 1)
+		end,
+		"Fix "..(IsValid(target) and target:GetPlayerName() or ent:GetPlayerName()).."'s dislocation (leg)",
+		[5] = Material("radialmenu/broken.png", "smooth mips")
+		}
+		hg.radialOptions[#hg.radialOptions + 1] = tbl
+	end
 end)
 
 hook.Add("radialOptions", "DislocatedJoint2", function()
@@ -343,20 +345,22 @@ hook.Add("radialOptions", "DislocatedJoint2", function()
             "Fix dislocation (arm)"
         }
         hg.radialOptions[#hg.radialOptions + 1] = tbl
-	else
-		local ent = hg.eyeTrace(lply).Entity
+	end
 
-		if ent.organism and (ent.organism.larmdislocation or ent.organism.rarmdislocation) then
-			local tbl = {
-				function()
-					lply.tried_fixing_limb = CurTime() + 0.5
-					RunConsoleCommand("hg_fixdislocation", 2, 1)
-				end,
-				"Fix "..ent:GetPlayerName().."'s dislocation (arm)"
-			}
-			hg.radialOptions[#hg.radialOptions + 1] = tbl
-		end
-    end
+	local ent = hg.eyeTrace(lply).Entity
+
+	if IsValid(ent) and ent.organism and ent.organism != org and (ent.organism.larmdislocation or ent.organism.rarmdislocation) then
+		local target = (IsValid(ent:GetNWEntity("ply")) and ent:GetNWEntity("ply")) or (ent.organism and ent.organism.owner) or ent
+		local tbl = {
+			function()
+			lply.tried_fixing_limb = CurTime() + 0.5
+			RunConsoleCommand("hg_fixdislocation", 2, 1)
+		end,
+		"Fix "..(IsValid(target) and target:GetPlayerName() or ent:GetPlayerName()).."'s dislocation (arm)",
+		[5] = Material("radialmenu/broken.png", "smooth mips")
+		}
+		hg.radialOptions[#hg.radialOptions + 1] = tbl
+	end
 end)
 
 hook.Add("radialOptions", "DislocatedJaw", function()
@@ -374,20 +378,22 @@ hook.Add("radialOptions", "DislocatedJaw", function()
             "Fix dislocation (jaw)"
         }
         hg.radialOptions[#hg.radialOptions + 1] = tbl
-	else
-		local ent = hg.eyeTrace(lply).Entity
+	end
 
-		if ent.organism and ent.organism.jawdislocation then
-			local tbl = {
-				function()
-					lply.tried_fixing_limb = CurTime() + 0.5
-					RunConsoleCommand("hg_fixdislocation", 3, 1)
-				end,
-				"Fix "..ent:GetPlayerName().."'s dislocation (jaw)"
-			}
-			hg.radialOptions[#hg.radialOptions + 1] = tbl
-		end
-    end
+	local ent = hg.eyeTrace(lply).Entity
+
+	if IsValid(ent) and ent.organism and ent.organism != org and ent.organism.jawdislocation then
+		local target = (IsValid(ent:GetNWEntity("ply")) and ent:GetNWEntity("ply")) or (ent.organism and ent.organism.owner) or ent
+		local tbl = {
+			function()
+			lply.tried_fixing_limb = CurTime() + 0.5
+			RunConsoleCommand("hg_fixdislocation", 3, 1)
+		end,
+		"Fix "..(IsValid(target) and target:GetPlayerName() or ent:GetPlayerName()).."'s dislocation (jaw)",
+		[5] = Material("radialmenu/broken.png", "smooth mips")
+		}
+		hg.radialOptions[#hg.radialOptions + 1] = tbl
+	end
 end)
 
 hook.Add("PostRender", "screenshot_think", function()

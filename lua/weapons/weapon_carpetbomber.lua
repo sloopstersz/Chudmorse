@@ -130,6 +130,10 @@ function SWEP:SecondaryAttack()
 	self:SetNextSecondaryFire(CurTime() + 0.2)
 end
 
+function SWEP:OnDrop()
+	if self._carpetSpent then self:Remove() end
+end
+
 net.Receive("callbomber_carpet_begin", function(_, ply)
 	local weapon = GetWeapon(ply)
 	if not IsValid(weapon) or weapon._carpetBusy then return end
@@ -179,9 +183,12 @@ net.Receive("callbomber_carpet_confirm", function(_, ply)
 	end
 
 	weapon:CallBomber(weapon._carpetTarget, true, direction:GetNormalized())
-	ply:DropWeapon(weapon)
+	weapon._carpetSpent = true
 	weapon._carpetBusy = nil
 	weapon._carpetTarget = nil
 	weapon._carpetReadyTime = nil
+	local class = weapon:GetClass()
+	ply:StripWeapon(class)
+	if IsValid(weapon) then weapon:Remove() end
 end)
 end

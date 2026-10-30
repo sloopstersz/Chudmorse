@@ -13,10 +13,20 @@ local CUSTOM_EXPLOSION_VOLUME = 1
 local CUSTOM_EXPLOSION_LEVEL = 140
 local GRENADE_BLAST_RADIUS_MULT = 2.2
 local GRENADE_BLAST_DAMAGE = 40
-local GRENADE_DISORIENTATION_RADIUS = 15
-local GRENADE_KNOCKBACK_FORCE = 16500
-local GRENADE_LIFT_FORCE = 35000
+local GRENADE_DISORIENTATION_RADIUS = 8
+local GRENADE_KNOCKBACK_FORCE = 8000
+local GRENADE_LIFT_FORCE = 10000
 local GRENADE_LIFT_FRAC = 0.85
+
+local SHRAPNEL_TRACE_DISTANCE = 2500
+
+local function ShrapnelTraceHit(tr)
+	if not tr or not tr.Hit or tr.HitSky or tr.HitWorld then return false end
+	local hit = tr.Entity
+	if not IsValid(hit) then return false end
+	if hit:IsPlayer() or hit:IsRagdoll() or hit:IsNPC() or hit:IsNextBot() or hit:IsVehicle() then return true end
+	return string.StartWith(hit:GetClass(), "prop_")
+end
 
 function ENT:InitAdd()
 end
@@ -149,8 +159,6 @@ function ENT:Arm(time,vel)
 		self.lpos = nil
 	end
 end
-
-local vecCone = Vector(0, 0, 0)
 
 function ENT:PoopBomb()
 	return math.random(1, 100) == 1
@@ -310,6 +318,13 @@ function ENT:Explode()
 		end
 
 		if len > dis then continue end
+
+		if hg.BreakablePropClasses and hg.BreakablePropClasses[enta:GetClass()] and not enta.organism and not hg.expItems[enta:GetModel()] and not hg.GasTank.ActiveTanks[enta:EntIndex()] then
+			hg.DestroyBreakableProp(enta, entPos, self.owner)
+			entsCount = entsCount + 1
+			continue
+		end
+
 		if len > 0 then
 			force:Div(len)
 		else
@@ -380,48 +395,25 @@ function ENT:Explode()
 	timer.Simple(0, function()
 		util.ScreenShake( selfPos, 35, 200, 1, 1000 )
 
-		local ammo = "Metal Debris"
-		local ammotype = hg.ammotypeshuy[ammo].BulletSettings
-
 		local co = coroutine.create(function()
 
-			local LastShrapnel = SysTime()
-			local filter = {self}
-			local penetration = (ammotype.Penetration or (-(-self.Penetration))) * (self.PenetrationMultiplier or 1)
-			local diameter = ammotype.Diameter or 1
-			local bullet = {
-				Speed = ammotype.Speed,
-				Distance = 56756,
-				MaxPenLen = 100,
-				Diameter = diameter,
-				Src = selfPos,
-				Spread = vecCone,
-				Force = 20,
-				Damage = 40,
-				AmmoType = ammo,
-				Attacker = self.owner,
-				Inflictor = self,
-				DisableLagComp = true,
-				Filter = filter,
-				Callback = hg.bulletHit
-			}
+			local lastShrapnel = SysTime()
+		local filter = {self}
+		local traceData = {start = selfPos, mask = MASK_SHOT, filter = filter}
 
-			for i = 1, self.Fragmentation do
-					LastShrapnel = SysTime()
+		for i = 1, self.Fragmentation do
+				LastShrapnel = SysTime()
 
-					local dir = VectorRand(-1,1):GetNormalized()--vector_up
-					dir[3] = dir[3] > 0 and math.abs(dir[3] - 0.5) or -math.abs(dir[3] + 0.5)
-					dir:Normalize()
+				local dir = VectorRand(-1,1):GetNormalized()--vector_up
+				dir[3] = dir[3] > 0 and math.abs(dir[3] - 0.5) or -math.abs(dir[3] + 0.5)
+				dir:Normalize()
 
-					local Tr = util.QuickTrace(selfPos, dir * 10000, self)
+				traceData.endpos = selfPos + dir * SHRAPNEL_TRACE_DISTANCE
 
-					if Tr.Hit and !Tr.HitSky and !Tr.HitWorld then
-						bullet.penetrated = 0
-						bullet.Penetration = penetration
-						bullet.Diameter = diameter
-						bullet.Dir = dir
+				local Tr = util.TraceLine(traceData)
 
-						self:FireLuaBullets(bullet, true)
+					if ShrapnelTraceHit(Tr) then
+						hg.ShrapnelDamage(self.owner, self, selfPos, Tr, GRENADE_BLAST_DAMAGE)
 					end
 
 					LastShrapnel = SysTime() - LastShrapnel

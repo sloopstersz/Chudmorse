@@ -22,26 +22,12 @@ local function ChatLogic(output, input, isChat, teamonly, text)
 		chat_dist = chat_dist_whisper
 	end
 
-	if output:Alive() and input:Alive() then
-		-- A player can briefly exist before the organism table is initialized.
-		-- Keep the voice decision explicit so Garry's Mod never falls back to
-		-- base same-team/global voice when our custom data is unavailable.
-		if not output.organism or not input.organism then
-			if teamonly then return false, false end
-			if not input:TestPVS(output) then return false, false end
-			if input:GetPos():DistToSqr(output:GetPos()) >= (chat_dist * chat_dist) then return false, false end
+	if output:Alive() and input:Alive() and not output.organism.otrub and not input.organism.otrub and output.organism.o2[1] >= 15 and not output.organism.holdingbreath and input:TestPVS( output ) then
+		if input:GetPos():Distance(output:GetPos()) < chat_dist and not teamonly then
 			return true, true
+		else
+			return false
 		end
-
-		if output.organism.otrub or input.organism.otrub then return false, false end
-		if not output.organism.o2 or output.organism.o2[1] < 15 then return false, false end
-		if output.organism.holdingbreath then return false, false end
-		if teamonly then return false, false end
-		if not input:TestPVS(output) then return false, false end
-		if input:GetPos():DistToSqr(output:GetPos()) >= (chat_dist * chat_dist) then return false, false end
-
-		-- true, true = audible and spatial/3D voice.
-		return true, true
 	elseif not output:Alive() and not input:Alive() then
 		return true
 	else
@@ -73,7 +59,7 @@ hook.Add("PlayerCanSeePlayersChat", "RealiticChar", function(text, teamOnly, lis
 end)
 
 local function funca(ply, txt)
-	if not IsValid(ply) or !ply:Alive() or !ply.organism then return txt end
+	if !ply:Alive() or !ply.organism then return end
 	local starttxt = txt
 
 	if ply.organism.pain > 80 then
@@ -132,9 +118,7 @@ local function funca(ply, txt)
 		if bHasMassiveBrainDamage and math.random(2) == 1 then txt = hg.utf8_reverse(utf8.codes(txt), utf8.len(txt)) end
 	end
 
-	local oxygen = ply.organism.o2 and ply.organism.o2[1] or 100
-	local brainDamage = ply.organism.brain or 0
-	if oxygen < 15 or (brainDamage > 0.15 and math.random(4) == 1) then return "..." end
+	if ply.organism.o2[1] < 15 or (ply.organism.brain > 0.15 and math.random(4) == 1) then return "..." end
 
 	return txt
 end
@@ -158,8 +142,28 @@ hook.Add("HG_PlayerSay", "furrifyPhraseOwO", function(ply, txt)
 end)
 
 hook.Add("HG_PlayerCanHearPlayersVoice","BrainDamage", function(listener, speaker)
-	if not IsValid(speaker) or not speaker.organism then return end
-	if (speaker.organism.brain or 0) > 0.05 or speaker.organism.seizureActive then return false, false end
+	if speaker.organism.brain > 0.05 or speaker.organism.seizureActive then return false, false end
+end)
+
+local function hasNeckSlit(org)
+	if org.arteria == 1 then return true end
+
+	for _, wound in pairs(org.arterialwounds or {}) do
+		if wound[7] == "arteria" then return true end
+	end
+
+	return false
+end
+
+hook.Add("PlayerCanHearPlayersVoice", "NeckSlitVoiceCough", function(_, speaker)
+	if not IsValid(speaker) or not speaker:IsPlayer() or not speaker:IsSpeaking() then return end
+
+	local org = speaker.organism
+	if not org or not org.alive or org.otrub or not hasNeckSlit(org) then return end
+	if (speaker.remNeckVoiceCough or 0) > CurTime() then return end
+
+	speaker.remNeckVoiceCough = CurTime() + 2
+	hg.organism.Vomit(speaker)
 end)
 
 local braindeadphrase_male = {
@@ -178,7 +182,6 @@ hook.Add("HG_ReplacePhrase", "BraindeadPhrase", function(ply, phrase, muffed, pi
 end)
 
 hook.Add("PlayerCanHearPlayersVoice", "RealisticVoice", function(listener,speaker)
-	if not IsValid(listener) or not IsValid(speaker) then return false, false end
 	local result,is3D = ChatLogic(speaker,listener,false,false)
 	local speak = speaker:IsSpeaking()
 	speaker.IsSpeak = speak
@@ -189,16 +192,10 @@ hook.Add("PlayerCanHearPlayersVoice", "RealisticVoice", function(listener,speake
 		if speak then hook.Run( "StartVoice", speaker, listener ) else hook.Run( "EndVoice", speaker, listener )  end
 	end
 
-	local HookResult, Hook3D = hook.Run("HG_PlayerCanHearPlayersVoice", listener, speaker )
-	if HookResult ~= nil then
-		return HookResult, Hook3D == true
+	local Hook = hook.Run("HG_PlayerCanHearPlayersVoice", listener, speaker )
+	if Hook ~= nil then
+		return Hook
 	end
 
-	-- Never let an accidental nil decision fall back to the base gamemode's
-	-- same-team voice handling, which is non-spatial.
-	if result == nil then
-		return false, false
-	end
-
-	return result, is3D == true
+	return result,is3D
 end)

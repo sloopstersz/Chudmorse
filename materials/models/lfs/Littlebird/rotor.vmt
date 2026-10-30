@@ -1,0 +1,28 @@
+
+"VertexlitGeneric"
+{
+
+	$basetexture "models\lfs\Littlebird\rotor"
+	"$bumpmap" "models\lfs\Littlebird\rotor_n"
+	"$halflambert" "1"				
+	"$nocull" 1
+                "$alphatest" 0
+"$translucent" 1		
+
+	"$normalmapalphaenvmapmask" 1				
+	"$envmap" "env_cubemap"					
+	"$envmaptint" "[ .01 .01 .01 ]"					
+ 	"$envmapFresnel" "0.5"					
+
+	"$phong" "1"						
+	"$phongexponenttexture" "models\lfs\Littlebird\rotor_n"
+	"$phongboost" "1"						
+	"$phongfresnelranges"	"[ .2 1.2 8]"	
+
+	"$PhongAlbedoTint" "1"	
+
+	"$rimlight"     "1"
+	"$rimlightexponent"   "1" 
+	"$rimlightboost"   "0.1"
+	"$rimmask"      "1"
+}

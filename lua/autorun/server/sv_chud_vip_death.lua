@@ -1,0 +1,2 @@
+-- Retired: VIP uses the standard ZCity death and spectator flow.
+-- Do not send the legacy cinematic config or set its respawn-block flag.

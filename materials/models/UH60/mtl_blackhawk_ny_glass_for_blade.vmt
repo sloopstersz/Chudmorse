@@ -1,0 +1,25 @@
+"VertexlitGeneric"
+{
+	"$basetexture" "models/UH60/rotor" 
+	"$bumpmap" "models/UH60/rotor_n"
+	"$halflambert"     "1"
+	"$translucent"     "1"
+
+	"$ambientocclusion" "1"
+	
+	"$detail" ""
+	"$detailscale" "1"
+	"$detailblendmode" "0"
+	"$phongexponenttexture" "models/UH60/rotor_n"
+
+	"$phong"      "0"
+	"$phongboost"     "0.01"
+	"$normalmapalphaphongmask" "1"
+	"$phongfresnelranges"   "[30 30 30]"
+	$ambientocclusion "1"
+
+
+
+
+}
+

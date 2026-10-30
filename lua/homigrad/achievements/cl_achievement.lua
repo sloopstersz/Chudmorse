@@ -73,6 +73,30 @@ local achievement_color_dim = Color(60,60,60,180)
 local achievement_color_text = Color(225,225,225)
 local achievement_color_text_dim = Color(160,160,160)
 local achievement_color_accent = Color(192,57,43)
+local achievement_types = {
+    zzombies = {label = "Z-Zombies", color = Color(105, 160, 65)},
+    secret = {label = "???", color = Color(155, 155, 155)},
+    innocent = {label = "Bystander", color = Color(65, 145, 245)}, -- legacy category
+    bystander = {label = "Bystander", color = Color(65, 145, 245)},
+    hero = {label = "Hero", color = Color(110, 45, 155)},
+    vip = {label = "VIP", color = Color(0, 255, 255)},
+    traitor = {label = "Traitor", color = Color(230, 55, 55)},
+    milestone = {label = "Milestone", color = Color(240, 200, 60)},
+    general = {label = "General", color = Color(85, 190, 105)},
+    juggernaut = {label = "Juggernaut", color = Color(190, 85, 15)},
+    special = {label = "Special Event", color = Color(255, 255, 255)}
+}
+-- Resolve these fixed categories by achievement ID even if cached server metadata
+-- still contains the old combined innocent category.
+local achievement_categories = {
+    chud_odds = "bystander",
+    chud_vic = "vip",
+    chud_arrest = "hero"
+}
+local function AchievementType(category, key)
+    return achievement_types[achievement_categories[key] or category] or achievement_types.general
+end
+
 local achievement_gradient_right = Color(18,18,18,65)
 local achievement_overlay = Color(100,100,100,35)
 local achievement_bg = Color(10,10,19,235)
@@ -111,9 +135,11 @@ local function AchievementGetSortedEntries()
         local completed = currentValue >= neededValue
         local percent = math.Clamp(math.Round(normalized * 100), 0, 100)
 
+        if not ach.secret or completed then
         entries[#entries + 1] = {
             key = key,
             data = ach,
+            category = AchievementType(ach.category, key),
             name = tostring(ach.name or "Achievement"),
             description = tostring(ach.description or ""):gsub("\\n", "\n"),
             image = isstring(ach.img) and Material(ach.img, "smooth") or ach.img or achievement_placeholder,
@@ -124,6 +150,7 @@ local function AchievementGetSortedEntries()
             completed = completed,
             status = completed and "Completed" or (percent > 0 and "In Progress" or "Locked")
         }
+        end
     end
 
     table.sort(entries, function(a, b)
@@ -640,7 +667,8 @@ function hg.DrawAchievmentsMenu(ParentPanel)
     detailBar.Paint = function(self, w, h)
         surface.SetDrawColor(0, 0, 0, 160)
         surface.DrawRect(0, 0, w, h)
-        surface.SetDrawColor(achievement_color_accent.r, achievement_color_accent.g, achievement_color_accent.b, 220)
+        local accent = self.CategoryColor or achievement_types.general.color
+        surface.SetDrawColor(accent.r, accent.g, accent.b, 220)
         surface.DrawRect(0, 0, math.floor(w * (self.Progress or 0)), h)
         surface.SetDrawColor(achievement_color_white.r, achievement_color_white.g, achievement_color_white.b, 80)
         surface.DrawOutlinedRect(0, 0, w, h, 1)
@@ -747,6 +775,7 @@ function hg.DrawAchievmentsMenu(ParentPanel)
             row.Paint = function(self, w, h)
                 local active = achievement_active_key == self.Entry.key
                 local alpha = 110 + math.floor((self.HoverLerp or 0) * 40)
+                local accent = self.Entry.category.color
                 local percentText = self.Entry.percent .. "%"
                 local percentFont = "ZCity_Ach_Tiny"
                 local nameFont = "ZCity_Ach_Small"
@@ -756,25 +785,36 @@ function hg.DrawAchievmentsMenu(ParentPanel)
                 local nameY = MenuUnit(16)
                 local rightPadding = MenuUnit(12)
                 local nameAvailable = math.max(10, w - nameX - rightPadding - percentW - MenuUnit(16))
+                local iconSize = self.Entry.data.secret and MenuUnit(48) or 0
+                local iconX
+                if iconSize > 0 then
+                    surface.SetFont(nameFont)
+                    local nameWidth = surface.GetTextSize(self.Entry.name)
+                    nameAvailable = math.max(10, nameAvailable - iconSize - MenuUnit(16))
+                    iconX = nameX + math.min(nameWidth, nameAvailable) + MenuUnit(12)
+                end
                 local nameOffset = AchievementGetMarqueeOffset(self.Entry.name, nameFont, nameAvailable, w)
                 surface.SetDrawColor(20, 20, 30, alpha)
                 surface.DrawRect(0, 0, w, h)
-                if active then
-                    surface.SetDrawColor(achievement_color_accent.r, achievement_color_accent.g, achievement_color_accent.b, 220)
-                    surface.DrawRect(0, 0, MenuUnit(2), h)
-                end
+                surface.SetDrawColor(accent.r, accent.g, accent.b, active and 255 or 160)
+                surface.DrawRect(0, 0, MenuUnit(2), h)
                 surface.SetDrawColor(achievement_color_white.r, achievement_color_white.g, achievement_color_white.b, 55 + math.floor((self.HoverLerp or 0) * 60))
                 surface.DrawRect(0, h - MenuUnit(1), w, MenuUnit(1))
                 local clipX1, clipY1 = self:LocalToScreen(nameX, nameY - MenuUnit(14))
                 local clipX2, clipY2 = self:LocalToScreen(nameX + nameAvailable, nameY + MenuUnit(14))
                 render.SetScissorRect(clipX1, clipY1, clipX2, clipY2, true)
-                draw.SimpleText(self.Entry.name, nameFont, nameX + nameOffset, nameY, achievement_color_text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                draw.SimpleText(self.Entry.name, nameFont, nameX + nameOffset, nameY, accent, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
                 render.SetScissorRect(0, 0, 0, 0, false)
-                draw.SimpleText(self.Entry.status, "ZCity_Ach_Tiny", MenuUnit(12), MenuUnit(38), achievement_color_text_dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                if iconX then
+                    surface.SetMaterial(self.Entry.image)
+                    surface.SetDrawColor(255, 255, 255, 255)
+                    surface.DrawTexturedRect(iconX, MenuUnit(5), iconSize, iconSize)
+                end
+                draw.SimpleText(self.Entry.category.label .. " | " .. self.Entry.status, "ZCity_Ach_Tiny", MenuUnit(12), MenuUnit(38), achievement_color_text_dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
                 draw.SimpleText(percentText, percentFont, w - MenuUnit(12), MenuUnit(16), achievement_color_white, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
                 surface.SetDrawColor(0, 0, 0, 160)
                 surface.DrawRect(MenuUnit(12), h - MenuUnit(18), w - MenuUnit(24), MenuUnit(6))
-                surface.SetDrawColor(achievement_color_accent.r, achievement_color_accent.g, achievement_color_accent.b, 220)
+                surface.SetDrawColor(accent.r, accent.g, accent.b, 220)
                 surface.DrawRect(MenuUnit(12), h - MenuUnit(18), math.floor((w - MenuUnit(24)) * self.Entry.progress), MenuUnit(6))
             end
         end
@@ -795,10 +835,12 @@ function hg.DrawAchievmentsMenu(ParentPanel)
 
         detailIcon.IconMat = entry.image or achievement_placeholder
         detailName.DisplayText = string.upper(entry.name)
-        detailStatus:SetText(entry.status)
+        detailStatus:SetText(entry.category.label .. " | " .. entry.status)
+        detailStatus:SetTextColor(entry.category.color)
         detailDesc:SetText(entry.description ~= "" and entry.description or "No description provided.")
         detailProgress:SetText(entry.current .. " / " .. entry.needed .. " progress")
         detailBar.Progress = entry.progress
+        detailBar.CategoryColor = entry.category.color
         detailContent:InvalidateLayout(true)
     end
 
@@ -862,44 +904,88 @@ net.Receive("req_ach",function()
 end)
 
 hg.achievements.NewAchievements = hg.achievements.NewAchievements or {}
-local AchTable = hg.achievements.NewAchievements 
+local AchTable = hg.achievements.NewAchievements
+local function PlayAchievementSound()
+    surface.PlaySound("homigrad/vgui/achievement_earned.wav")
+end
+
 net.Receive("hg_NewAchievement",function()
-    local Ach = {time = CurTime() + 7.5,name = net.ReadString(),img = net.ReadString()}
+    local now = CurTime()
+    local achName = net.ReadString()
+    local Ach = {start = now, time = now + 7.5, name = achName, img = net.ReadString(), category = net.ReadString()}
+    Ach.sparks = {}
+    for i = 1, 12 do
+        Ach.sparks[i] = {
+            x = math.Rand(0.08, 0.32),
+            y = math.Rand(0.15, 0.85),
+            speed = math.Rand(0.05, 0.14),
+            size = math.Rand(1, 3),
+            phase = math.Rand(0, math.pi * 2)
+        }
+    end
+    if hg.achievements.ProgressNotifications then
+        for i = #hg.achievements.ProgressNotifications, 1, -1 do
+            if hg.achievements.ProgressNotifications[i].name == achName then
+                table.remove(hg.achievements.ProgressNotifications, i)
+            end
+        end
+    end
     table.insert(AchTable,1,Ach)
-	surface.PlaySound("homigrad/vgui/achievement_earned.wav")
+	PlayAchievementSound(Ach.rarity)
 end)
 
-local ach_clr1 , ach_clr2 = Color(200,25,25), Color(100,25,25)
 hook.Add("HUDPaint","hg_NewAchievement", function()
-    local frametime = FrameTime() * 10
-    for i = 1, #AchTable do
+    for i = #AchTable, 1, -1 do
         local ach = AchTable[i]
         if not ach then continue end
-        local txt = "Achievement! "..ach.name
-        ach.img = isstring(ach.img) and Material(ach.img) or ach.img
-        local wt, _ = surface.GetTextSize(txt)
+        local now = CurTime()
+        if ach.time < now then table.remove(AchTable, i) continue end
 
-        ach.Lerp = Lerp( frametime, ach.Lerp or 0, math.min( ach.time - CurTime(), 1 ) * i )
-        WSize, HSize = (ScrW() * 0.1) + (wt), ScrH() * 0.05
-        local HPos = ScrH() - ( HSize * ach.Lerp )
-        draw.RoundedBox( 0, 2, HPos + 2, WSize - 4, HSize - 4, ach_clr2 )
-		
-		surface.SetDrawColor(155, 0, 0, 255)
-		surface.SetMaterial(gradient_u)
-		surface.DrawTexturedRect( 0, HPos, WSize, HSize )
-	
-		surface.SetDrawColor( 150, 0, 0, 255)
-		surface.DrawOutlinedRect( 0, HPos, WSize, HSize, 2.5 )
+        ach.img = isstring(ach.img) and Material(ach.img, "smooth") or ach.img
+        local category = AchievementType(ach.category)
+        local rarityColor = category.color
+        local elapsed = now - ach.start
+        local remaining = ach.time - now
+        local enter = math.ease.OutCubic(math.Clamp(elapsed / 0.45, 0, 1))
+        local leave = math.ease.InCubic(math.Clamp(remaining / 0.55, 0, 1))
+        local visibility = math.min(enter, leave)
+        local cardW = math.Clamp(ScrW() * 0.27, 380, 560)
+        local cardH = math.Clamp(ScrH() * 0.105, 94, 126)
+        local margin = math.max(20, ScrH() * 0.025)
+        local x = margin - (1 - visibility) * (cardW + margin)
+        local y = ScrH() - margin - cardH - (i - 1) * (cardH + 12)
+        draw.RoundedBox(8, x, y, cardW, cardH, Color(9, 10, 16, 245 * visibility))
+        draw.RoundedBox(8, x, y, cardW, cardH, Color(rarityColor.r * 0.12, rarityColor.g * 0.12, rarityColor.b * 0.12, 190 * visibility))
+        surface.SetDrawColor(rarityColor.r, rarityColor.g, rarityColor.b, 245 * visibility)
+        surface.DrawRect(x, y, 5, cardH)
+        surface.DrawOutlinedRect(x, y, cardW, cardH, 2)
 
+        local iconSize = cardH - 24
+        local iconX, iconY = x + 16, y + 12
+        draw.RoundedBox(6, iconX, iconY, iconSize, iconSize, Color(0, 0, 0, 145 * visibility))
+        surface.SetDrawColor(rarityColor.r, rarityColor.g, rarityColor.b, 255 * visibility)
+        surface.SetMaterial(ach.img or achievement_placeholder)
+        surface.DrawTexturedRect(iconX + 8, iconY + 8, iconSize - 16, iconSize - 16)
+
+        local textX = iconX + iconSize + 17
+        draw.SimpleText(string.upper(category.label), "ZCity_Ach_Tiny", textX, y + 20, Color(rarityColor.r, rarityColor.g, rarityColor.b, 255 * visibility), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        local availableTextW = cardW - (textX - x) - 18
+        local displayName = ach.name
         surface.SetFont("HomigradFontMedium")
-        surface.SetTextColor(255,255,255)
-        surface.SetTextPos(HSize*1.25,(HPos + ( HSize/2 ) - ( HSize/4 )) )
-        surface.DrawText(txt)
-        surface.SetDrawColor(255,255,255)
-        surface.SetMaterial(ach.img)
-        surface.DrawTexturedRect(2,HPos+2,HSize-4,HSize-4)
-        if ach.time < CurTime() then 
-            table.remove(AchTable,i)
+        while #displayName > 3 and surface.GetTextSize(displayName) > availableTextW do
+            displayName = displayName:sub(1, -2)
+        end
+        if displayName ~= ach.name then displayName = displayName:sub(1, -4) .. "..." end
+        draw.SimpleText(displayName, "HomigradFontMedium", textX, y + cardH * 0.53, Color(255, 255, 255, 255 * visibility), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        draw.SimpleText("ACHIEVEMENT UNLOCKED", "ZCity_Ach_Tiny", textX, y + cardH - 20, Color(180, 185, 195, 230 * visibility), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+
+        for _, spark in ipairs(ach.sparks or {}) do
+            local sparkX = x + cardW * ((spark.x + elapsed * spark.speed) % 0.35)
+            local sparkY = y + cardH * spark.y + math.sin(now * 3 + spark.phase) * 5
+            local sparkAlpha = (90 + math.sin(now * 6 + spark.phase) * 70) * visibility
+            surface.SetDrawColor(rarityColor.r, rarityColor.g, rarityColor.b, sparkAlpha)
+            surface.DrawRect(sparkX, sparkY, spark.size, spark.size)
         end
     end
 end)
+

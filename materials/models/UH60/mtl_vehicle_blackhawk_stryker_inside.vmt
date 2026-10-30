@@ -1,0 +1,30 @@
+"VertexlitGeneric"
+{
+	"$basetexture" "models/UH60/cockpit" 
+	"$bumpmap" "models/UH60/cockpit_n"
+	"$halflambert"     "1"
+ 
+	"$phong"      "1"
+	"$phongboost"     "0.01"
+	"$normalmapalphaphongmask" "1"
+	"$phongexponenttexture" "models/UH60/cockpit_n"
+	"$phongfresnelranges"   "[30 30 30]"
+
+ 
+	
+	"$normalmapalphaenvmapmask" "1"
+//	"$envmap"      "env_cubemap"
+	"$envmaptint"     "[ 0.005 0.005 0.005 ]"
+	"$envmapfresnel"   "1"
+	"$envmapFresnelMinMaxExp" "[0 4 .4]"
+	
+	"$phongalbedotint" "1"
+ 
+	"$rimlight"     "1"
+	"$rimlightexponent"   "30" 
+	"$rimlightboost"   "0.5"
+	"$rimmask"      "1"
+	
+
+	
+}

@@ -217,8 +217,11 @@ if SERVER then
 	util.AddNetworkString("choose_poison")
 
 	net.Receive("choose_poison", function(len, ply)
+		if (ply.cooldown_poison4 or 0) > CurTime() then return end
+		ply.cooldown_poison4 = CurTime() + 0.5
+
 		local wep = net.ReadEntity()
-		if not IsValid(ply) or not ply:Alive() or ply.organism.otrub then return end
+		if not IsValid(ply) or not ply:Alive() or not istable(ply.organism) or ply.organism.otrub then return end
 
 		local weps = ply:GetWeapons()
 		for i, wep in ipairs(ents.FindInSphere(ply:GetPos(), 64)) do
@@ -233,6 +236,7 @@ if SERVER then
 			plywep:Remove()
 			ply:SelectWeapon(wep)
 		else -- prank
+			local org = ply.organism
 			if (not org.poison4notificate) and ((org.poison4 + 20) < CurTime()) then
 				org.poison4notificate = true
 				org.owner:Notify("I'm doing.. Something.. Wrong...", true, "poison4", 3)

@@ -268,18 +268,7 @@ if CLIENT then
 		local tbl = hg.notifications[1]
 
 		if tbl and istable(tbl) and not table.IsEmpty(tbl) then
-			/*if hg.currentNotification then
-				local tbl2 = hg.currentNotification
-
-				local clr = tbl2 and tbl2[4] and IsColor(tbl2[4]) and tbl2[4] or Color(255, 255, 255, 255)
-				if tbl2 and clr and tbl2[1] then
-					chat.AddText(Color(coloruse.r, coloruse.g, coloruse.b, 255), (last_message or tbl2[1]).."\n")
-				end
-
-				hg.currentNotification = nil
-			end*/
-
-			hg.currentNotification = {tbl[1], time_spent, tbl[2], tbl[3]}
+			hg.currentNotification = {tbl[1], time_spent, tbl[2], tbl[3], tbl[5]}
 
 			table.remove(hg.notifications,1)
 		end--показываем только одну нотификацию за раз (остальные держим в уме....)
@@ -302,6 +291,26 @@ if CLIENT then
 	local last_message
 	local last_time
 
+	hg.CreateShakyNotification = function(msg, showTimer, intensity)
+		local clr = Color(255, 255 - 255 * intensity, 255 - 255 * intensity, 255)
+		local current = hg.currentNotification
+
+		if current and current[5] ~= nil then
+			current[1] = msg
+			current[2] = CurTime()
+			current[3] = (showTimer or defaultShowTimer)
+			current[4] = clr
+			current[5] = intensity
+			last_message = nil
+			last_time = nil
+			oldclick = 0
+			return
+		end
+
+		hg.notifications = {}
+		table.insert(hg.notifications, {msg, (showTimer or defaultShowTimer), clr, nil, intensity})
+	end
+
 	local vector_one = Vector( 1, 1, 0)
 
 	local bluewhite = Color(187, 187, 255)
@@ -317,7 +326,7 @@ if CLIENT then
 		local tbl = hg.currentNotification
 
 		if tbl and istable(tbl) and not table.IsEmpty(tbl) then
-			local msg, time, timeshow, clr = tbl[1], tbl[2], tbl[3], tbl[4]
+			local msg, time, timeshow, clr, shaky = tbl[1], tbl[2], tbl[3], tbl[4], tbl[5]
 
 			local mul = ((org.brain > 0.1 or org.pulse < 50) and 3 or 1)// * (org.fear > 0 and math.max(1 - org.fear, 0.6) or 1)
 			local time_one_symbol = 0.06 * mul//(lply.organism and lply.organism.fear >= 0.5 and 0.5 or 1)
@@ -409,7 +418,11 @@ if CLIENT then
 					draw.SimpleText(last_message or txt, "ZB_ProotOSMedium", x + 2, y + 2, ColorAlpha(color_black, col.a), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 					draw.SimpleText(last_message or txt, "ZB_ProotOSMedium", x, y, ColorAlpha(bluewhite, col.a), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 				else
-					local x, y = ScrW() / 2 - txtw / 2 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2), ScrH() - ScrH() / 6 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2)
+					local shake = shaky or 0
+					local painShake = org.pain > 10 and org.pain / 10 or 0
+					local clrShake = (255 - clr.g) / 255 * 2
+					local x = ScrW() / 2 - txtw / 2 + math.Rand(-shake, shake) + math.Rand(0, painShake) + math.Rand(0, clrShake)
+					local y = ScrH() - ScrH() / 6 + math.Rand(-shake, shake) + math.Rand(0, painShake) + math.Rand(0, clrShake)
 
 					draw.SimpleTextOutlined(last_message or txt, font, x, y, col, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1.5, colBrown)
 				end

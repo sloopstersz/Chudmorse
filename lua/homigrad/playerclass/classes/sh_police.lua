@@ -62,7 +62,7 @@ function CLASS.Guilt(self, Victim)
         return 1
     end
 
-    if CurrentRound().name == "hmcd" then
+    if CurrentRound().name == "hmcd" or CurrentRound().name == "framed" then
         return zb.ForcesAttackedInnocent(self, Victim)
     end
 

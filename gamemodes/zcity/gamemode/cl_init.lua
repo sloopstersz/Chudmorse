@@ -16,21 +16,25 @@ local vecZero = Vector(0.2, 0.2, 0.2)
 local vecFull = Vector(1, 1, 1)
 spect,prevspect,viewmode = nil,nil,1
 local hullscale = Vector(0,0,0)
-net.Receive("ZB_SpectatePlayer", function(len)
-	spect = net.ReadEntity()
-	prevspect = net.ReadEntity()
-	viewmode = net.ReadInt(4)
-
-	timer.Simple(0.1,function()
-		-- LocalPlayer():BoneScaleChange()
-		LocalPlayer():SetHull(-hullscale,hullscale)
-		LocalPlayer():SetHullDuck(-hullscale,hullscale)
-
-		if viewmode == 3 then
-			LocalPlayer():SetMoveType(MOVETYPE_NOCLIP)
-		end
-	end)
+net.Receive("ChudSpectatorStateV2", function()
+    zb.SpectatorLastSync = RealTime()
+    local targetIndex = net.ReadUInt(16)
+    local previousIndex = net.ReadUInt(16)
+    local mode = net.ReadUInt(2)
+    local changed = zb.SpectatorTargetIndex ~= targetIndex or viewmode ~= mode
+    zb.SpectatorTargetIndex, viewmode = targetIndex, mode
+    spect, prevspect = Entity(targetIndex), Entity(previousIndex)
+    local ply = LocalPlayer()
+    if changed and IsValid(ply) then ply.spectLastPos, ply.spectLastAng = nil, nil end
 end)
+
+function zb.GetSpectatorTarget()
+    local target = Entity(zb.SpectatorTargetIndex or 0)
+    if IsValid(target) and target:IsPlayer() and target:Alive() then return target end
+    local ply = LocalPlayer()
+    target = IsValid(ply) and ply:GetNWEntity("spect")
+    if IsValid(target) and target:IsPlayer() and target:Alive() then return target end
+end
 
 zb.ROUND_TIME = zb.ROUND_TIME or 400
 zb.ROUND_START = zb.ROUND_START or CurTime()
@@ -112,16 +116,8 @@ local function FormatPoliceArrivalTime(timeLeft)
 end
 
 hook.Add("HUDPaint","FUCKINGSAMENAMEUSEDINHOOKFUCKME",function()
-    if zb and zb.CROUND == "realish" then
-        local ply = LocalPlayer()
-        if not IsValid(ply) then return end
-        local livesKey = ply:Team() == 0 and "Realish_ATLAS_Lives" or "Realish_REVENANT_Lives"
-        -- Hide behind the deployment menu only while respawns are still available.
-        if GetGlobalInt(livesKey, 50) > 0 then return end
-        if ply:GetNWBool("Realish_IsHero", false) and ply:GetNWInt("Realish_HeroLives", 0) > 0 then return end
-    end
-    if LocalPlayer():Alive() then return end
-	local spect = LocalPlayer():GetNWEntity("spect")
+    if not IsValid(LocalPlayer()) or LocalPlayer():Alive() then return end
+	local spect = zb.GetSpectatorTarget()
 	if not IsValid(spect) then return end
 	if viewmode == 3 then return end
 	
@@ -133,155 +129,125 @@ hook.Add("HUDPaint","FUCKINGSAMENAMEUSEDINHOOKFUCKME",function()
 	surface.DrawText(txt)
 	local txt = "In-game name: "..spect:GetPlayerName()
 	local w, h = surface.GetTextSize(txt)
-		surface.SetTextPos(ScrW() / 2 - w / 2, ScrH() / 8 * 7 + h)
-		surface.DrawText(txt)
-
-		-- Keep this tied to the same valid player-spectating state as the name
-		-- display. viewmode 3 is freecam and must never show the timer.
-		if zb and zb.CROUND == "hmcd" and viewmode ~= 3 and IsValid(spect) then
-			local policeArrivalTime = GetGlobalFloat("HMCD_PoliceArrivalTime", 0)
-			if policeArrivalTime > 0 then
-				local timerText = "POLICE ARRIVAL TIMER: " .. FormatPoliceArrivalTime(policeArrivalTime - CurTime())
-				local timerW = surface.GetTextSize(timerText)
-				surface.SetTextPos(ScrW() / 2 - timerW / 2, ScrH() / 8 * 7 + h * 2)
-				surface.DrawText(timerText)
-			end
-		end
+	surface.SetTextPos(ScrW() / 2 - w / 2, ScrH() / 8 * 7 + h)
+	surface.DrawText(txt)
+    if zb.ROUND_STATE == 1 and (zb.CROUND == "hmcd" or zb.CROUND == "chaos") then
+        local key = zb.CROUND == "chaos" and "CHAOS_PoliceArrivalTime" or "HMCD_PoliceArrivalTime"
+        local arrival = GetGlobalFloat(key, 0)
+        if arrival > 0 then
+            local text = "POLICE ARRIVAL TIMER: " .. FormatPoliceArrivalTime(arrival - CurTime())
+            local width = surface.GetTextSize(text)
+            surface.SetTextPos(ScrW() / 2 - width / 2, ScrH() / 8 * 7 + h * 2)
+            surface.DrawText(text)
+        end
+    end
 end)
 
-hook.Add("HG_CalcView", "zzzzzzzUwU", function(ply, pos, angles, fov)
-	if not lply:Alive() then
-		if lply:KeyDown(IN_ATTACK) then
-			if not keydownattack then
-				keydownattack = true
-				net.Start("ZB_ChooseSpecPly")
-				net.WriteInt(IN_ATTACK,32)
-				net.SendToServer()
-			end
-		else
-			keydownattack = false
-		end
+-- Direct physical polling remains available even if another addon consumes
+-- PlayerBindPress or CreateMove. Only fresh presses while in-game are accepted.
+local spectatorInputTimes = {}
+local spectatorButtons = {}
+local spectatorControls = {
+    {key = IN_ATTACK, bind = "+attack", fallback = MOUSE_LEFT},
+    {key = IN_ATTACK2, bind = "+attack2", fallback = MOUSE_RIGHT},
+    {key = IN_RELOAD, bind = "+reload", fallback = KEY_R}
+}
+local function SendSpectatorInput(key)
+    if (spectatorInputTimes[key] or 0) > RealTime() then return end
+    spectatorInputTimes[key] = RealTime() + 0.08
+    if util.NetworkStringToID("ChudSpectatorInputV2") == 0 then return end
+    net.Start("ChudSpectatorInputV2")
+    net.WriteInt(key, 32)
+    net.SendToServer()
+end
 
-		if lply:KeyDown(IN_ATTACK2) then
-			if not keydownattack2 then
-				keydownattack2 = true
-				net.Start("ZB_ChooseSpecPly")
-				net.WriteInt(IN_ATTACK2,32)
-				net.SendToServer()
-			end
-		else
-			keydownattack2 = false
-		end
-
-		if lply:KeyDown(IN_RELOAD) then
-			if not keydownreload then
-				keydownreload = true
-				net.Start("ZB_ChooseSpecPly")
-				net.WriteInt(IN_RELOAD,32)
-				net.SendToServer()
-			end
-		else
-			keydownreload = false
-		end
-
-		local spect = lply:GetNWEntity("spect",spect)
-		if not IsValid(spect) then return end
-
-		local viewmode = lply:GetNWInt("viewmode",viewmode)
-		
-		if viewmode == 3 then
-			if lply:GetMoveType()!=MOVETYPE_NOCLIP then
-				lply:SetMoveType(MOVETYPE_NOCLIP)
-			end
-			lply:SetObserverMode(OBS_MODE_ROAMING)
-			return
-		else
-			lply:SetPos(spect:GetPos())
-		end
-		
-		local ent = hg.GetCurrentCharacter(spect)
-		if not IsValid(ent) then return end
-		
-		local headBone = ent:LookupBone("ValveBiped.Bip01_Head1") or ent:LookupBone("ValveBiped.Bip01_Spine1") or 1
-		local bon = ent:GetBoneMatrix(headBone)
-		
-		if not bon then 
-			local eyePos = ent:EyePos()
-			if eyePos and eyePos ~= vector_origin then
-				pos = eyePos
-				ang = ent:EyeAngles()
-			else
-				pos = ent:GetPos() + Vector(0, 0, 64)
-				ang = ent:GetAngles()
-			end
-		else
-			pos, ang = bon:GetTranslation(), bon:GetAngles()
-		end
-
-		local eyePos, eyeAng = lply:EyePos(), lply:EyeAngles()
-		
-		local tr = {}
-		tr.start = pos
-		tr.endpos = pos + eyeAng:Forward() * -120
-		tr.filter = {ent, lply, spect}
-		tr.mins = Vector(-4, -4, -4)
-		tr.maxs = Vector(4, 4, 4)
-		tr = util.TraceHull(tr)
-
-		if viewmode == 2 then
-			pos = tr.HitPos + eyeAng:Forward() * 8
-			ang = eyeAng
-		elseif viewmode == 1 then
-			if ent ~= spect and IsValid(ent) then
-				local eyeAtt = ent:GetAttachment(ent:LookupAttachment("eyes"))
-				if eyeAtt then
-					ang = eyeAtt.Ang
-				else
-					ang = spect:EyeAngles()
-				end
-			else
-				ang = spect:EyeAngles()
-			end
-			pos = pos + spect:EyeAngles():Forward() * 8
-		else
-			pos = eyePos
-			ang = eyeAng
-		end
-		
-		ang[3] = 0
-		
-		local view
-		local hg_newspectate = GetConVar("hg_newspectate")
-		if hg_newspectate and hg_newspectate:GetBool() then
-			if not lply.spectLastPos then
-				lply.spectLastPos = pos
-				lply.spectLastAng = ang
-			end
-			
-			local lerpFactor = FrameTime() * 10
-			lply.spectLastPos = LerpVector(lerpFactor, lply.spectLastPos, pos)
-			lply.spectLastAng = LerpAngle(lerpFactor, lply.spectLastAng, ang)
-
-			view = {
-				origin = lply.spectLastPos,
-				angles = lply.spectLastAng,
-				fov = fov,
-			}
-		else
-			view = {
-				origin = pos,
-				angles = ang,
-				fov = fov,
-			}
-		end
-
-		return view
-	else
-		lply.spectLastPos = nil
-		lply.spectLastAng = nil
-		lply:SetObserverMode(OBS_MODE_NONE)
-	end
+hook.Add("PlayerBindPress", "ChudEventSpectatorControls", function(ply, bind, pressed)
+    if not IsValid(ply) or ply:Alive() or gui.IsGameUIVisible() or vgui.CursorVisible() then return end
+    local key = ({["+attack"] = IN_ATTACK, ["+attack2"] = IN_ATTACK2, ["+reload"] = IN_RELOAD})[string.lower(bind)]
+    if not key then return end
+    if pressed then SendSpectatorInput(key) end
+    return true
 end)
+hook.Remove("CreateMove", "ChudSpectatorInputFallback")
+timer.Create("ChudSpectatorPhysicalInput", 0.01, 0, function()
+    local ply = LocalPlayer()
+    local accept = IsValid(ply) and not ply:Alive() and not gui.IsGameUIVisible()
+        and not vgui.CursorVisible() and system.HasFocus()
+    for _, control in ipairs(spectatorControls) do
+        local binding = input.LookupBinding(control.bind)
+        local code = binding and input.GetKeyCode(binding) or control.fallback
+        if not code or code == KEY_NONE then code = control.fallback end
+        local down = input.IsButtonDown(code)
+        if accept and down and not spectatorButtons[control.key] then SendSpectatorInput(control.key) end
+        -- Update while menus are open too: closing a menu must not fire a held click.
+        spectatorButtons[control.key] = down
+    end
+end)
+
+local spectatorWasDead = false
+hook.Add("Think", "ChudSpectatorClientReset", function()
+    local ply = LocalPlayer()
+    if not IsValid(ply) then return end
+    if spectatorWasDead and ply:Alive() then
+        zb.SpectatorTargetIndex = nil
+        ply.spectLastPos, ply.spectLastAng = nil, nil
+    end
+    spectatorWasDead = not ply:Alive()
+end)
+
+-- Called directly by the shared camera, not through unordered mode hooks.
+hook.Remove("HG_CalcView", "zzzzzzzUwU")
+function zb.CalcSpectatorView(ply, origin, angles, fov, znear, zfar)
+    if not IsValid(ply) or ply:Alive() then return end
+    local target = zb.GetSpectatorTarget()
+    if viewmode == 3 or not IsValid(target) then
+        ply.spectLastPos, ply.spectLastAng = nil, nil
+        return {origin = origin, angles = angles, fov = fov, znear = znear, zfar = zfar, drawviewer = true}
+    end
+    local ent = hg.GetCurrentCharacter(target)
+    if not IsValid(ent) then ent = target end
+    local eyePos, eyeAng = target:EyePos(), target:EyeAngles()
+    if ent ~= target then
+        -- A living ragdoll's camera follows its physical eyes, not the hidden player.
+        local eyeIndex = ent:LookupAttachment("eyes")
+        local eyes = eyeIndex and eyeIndex > 0 and ent:GetAttachment(eyeIndex)
+        if eyes then
+            eyePos, eyeAng = eyes.Pos, eyes.Ang
+        else
+            local head = ent:LookupBone("ValveBiped.Bip01_Head1")
+            local bone = head and ent:GetBoneMatrix(head)
+            eyePos = bone and bone:GetTranslation() or ent:EyePos()
+        end
+    end
+    -- Version 3 follow/orbit camera, with safe attachment fallbacks and
+    -- collision checked after smoothing so transitions cannot cross walls.
+    local ang = viewmode == 1 and Angle(eyeAng.p, eyeAng.y, 0) or Angle(angles.p, angles.y, 0)
+    local desired = viewmode == 1 and (eyePos + ang:Forward() * 8) or (eyePos - ang:Forward() * 120)
+    local smooth = GetConVar("hg_newspectate")
+    if smooth and smooth:GetBool() then
+        local factor = math.Clamp(FrameTime() * 10, 0, 1)
+        desired = LerpVector(factor, ply.spectLastPos or desired, desired)
+        ang = LerpAngle(factor, ply.spectLastAng or ang, ang)
+    end
+    local trace = util.TraceHull({start = eyePos, endpos = desired,
+        filter = {ply, target, ent}, mins = Vector(-4, -4, -4), maxs = Vector(4, 4, 4)})
+    local pos = trace.HitPos
+    ply.spectLastPos, ply.spectLastAng = pos, ang
+    return {origin = pos, angles = ang, fov = fov, znear = viewmode == 1 and 1 or znear,
+        zfar = zfar, drawviewer = viewmode ~= 1}
+end
+
+-- Late joins, client Lua refreshes and respawn/death timing must not depend on
+-- receiving the server's first state packet before this client is ready.
+timer.Create("ChudSpectatorHandshakeV2", 1, 0, function()
+    local ply = LocalPlayer()
+    if not IsValid(ply) or ply:Alive() then return end
+    if (zb.SpectatorLastSync or 0) + 2 > RealTime() then return end
+    if util.NetworkStringToID("ChudSpectatorReadyV2") == 0 then return end
+    net.Start("ChudSpectatorReadyV2")
+    net.SendToServer()
+end)
+
 
 zb.fade = zb.fade or 0
 
@@ -311,7 +277,7 @@ net.Receive("RoundInfo", function()
 	zb.ROUND_STATE = net.ReadInt(4)
 	
 	if zb.ROUND_STATE == 0 then
-		zb.fade = 0.75
+		zb.fade = 7
 	end
 
 	if zb.CROUND ~= "" then
@@ -342,18 +308,9 @@ hook.Add("Player Disconnected","retrymenu",function(data)
 end)
 
 --local hg_coolvetica = ConVarExists("hg_coolvetica") and GetConVar("hg_coolvetica") or CreateClientConVar("hg_coolvetica", "0", true, false, "changes every text to coolvetica because its good", 0, 1)
-local hg_font_default = "Lora"
-local hg_font_legacy_default = "Courier Prime"
-local hg_font = ConVarExists("hg_font") and GetConVar("hg_font") or CreateClientConVar("hg_font", hg_font_default, true, false, "Change UI text font")
-local hg_font_value = hg_font:GetString()
-
-if hg_font_value == "" or hg_font_value == hg_font_legacy_default then
-	RunConsoleCommand("hg_font", hg_font_default)
-	hg_font_value = hg_font_default
-end
-
-local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "Courier Prime"
-    local usefont = hg_font_default
+local hg_font = ConVarExists("hg_font") and GetConVar("hg_font") or CreateClientConVar("hg_font", "Bahnschrift", true, false, "Change UI text font")
+local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "Bahnschrift"
+    local usefont = "Bahnschrift"
 
     if hg_font:GetString() != "" then
         usefont = hg_font:GetString()
@@ -798,6 +755,31 @@ function GM:ScoreboardShow()
 		return column
 	end
 
+	local function ScoreboardClothingColor(ply)
+        if ZZIsZombie and ZZIsZombie(ply) and ply:GetNWBool("ZZFirstInfected", false) then return Color(190, 30, 30) end
+		local appearance = ply.CurAppearance
+		local tint = appearance and appearance.AColor or ply:GetNWVector("PlayerColor", ply:GetPlayerColor())
+		if isvector(tint) then return Color(tint.x * 255, tint.y * 255, tint.z * 255) end
+		if istable(tint) then
+			return Color(tint.r or tint[1] or 255, tint.g or tint[2] or 255, tint.b or tint[3] or 255)
+		end
+		return SB.text
+	end
+
+	local function FitScoreboardName(text, width)
+		if width <= 0 then return "" end
+		surface.SetFont("ZCity_SB_Row")
+		if surface.GetTextSize(text) <= width then return text end
+		if surface.GetTextSize("...") > width then return "" end
+		local result = ""
+		-- Keep UTF-8 characters intact when shortening long names.
+		for char in string.gmatch(text, "[%z\1-\127\194-\244][\128-\191]*") do
+			if surface.GetTextSize(result .. char .. "...") > width then break end
+			result = result .. char
+		end
+		return result .. "..."
+	end
+
 	local function AddPlayerRow(scroll, ply, spectator)
 		local rowH = SB_Unit(42)
 		local avaSize = rowH - SB_Unit(14)
@@ -837,8 +819,19 @@ function GM:ScoreboardShow()
 
 			local xp = ply.exp or 0
 			local _, medal = zb.Experience.GetAwards(ply)
-			draw.SimpleText(ply:Name(), "ZCity_SB_Row", nameX, h / 2, spectator and SB.textDim or SB.text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-			draw.SimpleText("XP  " .. xp, "ZCity_SB_Tiny", w - SB_Unit(155), h / 2, SB.textDim, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+			local characterName = ply:GetNWString("PlayerName", "")
+			local nameWidth = math.max(0, w - SB_Unit(275) - nameX)
+			local steamName = FitScoreboardName(ply:Name(), characterName ~= "" and nameWidth * 0.6 or nameWidth)
+			surface.SetFont("ZCity_SB_Row")
+			local steamWidth = surface.GetTextSize(steamName)
+			draw.SimpleText(steamName, "ZCity_SB_Row", nameX, h / 2, spectator and SB.textDim or SB.text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			if characterName ~= "" then
+				local suffix = FitScoreboardName(" - " .. characterName, nameWidth - steamWidth)
+				draw.SimpleText(suffix, "ZCity_SB_Row", nameX + steamWidth, h / 2, ScoreboardClothingColor(ply), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			end
+			local karma = ply:GetNWBool("ScoreboardKarmaReady", false) and tostring(ply:GetNWInt("ScoreboardKarma", 0)) or "--"
+			draw.SimpleText("XP  " .. xp, "ZCity_SB_Tiny", w - SB_Unit(155), h / 2 - SB_Unit(8), SB.textDim, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+			draw.SimpleText("K  " .. karma, "ZCity_SB_Tiny", w - SB_Unit(155), h / 2 + SB_Unit(8), SB.textDim, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
 			if medal and medal.icon then
 				surface.SetMaterial(medal.icon)
 				surface.SetDrawColor(255, 255, 255, 220)
@@ -881,31 +874,42 @@ function GM:ScoreboardShow()
 				SetClipboardText(ply:SteamID())
 			end)
 			if lp:IsSuperAdmin() then
+                for _, option in ipairs({
+                    {"Set as juggernaut", "juggernaut"},
+                    {"Set as VIP", "vip"},
+                    {"Set as infector", "infector"}
+                }) do
+                    local role = option[2]
+                    menu:AddOption(option[1], function()
+                        if not IsValid(ply) then return end
+                        net.Start("Chud_SetNextModeRole")
+                        net.WriteEntity(ply)
+                        net.WriteString(role)
+                        net.SendToServer()
+                    end)
+                end
 				menu:AddOption("Set as assistant", function()
 					net.Start("HMCD_SetNextTraitorRole")
 						net.WriteEntity(ply)
 						net.WriteString("assistant")
 					net.SendToServer()
 				end)
-				menu:AddOption("Set as traitor", function()
-					net.Start("HMCD_SetNextTraitorRole")
-						net.WriteEntity(ply)
-						net.WriteString("traitor")
-					net.SendToServer()
-				end)
-				menu:AddOption("Set as VIC", function()
-					net.Start("HMCD_SetNextTraitorRole")
-						net.WriteEntity(ply)
-						net.WriteString("vic")
-					net.SendToServer()
-				end)
-				menu:AddOption("Set as Juggernaut", function()
-					net.Start("HMCD_SetNextTraitorRole")
-						net.WriteEntity(ply)
-						net.WriteString("juggernaut")
-					net.SendToServer()
-				end)
+
 			end
+			local round = CurrentRound and CurrentRound()
+            local framed = round and round.name == "framed"
+            if lp:IsSuperAdmin() or (framed and lp:IsAdmin()) then
+                menu:AddOption("Set as traitor", function()
+                    if not IsValid(ply) then return end
+                    local current = CurrentRound and CurrentRound()
+                    local isFramed = current and current.name == "framed"
+                    if not lp:IsSuperAdmin() and not (isFramed and lp:IsAdmin()) then return end
+                    net.Start(isFramed and "framed_setrole" or "HMCD_SetNextTraitorRole")
+                    net.WriteEntity(ply)
+                    net.WriteString(isFramed and "killer" or "traitor")
+                    net.SendToServer()
+                end)
+            end
 			menu:Open()
 		end
 	end
@@ -969,17 +973,6 @@ function GM:ScoreboardHide()
 		scoreBoardMenu = nil
 	end
 end
-local AdminShowVoiceChat = CreateClientConVar("zb_admin_show_voicechat","0",false,false,"Show voicechat panels for admins",0,1)
-hook.Add("PlayerStartVoice", "showVoicePanels", function(ply)
-	if !IsValid(ply) then return end
-	local lp = LocalPlayer()
-	if (lp:IsAdmin() or (lp.CheckGroup and (lp:CheckGroup("admin") or lp:CheckGroup("superadmin")))) and AdminShowVoiceChat:GetBool() then return end
-
-	local other_alive = (ply:Alive() and LocalPlayer() != ply) or (ply.organism and (ply.organism.otrub or (ply.organism.brain and ply.organism.brain > 0.05)))
-
-	return other_alive or nil
-end)
-
 -- свет от молнии а саму молнию я не сделал skill issue
 if CLIENT then
 	net.Receive("PunishLightningEffect", function()

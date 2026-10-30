@@ -154,7 +154,7 @@ hook.Add("PlayerDropWeapon", "homigrad-inventory", function(ply)
 	if ply.organism and ishgweapon(wep) then ply.organism.postureGunfireWeapon = wep end
 
     timer.Simple(0.1,function()
-        if not IsValid(wep) or IsValid(wep:GetOwner()) or IsValid(wep:GetParent()) then return end
+        if not IsValid(wep) then return end
         if not IsValid(ply) then return end
         local ent = IsValid(ply:GetNWEntity("RagdollDeath")) and ply:GetNWEntity("RagdollDeath") or ply.FakeRagdoll
         if not IsValid(ent) then return end
@@ -170,31 +170,20 @@ hook.Add("PlayerDropWeapon", "homigrad-inventory", function(ply)
 
         local localpos,localang = LocalToWorld(wep.WorldPos and wep.WorldPos + Vector(3.5,0,0) or vector_origin,wep.WorldAng or angle_zero,handpos,handang)
         localang:RotateAroundAxis(localang:Forward(),180)
-        if wep.ismelee2 and hg.PlaceDroppedMelee then
-            local placed, moved = hg.PlaceDroppedMelee(wep, localpos, localang, ent, ply)
-            -- A buried hand would pull the weapon back through the floor if welded.
-            if not placed or moved then return end
-        else
-            wep:SetPos(localpos)
-            wep:SetAngles(localang)
-        end
+        wep:SetPos(localpos)
+        wep:SetAngles(localang)
         wep:SetVelocity(vector_origin)
         wep:SetCollisionGroup(COLLISION_GROUP_WEAPON)
 
-        if not bon then return end
         local physbone = ent:TranslateBoneToPhysBone(bon)
-        if physbone < 0 then return end
-        local torsoBone = ent:LookupBone("ValveBiped.Bip01_Spine2")
-        local physbonetorso = torsoBone and ent:TranslateBoneToPhysBone(torsoBone) or 0
+        local physbonetorso = ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_Spine2"))
 
         local cons = constraint.Weld(wep, ent, 0, physbone, 600, true, false)
 		if ply.organism and ishgweapon(wep) then ply.organism.postureGunfireWeapon = wep end
 
         if math.random(1,10) <= 2 then
             timer.Simple(4, function()
-                if not IsValid(wep) or not IsValid(ent) or IsValid(wep:GetOwner()) then return end
                 timer.Simple(0, function()
-                    if not IsValid(wep) or not IsValid(ent) or IsValid(wep:GetOwner()) then return end
                     local cons2 = constraint.NoCollide(wep, ent, 0, 0)
                 end)
                 if IsValid(cons) then

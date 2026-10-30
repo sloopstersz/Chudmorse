@@ -74,7 +74,7 @@ local hg_slings = ConVarExists("hg_slings") and GetConVar("hg_slings") or Create
 hook.Add("PlayerSwitchInFake","slingDrop",function(ply,oldWeapon,newWeapon)
 	if not hg_slings:GetBool() then return end
 	if oldWeapon == newWeapon then return end
-	if zb.CROUND and zb.CROUND == "hmcd" or gamemod == "sandbox" then
+	if zb.CROUND and (zb.CROUND == "hmcd" or zb.CROUND == "framed") or gamemod == "sandbox" then
 		local inv = ply:GetNetVar("Inventory")
 
 		if SERVER and not oldWeapon.bigNoDrop and oldWeapon.weaponInvCategory == 1 and not inv["Weapons"]["hg_sling"] then

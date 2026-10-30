@@ -481,7 +481,7 @@ hg.ConVars = hg.ConVars or {}
 
 		hook.Run("Player Getup", ply)
 
-		local override = (CLIENT and hg.override[ply]) or (SERVER and (OverrideSpawn or ply.hgFakeUpSpawning))
+		local override = (CLIENT and hg.override[ply]) or (SERVER and OverrideSpawn)
 
 		if eightbit and eightbit.EnableEffect and ply.UserID then
 			eightbit.EnableEffect(ply:UserID(), ply.PlayerClassName == "furry" and eightbit.EFF_PROOT or 0)
@@ -765,11 +765,10 @@ local IsValid = IsValid
 	end
 
 	function hg.eye(ply, dist, ent, aimvec, startpos)
-		if !ply:IsPlayer() then return false end
+		if not IsValid(ply) or not ply:IsPlayer() then return false end
 		local fakeCam = false//IsValid(ent) and ent != ply
 		local ent = (IsValid(ent) and ent) or (IsValid(ply.FakeRagdoll) and ply.FakeRagdoll) or ply
 		local bon = ent:LookupBone("ValveBiped.Bip01_Neck1")
-		if not bon then return end
 		if not IsValid(ply) then return end
 		if not ply.GetAimVector then return end
 
@@ -781,7 +780,7 @@ local IsValid = IsValid
 				endpos = ply:EyePos() + aim_vector * (dist or 60),
 				filter = ply
 			}
-			return ply:EyePos(), aim_vector * (dist or 60), ply//util.TraceLine(tr)
+			return startpos or ply:EyePos(), aim_vector * (dist or 60), {ply, ent, ply.OldRagdoll}
 		end
 
 		/*if (ply.InVehicle and ply:InVehicle() and IsValid(ply:GetVehicle())) then
@@ -865,15 +864,37 @@ local IsValid = IsValid
 
 --\\ Suicide
 	if SERVER then
+		util.AddNetworkString("rem_suicide_attempt")
+
+		local suicide_call_delay = 0.5
+		local suicide_call_window = 3
+		local suicide_calls_needed = 4
+
 		concommand.Add("suicide", function(ply)
 			if not IsValid(ply) or not ply:IsPlayer() then return end
 			if ply:GetNWFloat("rem_urges_end", 0) > CurTime() then return end
 			if ply.remUrgeEnd then return end
-			if not ply.suiciding and ply.organism and (ply.organism.depression or 0) < 0.5 then
-				if ply:GetInfoNum("hg_newthoughts", 0) > 0 then
-					ply:Thought("You shouldnt do this.", 6, "depression_block_suicide", 0)
-				else
-					ply:Notify("I shouldnt do this", 6, "depression_block_suicide", 0)
+			if hg.organism.IsMentalDisabled and hg.organism.IsMentalDisabled() then return end
+
+			local now = CurTime()
+			if (ply.suicideCallNext or 0) > now then return end
+
+			local org = ply.organism
+
+			if not ply.suiciding and org and (org.depression or 0) < 0.5 then
+				if (ply.suicideCallLast or 0) + suicide_call_window < now then ply.suicideCallCount = 0 end
+
+				ply.suicideCallLast = now
+				ply.suicideCallNext = now + suicide_call_delay
+				ply.suicideCallCount = (ply.suicideCallCount or 0) + 1
+
+				net.Start("rem_suicide_attempt")
+				net.WriteFloat(math.Clamp((ply.suicideCallCount - 1) / (suicide_calls_needed - 1), 0, 1))
+				net.Send(ply)
+
+				if ply.suicideCallCount >= suicide_calls_needed then
+					ply.suicideCallCount = 0
+					hg.StartSuicideUrge(ply, true)
 				end
 				return
 			end
@@ -1537,6 +1558,7 @@ local IsValid = IsValid
 
 		if not ply:KeyDown(IN_USE) then return false end
 		local eyetr = hg.eyeTrace(ply,100,nil,nil,nil,checkUse)
+        if not eyetr then return false end
 
 		local ent = eyetr.Entity
 

@@ -1,0 +1,11 @@
+vertexLitGeneric
+{
+	"$basetexture" "models/UH60/2c_met"
+	"$surfaceprop" "metal"
+	"$bumpmap"	"models/UH60/c_met_n"
+	"$phong" "1"
+	"$phongexponent" "5"
+	"$phongboost" "0.1"	
+	"$phongfresnelranges"	"[2 3 3]"
+	"$selfillum" 1
+}

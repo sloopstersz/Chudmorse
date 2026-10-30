@@ -193,6 +193,7 @@ hook.Add("Post Post Processing", "berserkEffect", function()
 end)
 
 hook.Add("HG_CalcView","InsaneRollCam",function(ply, origin, angles, fova)
+	if not istable(fova) then return end
 	if ply:Alive() and hg.underberserk2 and IsValid(hg.berserkStation) and hg.berserkClamped then
 		local intensity = 1 - ((hg.berserkStation:GetTime() - offset:GetFloat()) / 60 * bpm:GetInt())
 		angles[1] = angles[1] - hg.berserkIntensity * 0.2

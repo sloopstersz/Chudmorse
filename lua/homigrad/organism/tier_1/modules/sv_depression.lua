@@ -3,31 +3,29 @@ hg.organism.module.depression = {}
 local module = hg.organism.module.depression
 
 local depression_max = 1
--- Balance: halve all incoming depression, including queued event gains.
-local depression_gain_mul = 0.5
 local depression_drain_time = 300
 local depression_drain_boost_time = 100
-local depression_pain_threshold = 60
-local depression_pain_gain = 0.02
-local depression_fear_threshold = 3
-local depression_fear_gain = 0.015
-local depression_blood_threshold = 3500
-local depression_blood_gain = 0.01
-local depression_otrub_gain = 0.005
-local depression_adrenaline_suppress_start = 0.5
-local depression_adrenaline_suppress_min = 0.1
-local depression_bleedrate_threshold = 5
-local depression_bleedrate_gain = 0.03
+local depression_pain_threshold = 80
+local depression_pain_gain = 0.01
+local depression_fear_threshold = 5
+local depression_fear_gain = 0.0075
+local depression_blood_threshold = 3000
+local depression_blood_gain = 0.0025
+local depression_blood_cap = 0.15
+local selfharm_adrenaline_threshold = 1.5
+local selfharm_adrenaline_delay = 3
+local depression_bleedrate_threshold = 8
+local depression_bleedrate_gain = 0.0075
 local depression_bleedrate_maxmul = 4
-local depression_o2_threshold = 15
-local depression_o2_gain = 0.02
-local depression_bones_gain = 0.012
-local depression_cold_threshold = 35
-local depression_cold_gain = 0.01
-local depression_panic_gain = 0.02
-local depression_amputation_gain = 0.015
+local depression_o2_threshold = 12
+local depression_o2_gain = 0.01
+local depression_bones_gain = 0.006
+local depression_cold_threshold = 34
+local depression_cold_gain = 0.005
+local depression_panic_gain = 0.01
+local depression_amputation_gain = 0.0075
 
-local selfharm_threshold = 0.65
+local selfharm_threshold = 0.4
 local selfharm_roll_time_min = 5
 local selfharm_roll_time_max = 12
 local selfharm_chance_min = 0.25
@@ -55,47 +53,81 @@ local selfharm_pending_phrases = {
 	"I can't stop thinking about the knife...",
 }
 
-local depression_stage_thresholds = {0.4, 0.55, 0.7}
+local depression_stage_thresholds = {0.25, 0.35, 0.5}
 local depression_stage_thoughts = {
-	[0.4] = "You are feeling down.",
-	[0.55] = "You are feeling upset.",
-	[0.7] = "You are feeling depressed.",
+	[0.25] = {
+		{text = "You are feeling down."},
+	{text = "A heavy weight settles on your chest."},
+	{text = "Everything looks duller than it should."},
+	{text = "You feel tired for no reason."},
+	},
+	[0.35] = {
+		{text = "You are feeling upset."},
+	{text = "A quiet sadness creeps over you."},
+	{text = "Nothing feels worth the effort."},
+	{text = "You can feel yourself slipping."},
+	},
+	[0.5] = {
+		{text = "You are feeling depressed."},
+	{text = "A grey fog settles over everything."},
+	{text = "You feel hollow, like something is missing."},
+	{text = "Nothing seems to matter anymore."},
+	},
 }
 local depression_stage_cooldown = 30
-local depression_dark_threshold = 0.85
+local depression_dark_threshold = 0.65
 local depression_dark_thought_min = 45
 local depression_dark_thought_max = 120
 local depression_dark_thoughts = {
-	"You wont make it far.",
-	"You wont succeed.",
-	"Find something sharp.",
-	"Have you lost hope?",
-	"Do you miss them?",
-	"You are nobody.",
-	"You are a waste of time.",
-	"You are worthless.",
-	"End it all.",
+	{text = "You wont make it far."},
+	{text = "You wont succeed."},
+	{text = "Find something sharp.", cut = true},
+	{text = "Have you lost hope?"},
+	{text = "Do you miss them?"},
+	{text = "You are nobody."},
+	{text = "You are a waste of time."},
+	{text = "You are worthless."},
+	{text = "End it all."},
+	{text = "You are a burden to everyone."},
+	{text = "Nobody would even notice."},
+	{text = "Nothing you do matters."},
+	{text = "You deserve every bit of this."},
+	{text = "The blade would be so easy.", cut = true},
 }
 
-local depression_notify_stage_thresholds = {0.5, 0.65, 0.8}
+local depression_notify_stage_thresholds = {0.35, 0.45, 0.55, 0.65}
 local depression_notify_stage_phrases = {
-	[0.5] = {
-		"I'm feeling down..",
-		"I'm feeling kinda down..",
-		"Dude... I'm bored..",
-		"Mmmh... I should get busy with something.",
+	[0.35] = {
+		{text = "I'm feeling down.."},
+		{text = "I'm feeling kinda down.."},
+		{text = "Dude... I'm bored.."},
+		{text = "Mmmh... I should get busy with something."},
+		{text = "This day just keeps dragging on.."},
+		{text = "I dont feel like doing anything today.."},
+	},
+	[0.45] = {
+		{text = "I feel upset.."},
+		{text = "I really feel sad.."},
+		{text = "Does it get worse than this?"},
+		{text = "Staying strong... I hope."},
+		{text = "Why does everything feel so heavy.."},
+		{text = "I just want this feeling to stop.."},
+	},
+	[0.55] = {
+		{text = "Fuck my life."},
+		{text = "I cant take this anymore."},
+		{text = "I need something sharp.", cut = true},
+		{text = "Fuck everything."},
+		{text = "I'm so tired of all this.."},
+		{text = "Everything is falling apart on me.."},
 	},
 	[0.65] = {
-		"I feel upset..",
-		"I really feel sad..",
-		"Does it get worse than this?",
-		"Staying strong... I hope.",
-	},
-	[0.8] = {
-		"Fuck my life.",
-		"I cant take this anymore.",
-		"I need something sharp.",
-		"Fuck everything.",
+		{text = "I dont see the point in any of this anymore.."},
+		{text = "Nobody would even notice if I was gone.."},
+		{text = "I'm so tired of fighting this.."},
+		{text = "Maybe it would just be easier this way.."},
+		{text = "The knife keeps calling me..", cut = true},
+		{text = "Just one cut and it all goes quiet..", cut = true},
 	},
 }
 
@@ -106,18 +138,14 @@ local depression_minigame_phrases = {
 	"KEEP GOING..  STEADY.. STEADY..",
 	"YES.. GO ON... FUCK... FUCK MY LIFE..",
 	"END IT ALREADY.. COME ON..",
+	"YES.. MORE.. DEEPER..",
+	"DONT YOU DARE STOP.. KEEP CUTTING..",
+	"IT HURTS SO GOOD.. KEEP GOING..",
+	"ALMOST.. FINISH IT.. COME ON..",
 }
 
 util.AddNetworkString("rem_selfharm_press")
 util.AddNetworkString("rem_selfharm_end")
-
-local function showDepressionThought(owner, text, id)
-	if owner:GetInfoNum("hg_newthoughts", 0) > 0 then
-		owner:Thought(text, 6, id, 0)
-	else
-		owner:Notify(text, 6, id, 0)
-	end
-end
 
 local function isSelfHarmWeapon(wep)
 	if not IsValid(wep) or not wep.Canselfharm then return false end
@@ -150,11 +178,35 @@ local function autoEquipSelfHarmWeapon(owner)
 	return true
 end
 
+local function hasCutWeapon(owner)
+	return hasSelfHarmWeapon(owner) or IsValid(findInventorySelfHarmWeapon(owner))
+end
+
+local function hasStrongAdrenaline(org)
+	return (org.adrenaline or 0) >= selfharm_adrenaline_threshold
+end
+
+local function pickPhrase(owner, pool)
+	local canCut = hasCutWeapon(owner)
+
+	local choices = {}
+	for _, phrase in ipairs(pool) do
+		if not phrase.cut or canCut then
+			choices[#choices + 1] = phrase.text
+		end
+	end
+
+	if #choices == 0 then return end
+
+	return choices[math.random(#choices)]
+end
+
 function hg.organism.StartSelfHarm(owner)
 	if not IsValid(owner) or not owner:IsPlayer() then return end
 
 	local org = owner.organism
 	if not org or not org.alive or owner.selfharming then return end
+	if hasStrongAdrenaline(org) then return end
 	if owner.suiciding or owner.remUrgeEnd then return end
 	if (owner.remUrgeCooldown or 0) > CurTime() then return end
 
@@ -219,6 +271,7 @@ end
 module[1] = function(org)
 	org.depression = 0
 	org.depressionadd = 0
+	org.depressionBlood = 0
 	org.depressionThoughtStage = nil
 	org.depressionNextStageThought = nil
 	org.depressionNextDarkThought = nil
@@ -277,7 +330,7 @@ local function updateSelfHarm(owner, org)
 		return
 	end
 
-	if org.otrub or owner.suiciding or org.larmamputated then
+	if org.otrub or owner.suiciding or org.larmamputated or hasStrongAdrenaline(org) then
 		hg.organism.EndSelfHarm(owner)
 		return
 	end
@@ -304,7 +357,7 @@ local function updatePending(owner, org)
 		return
 	end
 
-	if org.otrub or owner.suiciding or org.larmamputated then
+	if org.otrub or owner.suiciding or org.larmamputated or hasStrongAdrenaline(org) then
 		org.selfharmPendingUntil = nil
 		owner:SetNWFloat("rem_selfharm_pending", 0)
 		return
@@ -326,6 +379,10 @@ local function updatePending(owner, org)
 end
 
 local function rollSelfHarm(owner, org)
+	if hasStrongAdrenaline(org) then
+		org.selfharmNextRoll = CurTime() + selfharm_adrenaline_delay
+		return
+	end
 	if (org.depression or 0) < selfharm_threshold then return end
 	if (org.selfharmNextRoll or 0) > CurTime() then return end
 
@@ -357,12 +414,36 @@ local function rollSelfHarm(owner, org)
 end
 
 module[2] = function(owner, org, timeValue)
+    if ZZIsZombie and ZZIsZombie(owner) then
+        ZZUpdateZombieOrganism(owner, org)
+        return
+    end
+	if hg.organism.IsMentalDisabled and hg.organism.IsMentalDisabled() then
+		org.depression = 0
+		org.depressionadd = 0
+		org.depressionBlood = 0
+
+		if owner.selfharming then
+			hg.organism.EndSelfHarm(owner)
+		end
+
+		return
+	end
+
 	if owner.selfharming and (not org.alive or org.heartstop) then
 		hg.organism.EndSelfHarm(owner)
 	end
 
 	if not org.alive then return end
 	if org.heartstop then return end
+
+	if org.otrub then
+		if owner.selfharming then
+			hg.organism.EndSelfHarm(owner)
+		end
+
+		return
+	end
 
 	local add = 0
 
@@ -376,15 +457,27 @@ module[2] = function(owner, org, timeValue)
 		add = add + depression_fear_gain * timeValue
 	end
 
+	local bloodAdd = 0
+
 	local blood = org.blood or 5000
 	if blood < depression_blood_threshold then
-		add = add + depression_blood_gain * timeValue
+		bloodAdd = bloodAdd + depression_blood_gain * timeValue
 	end
 
 	local bleedrate = org.bleed or 0
 	if bleedrate > depression_bleedrate_threshold then
-		add = add + depression_bleedrate_gain * min(bleedrate / depression_bleedrate_threshold, depression_bleedrate_maxmul) * timeValue
+		bloodAdd = bloodAdd + depression_bleedrate_gain * min(bleedrate / depression_bleedrate_threshold, depression_bleedrate_maxmul) * timeValue
 	end
+
+	local bloodAllowed = depression_blood_cap - (org.depressionBlood or 0)
+	if bloodAllowed <= 0 then
+		bloodAdd = 0
+	else
+		bloodAdd = min(bloodAdd, bloodAllowed)
+		org.depressionBlood = (org.depressionBlood or 0) + bloodAdd
+	end
+
+	add = add + bloodAdd
 
 	local o2 = org.o2 and org.o2[1] or 30
 	if o2 < depression_o2_threshold then
@@ -407,27 +500,16 @@ module[2] = function(owner, org, timeValue)
 		add = add + depression_amputation_gain * timeValue
 	end
 
-	if org.otrub then
-		add = add + depression_otrub_gain * timeValue
-	end
-
 	if (org.depressionadd or 0) > 0 then
 		local applied = min(org.depressionadd, timeValue / 5)
 		org.depressionadd = max(org.depressionadd - applied, 0)
 		add = add + applied
 	end
 
-	add = add * depression_gain_mul
-
-	local adrenaline = org.adrenaline or 0
-	if adrenaline > depression_adrenaline_suppress_start then
-		add = add * max(1 - adrenaline * 0.2, depression_adrenaline_suppress_min)
-	end
-
 	org.depression = Clamp((org.depression or 0) + add, 0, depression_max)
 
 	local drainRate = timeValue / depression_drain_time
-	if pain < 30 and fear < 2 and blood > 4000 and not org.otrub then
+	if pain < 30 and fear < 2 and blood > 4000 then
 		drainRate = drainRate * (depression_drain_time / depression_drain_boost_time)
 	end
 
@@ -440,75 +522,79 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	org.depression = max((org.depression or 0) - drainRate, 0)
+	org.depressionBlood = max((org.depressionBlood or 0) - drainRate, 0)
 
 	if owner:IsPlayer() then
 		local dep = org.depression or 0
-		local stage = org.depressionThoughtStage
 
-		if stage and dep < stage then
-			org.depressionThoughtStage = nil
-		end
+		if owner:GetInfoNum("hg_newthoughts", 0) > 0 then
+			local stage = org.depressionThoughtStage
 
-		if dep < depression_stage_thresholds[1] then
-			org.depressionThoughtStage = nil
-		elseif (org.depressionNextStageThought or 0) < CurTime() then
-			stage = org.depressionThoughtStage or 0
+			if stage and dep < stage then
+				org.depressionThoughtStage = nil
+			end
 
-			for i = #depression_stage_thresholds, 1, -1 do
-				local threshold = depression_stage_thresholds[i]
+			if dep < depression_stage_thresholds[1] then
+				org.depressionThoughtStage = nil
+			elseif (org.depressionNextStageThought or 0) < CurTime() then
+				stage = org.depressionThoughtStage or 0
 
-				if dep >= threshold then
-					if stage < threshold then
-						org.depressionThoughtStage = threshold
-						org.depressionNextStageThought = CurTime() + depression_stage_cooldown
-						showDepressionThought(owner, depression_stage_thoughts[threshold], "depression_stage_" .. threshold)
+				for i = #depression_stage_thresholds, 1, -1 do
+					local threshold = depression_stage_thresholds[i]
+
+					if dep >= threshold then
+						if stage < threshold then
+							org.depressionThoughtStage = threshold
+							org.depressionNextStageThought = CurTime() + depression_stage_cooldown
+							owner:Thought(pickPhrase(owner, depression_stage_thoughts[threshold]), 6, "depression_stage_" .. threshold, 0)
+						end
+
+						break
 					end
-
-					break
 				end
 			end
-		end
 
-		if dep > depression_dark_threshold then
-			if (org.depressionNextDarkThought or 0) < CurTime() then
-				org.depressionNextDarkThought = CurTime() + math.Rand(depression_dark_thought_min, depression_dark_thought_max)
-				showDepressionThought(owner, table.Random(depression_dark_thoughts), "depression_dark")
+			if dep > depression_dark_threshold then
+				if (org.depressionNextDarkThought or 0) < CurTime() then
+					org.depressionNextDarkThought = CurTime() + math.Rand(depression_dark_thought_min, depression_dark_thought_max)
+					owner:Thought(pickPhrase(owner, depression_dark_thoughts), 6, "depression_dark", 0)
+				end
+			else
+				org.depressionNextDarkThought = nil
 			end
 		else
-			org.depressionNextDarkThought = nil
-		end
+			local notifyStage = org.depressionNotifyStage
 
-		local notifyStage = org.depressionNotifyStage
+			if notifyStage and dep < notifyStage then
+				org.depressionNotifyStage = nil
+			end
 
-		if notifyStage and dep < notifyStage then
-			org.depressionNotifyStage = nil
-		end
+			if dep < depression_notify_stage_thresholds[1] then
+				org.depressionNotifyStage = nil
+			elseif (org.depressionNextNotifyThought or 0) < CurTime() then
+				notifyStage = org.depressionNotifyStage or 0
 
-		if dep < depression_notify_stage_thresholds[1] then
-			org.depressionNotifyStage = nil
-		elseif (org.depressionNextNotifyThought or 0) < CurTime() then
-			notifyStage = org.depressionNotifyStage or 0
+				for i = #depression_notify_stage_thresholds, 1, -1 do
+					local threshold = depression_notify_stage_thresholds[i]
 
-			for i = #depression_notify_stage_thresholds, 1, -1 do
-				local threshold = depression_notify_stage_thresholds[i]
+					if dep >= threshold then
+						if notifyStage < threshold then
+							org.depressionNotifyStage = threshold
+							org.depressionNextNotifyThought = CurTime() + depression_stage_cooldown
+							owner:Notify(pickPhrase(owner, depression_notify_stage_phrases[threshold]), 6, "depression_notify_stage_" .. threshold, 0)
+						end
 
-				if dep >= threshold then
-					if notifyStage < threshold then
-						org.depressionNotifyStage = threshold
-						org.depressionNextNotifyThought = CurTime() + depression_stage_cooldown
-						owner:Notify(table.Random(depression_notify_stage_phrases[threshold]), 6, "depression_notify_stage_" .. threshold, 0)
+						break
 					end
-
-					break
 				end
 			end
-		end
 
-		if (owner.selfharming or owner.suiciding or owner.remUrgeEnd) and (org.depressionNextMinigamePhrase or 0) < CurTime() then
-			org.depressionNextMinigamePhrase = CurTime() + math.Rand(depression_minigame_phrase_interval_min, depression_minigame_phrase_interval_max)
-			owner:Notify(table.Random(depression_minigame_phrases), 3, "depression_minigame", 0)
-		elseif not owner.selfharming and not owner.suiciding and not owner.remUrgeEnd then
-			org.depressionNextMinigamePhrase = nil
+			if (owner.selfharming or owner.suiciding or owner.remUrgeEnd) and (org.depressionNextMinigamePhrase or 0) < CurTime() then
+				org.depressionNextMinigamePhrase = CurTime() + math.Rand(depression_minigame_phrase_interval_min, depression_minigame_phrase_interval_max)
+				owner:Notify(depression_minigame_phrases[math.random(#depression_minigame_phrases)], 3, "depression_minigame", 0)
+			elseif not owner.selfharming and not owner.suiciding and not owner.remUrgeEnd then
+				org.depressionNextMinigamePhrase = nil
+			end
 		end
 	end
 
@@ -524,7 +610,7 @@ function hg.organism.AddDepression(org, amount)
 	if not org then return 0 end
 	if not isnumber(amount) or amount <= 0 then return org.depressionadd or 0 end
 
-	org.depressionadd = Clamp((org.depressionadd or 0) + amount, 0, depression_max)
+	org.depressionadd = Clamp((org.depressionadd or 0) + amount * 0.5, 0, depression_max)
 
 	return org.depressionadd
 end

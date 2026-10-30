@@ -1,0 +1,7 @@
+"VertexlitGeneric"
+{
+	"$basetexture" "models\lfs\mi8t_hip/the_mi17_c"
+	"$bumpmap" "models\lfs\mi8t_hip/the_mi17_b"
+	"$surfaceprop" "Metal"
+	"$nocull" 1
+}

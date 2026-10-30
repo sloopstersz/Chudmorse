@@ -50,7 +50,7 @@ matproxy.Add({
 hook.Add("radialOptions", "ReloadOnFloor", function()
 	if !lply:Alive() or !lply.organism or lply.organism.otrub then return end
 	local org = lply.organism
-	if not isnumber(org.pain) or org.pain > 50 or (org.rarmamputated and org.larmamputated) then return end
+	if org.pain > 50 or (org.rarmamputated and org.larmamputated) then return end
 	local ent = (IsValid(hg.eyeTrace(lply).Entity) and hg.eyeTrace(lply).Entity) or (IsValid(lply:GetNetVar("carryent")) and lply:GetNetVar("carryent"))
 	if not IsValid(ent) then return end
 	if not ishgweapon(ent) then return end
@@ -72,7 +72,7 @@ end)
 hook.Add("radialOptions", "PlaceBipod", function()
 	if !lply:Alive() or !lply.organism or lply.organism.otrub then return end
 	local org = lply.organism
-	if not isnumber(org.pain) or org.pain > 50 or (org.rarmamputated and org.larmamputated) then return end
+	if org.pain > 50 or (org.rarmamputated and org.larmamputated) then return end
 	local ent = lply:GetActiveWeapon()
 	if not IsValid(ent) then return end
 	if not ishgweapon(ent) then return end

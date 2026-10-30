@@ -76,6 +76,7 @@ SWEP.AnimsEvents = {
 	["reload_empty"] = {
 		[0.2] = function(self)
 			local ent = hg.CreateMag( self, Vector(0,-45,-12), "0", true)
+			if not IsValid(ent) then return end
 			local phys = ent:GetPhysicsObject()
 
 			if IsValid(phys) then

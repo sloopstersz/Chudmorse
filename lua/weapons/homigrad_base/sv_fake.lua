@@ -2,15 +2,6 @@
 SWEP.WorkWithFake = true
 
 hook.Add("PlayerSwitchWeapon", "homigrad-weapons", function(ply, oldWep, newWep)
-    -- Fake-up Spawn temporarily changes the active weapon. Do not treat those
-    -- engine switches as player input, sling drops, or ragdoll holsters.
-    if ply.hgFakeUpSpawning then return end
-    local pending = ply.hgFakeUpWeaponRestore
-    if pending and newWep == pending.weapon and CurTime() <= pending.expires then
-        -- Restoring the saved weapon is not a manual sling/drop operation.
-        return
-    end
-    ply.hgFakeWeaponSwitch = (ply.hgFakeWeaponSwitch or 0) + 1
 	local switch = hook.Run("PlayerSwitchInFake",ply,oldWep,newWep)
 	
 	if switch ~= nil then
@@ -18,15 +9,13 @@ hook.Add("PlayerSwitchWeapon", "homigrad-weapons", function(ply, oldWep, newWep)
 	end
 	
 	if not IsValid(ply.FakeRagdoll) then return end
-	local switchToken = ply.hgFakeWeaponSwitch
 	if IsValid(ply.FakeRagdoll.weldHuy) then
 		ply.FakeRagdoll.weldHuy:Remove()
 		ply.FakeRagdoll.weldHuy = nil
 	end
 
 	if IsValid(oldWep) and oldWep.RemoveFake then oldWep:RemoveFake() end
-	if IsValid(newWep) and newWep.WorkWithFake and ply.organism and ply.organism.canmove then
-		ply.ActiveWeapon = newWep
+	if IsValid(newWep) and newWep.WorkWithFake and ply.organism.canmove then
 		--newWep:CreateFake(ply.FakeRagdoll)
 		local ragdoll = ply.FakeRagdoll
 		if ragdoll:LookupBone("ValveBiped.Bip01_R_Finger21") then
@@ -38,15 +27,9 @@ hook.Add("PlayerSwitchWeapon", "homigrad-weapons", function(ply, oldWep, newWep)
 	else
 		ply.ActiveWeapon = newWep
 		
-        if not IsValid(oldWep) or not oldWep.Holster or oldWep:Holster(newWep) then
-            local ragdoll = ply.FakeRagdoll
-            timer.Simple(0, function()
-                if not IsValid(ply) or not IsValid(ragdoll) then return end
-                if ply.FakeRagdoll ~= ragdoll or ply.hgFakeWeaponSwitch ~= switchToken then return end
-                if ply:GetActiveWeapon() ~= oldWep then return end
-                ply:SetActiveWeapon(NULL)
-            end)
-        end
+		if !oldWep.Holster or oldWep:Holster(newWep) then
+			timer.Simple(0,function() if not IsValid(ply) then return end ply:SetActiveWeapon(NULL) end)
+		end
 
 		local ragdoll = ply.FakeRagdoll
 		
@@ -63,17 +46,9 @@ hook.Add("PlayerSwitchWeapon", "homigrad-weapons", function(ply, oldWep, newWep)
 end)
 
 hook.Add("Fake", "weapons", function(ply, ragdoll)
-    ply.hgFakeUpSpawning = nil
-    ply.hgFakeUpSpawnToken = nil
-    hg.ClearFakeUpWeaponRestore(ply)
-    ply.hgFakeWeaponSwitch = (ply.hgFakeWeaponSwitch or 0) + 1
-    local wep = ply:GetActiveWeapon()
-    if not IsValid(wep) and IsValid(ply.ActiveWeapon) and ply.ActiveWeapon:GetOwner() == ply then
-        wep = ply.ActiveWeapon
-    end
-    if IsValid(wep) and wep:GetOwner() == ply then ply.ActiveWeapon = wep end
-    if IsValid(wep) and wep.WorkWithFake and wep:GetOwner() == ply then
-        ply:SetActiveWeapon(wep)
+	local wep = ply:GetActiveWeapon()
+	if IsValid(wep) and wep.WorkWithFake and IsValid(ply.ActiveWeapon) then
+		ply:SetActiveWeapon(ply.ActiveWeapon)
 		--wep:CreateFake(ragdoll)
 	else
 		if IsValid(wep) and wep.Holster then

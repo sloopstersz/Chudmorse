@@ -65,6 +65,8 @@ function ENT:Think()
 						
 						if(ply_cyanide_accumulated > 100)then
 							ent.organism.poison3 = CurTime()
+                        ent.organism.ChudCyanideOwner = self.ChudCyanideOwner
+                        hook.Run("ChudAchievementCyanideExposure", self.ChudCyanideOwner, ent.organism.owner)
 						end
 						
 						NetworkChemicalResistanceOfPlayer(ent)
@@ -74,9 +76,13 @@ function ENT:Think()
 						-- ent:ChatPrint("cyanide = " .. math.Round(ply_cyanide_accumulated) .. " / " .. "10")
 					else
 						ent.organism.poison3 = CurTime()
+                        ent.organism.ChudCyanideOwner = self.ChudCyanideOwner
+                        hook.Run("ChudAchievementCyanideExposure", self.ChudCyanideOwner, ent.organism.owner)
 					end
 				else
 					ent.organism.poison3 = CurTime()
+                        ent.organism.ChudCyanideOwner = self.ChudCyanideOwner
+                        hook.Run("ChudAchievementCyanideExposure", self.ChudCyanideOwner, ent.organism.owner)
 				end
 			end
 		end

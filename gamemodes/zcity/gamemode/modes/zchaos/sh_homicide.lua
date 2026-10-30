@@ -1,0 +1,431 @@
+local MODE = MODE
+MODE.name = "chaos"
+MODE.PrintName = "CHAOS"
+
+--\\
+MODE.TraitorExpectedAmtBits = 13
+--//
+
+--\\Sub Roles
+MODE.ConVarName_SubRole_Traitor = "chaos_subrole_traitor"
+
+if(CLIENT)then
+	MODE.ConVar_SubRole_Traitor = CreateClientConVar(MODE.ConVarName_SubRole_Traitor, "traitor_custom", true, true, "Select traitor role in homicide")
+end
+
+local HeroWeaponData = {
+	["weapon_revolver357"] = {extraClips = 0},
+	["weapon_draco"] = {extraClips = 0},
+	["weapon_revolver2"] = {extraClips = 0},
+	["weapon_m870mcs"] = {extraClips = 0, sling = true},
+	["weapon_m1911compact"] = {extraClips = 0},
+	["weapon_fn45"] = {extraClips = 0},
+	["weapon_cz75"] = {extraClips = 0},
+	["weapon_px4beretta"] = {extraClips = 0},
+	["weapon_glock17"] = {extraClips = 0},
+	["weapon_hk_usp"] = {extraClips = 0},
+	["weapon_remington870"] = {extraClips = 0, sling = true},
+	["weapon_remington870_long"] = {extraClips = 0, sling = true},
+	["weapon_remington870_sawed_off"] = {extraClips = 0},
+	["weapon_kar98"] = {extraClips = 0, sling = true},
+	["weapon_vpo209"] = {extraClips = 0},
+	["weapon_vpo136"] = {extraClips = 0},
+	["weapon_mosin"] = {extraClips = 0, sling = true},
+}
+
+local HeroUpgradeData = {
+	["hero_revolver357_ammo"] = {parent = "weapon_revolver357", type = "ammo", extraClips = 1},
+	["hero_draco_silencer"] = {parent = "weapon_draco", type = "attachment", attachment = "supressor8"},
+	["hero_draco_ammo"] = {parent = "weapon_draco", type = "ammo", extraClips = 1},
+	["hero_revolver2_ammo"] = {parent = "weapon_revolver2", type = "ammo", extraClips = 1},
+	["hero_m870mcs_silencer"] = {parent = "weapon_m870mcs", type = "attachment", attachment = "supressor5"},
+	["hero_m870mcs_ammo"] = {parent = "weapon_m870mcs", type = "ammo", extraClips = 1},
+	["hero_m1911compact_ammo"] = {parent = "weapon_m1911compact", type = "ammo", extraClips = 1},
+	["hero_m1911compact_laser"] = {parent = "weapon_m1911compact", type = "attachment", attachment = "laser5"},
+	["hero_fn45_ammo"] = {parent = "weapon_fn45", type = "ammo", extraClips = 1},
+	["hero_fn45_laser"] = {parent = "weapon_fn45", type = "attachment", attachment = "laser5"},
+	["hero_fn45_silencer"] = {parent = "weapon_fn45", type = "attachment", attachment = "supressor4"},
+    ["hero_cz75_ammo"] = {parent = "weapon_cz75", type = "ammo", extraClips = 1},
+    ["hero_cz75_silencer"] = {parent = "weapon_cz75", type = "attachment", attachment = "supressor4"},
+	["hero_px4_silencer"] = {parent = "weapon_px4beretta", type = "attachment", attachment = "supressor4"},
+	["hero_px4_ammo"] = {parent = "weapon_px4beretta", type = "ammo", extraClips = 1},
+	["hero_glock_silencer"] = {parent = "weapon_glock17", type = "attachment", attachment = "supressor4"},
+	["hero_glock_rmr"] = {parent = "weapon_glock17", type = "attachment", attachment = "holo16"},
+	["hero_glock_laser"] = {parent = "weapon_glock17", type = "attachment", attachment = "laser3"},
+	["hero_glock_ammo"] = {parent = "weapon_glock17", type = "ammo", extraClips = 1},
+	["hero_usp_silencer"] = {parent = "weapon_hk_usp", type = "attachment", attachment = "supressor4"},
+	["hero_usp_ammo"] = {parent = "weapon_hk_usp", type = "ammo", extraClips = 1},
+	["hero_remington_sight"] = {parent = "weapon_remington870", type = "attachment", attachment = "holo16"},
+	["hero_remington_ammo"] = {parent = "weapon_remington870", type = "ammo", extraClips = 1},
+	["hero_remington_long_sight"] = {parent = "weapon_remington870_long", type = "attachment", attachment = "holo16"},
+	["hero_remington_long_ammo"] = {parent = "weapon_remington870_long", type = "ammo", extraClips = 1},
+	["hero_remington_sawedoff_sight"] = {parent = "weapon_remington870_sawed_off", type = "attachment", attachment = "holo16"},
+	["hero_remington_sawedoff_ammo"] = {parent = "weapon_remington870_sawed_off", type = "ammo", extraClips = 1},
+	["hero_kar98_scope"] = {parent = "weapon_kar98", type = "attachment", attachment = "optic12"},
+	["hero_kar98_ammo"] = {parent = "weapon_kar98", type = "ammo", extraClips = 1},
+	["hero_vpo209_silencer"] = {parent = "weapon_vpo209", type = "attachment", attachment = "supressor1"},
+	["hero_vpo209_optic"] = {parent = "weapon_vpo209", type = "attachment", attachment = "holo16"},
+	["hero_vpo209_ammo"] = {parent = "weapon_vpo209", type = "ammo", extraClips = 1},
+	["hero_vpo136_silencer"] = {parent = "weapon_vpo136", type = "attachment", attachment = "supressor1"},
+	["hero_vpo136_optic"] = {parent = "weapon_vpo136", type = "attachment", attachment = "holo16"},
+	["hero_vpo136_ammo"] = {parent = "weapon_vpo136", type = "ammo", extraClips = 1},
+	["hero_mosin_silencer"] = {parent = "weapon_mosin", type = "attachment", attachment = "supressor1"},
+	["hero_mosin_scope"] = {parent = "weapon_mosin", type = "attachment", attachment = "optic12"},
+	["hero_mosin_ammo"] = {parent = "weapon_mosin", type = "ammo", extraClips = 1},
+}
+
+local function ParseLoadoutString(dataStr)
+	local loadout = {}
+	if dataStr and dataStr ~= "" then
+		local ok, parsed = pcall(util.JSONToTable, dataStr)
+		if ok and istable(parsed) then
+			loadout = parsed
+		end
+	end
+	return loadout
+end
+
+local LegacyTraitorLoadout = {
+	skillset = "none",
+	weapons = {
+		"weapon_p22",
+		"weapon_p22_silencer",
+		"weapon_buck200knife",
+		"weapon_hg_rgd_tpik",
+		"weapon_adrenaline",
+		"weapon_hg_shuriken",
+		"weapon_hg_smokenade_tpik",
+		"weapon_traitor_ied",
+		"weapon_traitor_poison1",
+		"weapon_traitor_suit",
+		"weapon_hg_jam",
+		"weapon_walkie_talkie"
+	}
+}
+
+local TraitorSkillsetSubRoles = {
+	["fox"] = "traitor_fox",
+	["infiltrator"] = "traitor_infiltrator",
+	["assassin"] = "traitor_assasin",
+	["chemist"] = "traitor_chemist",
+}
+
+local function ApplyTraitorLoadout(ply)
+	local loadout = ParseLoadoutString(ply:GetInfo("hmcd_traitor_loadout"))
+	if not loadout.skillset and not istable(loadout.weapons) then loadout = LegacyTraitorLoadout end
+
+	local skillset = loadout.skillset or "none"
+	if SERVER then ply.ChudAppliedTraitorSkillset = skillset end
+	local weaponsList = loadout.weapons or {}
+	ply.SubRole = TraitorSkillsetSubRoles[skillset] or ply.SubRole
+
+	ply.organism.stamina.max = 220
+	ply.organism.recoilmul = 1
+
+	if skillset == "infiltrator" then
+		-- Infiltrator specifics
+	elseif skillset == "assassin" then
+		ply.organism.recoilmul = 0.8
+		ply.organism.stamina.max = 300
+	elseif skillset == "chemist" then
+		if CleanChemicalsOfPlayer then CleanChemicalsOfPlayer(ply) end
+	end
+
+	local inv = ply:GetNetVar("Inventory", {})
+	inv["Weapons"] = inv["Weapons"] or {}
+	inv["Weapons"]["hg_flashlight"] = true
+	ply:SetNetVar("Inventory", inv)
+
+	local hasP22 = false
+	local hasPL15 = false
+	local hasTaser = false
+
+	for _, wep in pairs(weaponsList) do
+		if wep == "weapon_p22_silencer" then
+			timer.Simple(0.5, function()
+				if IsValid(ply) and ply:HasWeapon("weapon_p22") then
+					local w = ply:GetWeapon("weapon_p22")
+					if hg and hg.AddAttachmentForce then hg.AddAttachmentForce(ply, w, "supressor4") end
+				end
+			end)
+		elseif wep == "weapon_pl15_silencer" then
+			timer.Simple(0.5, function()
+				if IsValid(ply) and ply:HasWeapon("weapon_pl15") then
+					local w = ply:GetWeapon("weapon_pl15")
+					if hg and hg.AddAttachmentForce then hg.AddAttachmentForce(ply, w, "supressor4") end
+				end
+			end)
+		elseif wep == "weapon_p22_ammo" then
+			timer.Simple(0.5, function()
+				if IsValid(ply) and ply:HasWeapon("weapon_p22") then
+					local w = ply:GetWeapon("weapon_p22")
+					if IsValid(w) and w:GetPrimaryAmmoType() >= 0 then
+						ply:GiveAmmo(w:GetMaxClip1(), w:GetPrimaryAmmoType(), true)
+					end
+				end
+			end)
+		else
+			local w = ply:Give(wep)
+			if wep == "weapon_zoraki" then
+				timer.Simple(1, function() if IsValid(w) then w:ApplyAmmoChanges(2) end end)
+			elseif wep == "weapon_p22" then
+				hasP22 = true
+			elseif wep == "weapon_pl15" then
+				hasPL15 = true
+			elseif wep == "weapon_taser" then
+				hasTaser = true
+			end
+		end
+	end
+end
+
+local function ApplyHeroLoadout(ply)
+	local loadout = ParseLoadoutString(ply:GetInfo("hmcd_hero_loadout"))
+	local weaponsList = istable(loadout.weapons) and loadout.weapons or {}
+	local selectedWeapon = "weapon_px4beretta"
+
+	for _, weaponId in ipairs(weaponsList) do
+		if HeroWeaponData[weaponId] then
+			selectedWeapon = weaponId
+			break
+		end
+	end
+
+	ply.organism.recoilmul = 1
+
+	local inv = ply:GetNetVar("Inventory", {})
+	inv["Weapons"] = inv["Weapons"] or {}
+	inv["Weapons"]["hg_flashlight"] = true
+	if HeroWeaponData[selectedWeapon] and HeroWeaponData[selectedWeapon].sling then
+		inv["Weapons"]["hg_sling"] = true
+	end
+	ply:SetNetVar("Inventory", inv)
+
+	local weapon = ply:Give(selectedWeapon)
+	if not IsValid(weapon) then
+		return
+	end
+
+	if weapon:GetPrimaryAmmoType() >= 0 then
+		local baseInfo = HeroWeaponData[selectedWeapon]
+		local baseClips = baseInfo and baseInfo.extraClips or 0
+		if baseClips > 0 then
+			ply:GiveAmmo(weapon:GetMaxClip1() * baseClips, weapon:GetPrimaryAmmoType(), true)
+		end
+	end
+
+	local attachments = {}
+
+	for _, weaponId in ipairs(weaponsList) do
+		if weaponId == "weapon_walkie_talkie" then
+			ply:Give("weapon_walkie_talkie")
+			continue
+		end
+
+		if string.StartWith(weaponId, "ent_armor_") then
+			if hg and hg.AddArmor then
+				hg.AddArmor(ply, weaponId)
+			end
+			continue
+		end
+
+		local upgradeInfo = HeroUpgradeData[weaponId]
+		if not upgradeInfo or upgradeInfo.parent ~= selectedWeapon then
+			continue
+		end
+
+		if upgradeInfo.type == "ammo" then
+			if weapon:GetPrimaryAmmoType() >= 0 then
+				ply:GiveAmmo(weapon:GetMaxClip1() * (upgradeInfo.extraClips or 0), weapon:GetPrimaryAmmoType(), true)
+			end
+		elseif upgradeInfo.type == "attachment" and upgradeInfo.attachment then
+			attachments[#attachments + 1] = upgradeInfo.attachment
+		end
+	end
+
+	if #attachments > 0 then
+		timer.Simple(0.5, function()
+			if not IsValid(ply) or not ply:HasWeapon(selectedWeapon) then
+				return
+			end
+			local activeWeapon = ply:GetWeapon(selectedWeapon)
+			if not IsValid(activeWeapon) then
+				return
+			end
+			for _, attachmentId in ipairs(attachments) do
+				if hg and hg.AddAttachmentForce then
+					hg.AddAttachmentForce(ply, activeWeapon, attachmentId)
+				end
+			end
+		end)
+	end
+end
+
+MODE.ApplyTraitorLoadout = ApplyTraitorLoadout
+MODE.ApplyHeroLoadout = ApplyHeroLoadout
+
+MODE.SubRoles = {
+    ["traitor_fox"] = {
+        Name = "Technician",
+        Description = "Use the radial menu to scan for map traps. Aim at a trap and press E to activate it.",
+        Objective = "Use map traps and your loadout to eliminate your targets.",
+    },
+	["traitor_custom"] = {
+		Name = "Traitor",
+		Description = [[You are the custom traitor.
+Your abilities and loadout are based on your selected preset or loadout.]],
+		Objective = "Use your loadout to murder everyone here.",
+		SpawnFunction = function(ply)
+			ApplyTraitorLoadout(ply)
+		end,
+	},
+	["traitor_zombie"] = {
+		Name = "Zombie",
+		Description = [[Can infect other players silently.
+Infected players can be cured by a doctor.
+If all players are cured zombie will lose.
+Instead of dying will be randomly transported to another infected player's body.
+Has no weapons or any tools.
+Despite being zombie, still bears appearance of a normal human.]],
+		Objective = "You're the zombie. Infect everyone to win. Avoid doctor.",
+		SpawnFunction = function(ply)
+		end,
+	},
+}
+--//
+
+--\\Professions
+MODE.ProfessionsRoundTypes = {
+	["chaos_standard"] = true,
+}
+
+MODE.Professions = {
+	["doctor"] = {
+		Name = "Doctor",
+		SpawnFunction = function(ply)	--; TODO MAKE IT WORK
+			--; It's a bad practice to give professions any weapons or tools
+		end,
+	},
+	["huntsman"] = {
+		Name = "Huntsman",
+		SpawnFunction = function(ply)
+			--; It's a bad practice to give professions any weapons or tools
+		end,
+	},
+	["engineer"] = {
+		Name = "Engineer",
+		SpawnFunction = function(ply)
+			--; It's a bad practice to give professions any weapons or tools
+		end,
+	},
+	["cook"] = {
+		Name = "Cook",
+		SpawnFunction = function(ply)
+			--; It's a bad practice to give professions any weapons or tools
+		end,
+	},
+	["builder"] = {
+		Name = "Builder",
+		SpawnFunction = function(ply)
+			--; It's a bad practice to give professions any weapons or tools
+		end,
+	},
+}
+--//
+
+--\\
+--; Названия перменных чуть чуть конченные получились, нужно будет подумать как улучшить
+--; ужас
+MODE.FadeScreenTime = 1.5
+MODE.DefaultRoundStartTime = 6
+MODE.RoleChooseRoundStartTime = 10
+
+MODE.RoleChooseRoundTypes = {
+	["chaos_standard"] = {
+		TraitorDefaultRole = "traitor_custom",
+		Traitor = {
+			["traitor_custom"] = true,
+		},
+		Professions = {
+			["doctor"] = {
+				Chance = 1,
+			},
+			["huntsman"] = {
+				Chance = 1,
+			},
+			["engineer"] = {
+				Chance = 1,
+			},
+			["cook"] = {
+				Chance = 1,
+			},
+			["builder"] = {
+				Chance = 1,
+			},
+		},
+	},
+}
+--//
+
+MODE.Roles = {}
+MODE.Roles.chaos_standard = {
+	traitor = {
+		objective = "You've been preparing for this for a long time. Kill everyone.",
+		name = "Evil chud",
+		color = Color(190,0,0)
+	},
+
+	gunner = {
+		objective = "You're the hero. Use your loadout to stop the murderer.",
+		name = "Gun owning chud",
+		color = Color(158,0,190)
+	},
+
+	innocent = {
+		name = "Chud",
+		color = Color(0,120,190)
+	},
+}
+
+MODE.Roles.supermario = {
+	traitor = {
+		objective = "You're the evil Mario! Jump around and take down everyone.",
+		name = "Traitor Mario",
+		color = Color(190,0,0)
+	},
+
+	gunner = {
+		objective = "You're the hero Mario! Use your jumping ability to stop the traitor.",
+		name = "Hero Mario",
+		color = Color(158,0,190)
+	},
+
+	innocent = {
+		objective = "You're a bystander Mario, survive and avoid the traitor's traps!",
+		name = "Innocent Mario",
+		color = Color(0,120,190)
+	},
+}
+
+function MODE.GetPlayerTraceToOther(ply, aim_vector, dist)
+	local trace = hg.eyeTrace(ply, dist, nil, aim_vector)
+	
+	if(trace)then
+		local aim_ent = trace.Entity
+		local other_ply = nil
+		
+		if(IsValid(aim_ent))then
+			if(aim_ent:IsPlayer())then
+				other_ply = aim_ent
+			elseif(aim_ent:IsRagdoll())then
+				if(IsValid(aim_ent.ply))then
+					other_ply = aim_ent.ply
+				end
+			end
+		end
+		
+		return aim_ent, other_ply, trace
+	else
+		return nil
+	end
+end

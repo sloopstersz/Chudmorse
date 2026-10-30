@@ -345,24 +345,39 @@ local post1_ang1, post1_ang2, post1_ang3 = Angle(0, 20, 0), Angle(-18, -17, 0), 
 local post2_ang1, post2_ang2, post2_ang3, post2_ang4, post2_ang5, post2_ang6 = Angle(3, 15, 0),
 Angle(3, 0, 0), Angle(2, -5, 0), Angle(4, -5, 0), Angle(-5, -8, 0), Angle(35, -25, 0)
 
+local function spineWobLean(t, idx)
+	local off = idx * 1.7
+	local mix = math.sin(t * 0.35 + off)
+	local sway = math.sin(t * 1.05 + off * 0.43)
+	local bob = math.sin(t * 0.71 + off * 2.6)
+	return (sway * (1 + mix) + bob * (1 - mix)) * 0.45
+end
+
 hook.Add("Bones", "homigrad-lean-bone", function(ply, dtime)
 	ply.weightmul = weightmul or hg.CalculateWeight(ply, 140)
-	
+
 	local mul = ply.weightmul ^ 2
 	local ragdollcombat = hg.RagdollCombatInUse(ply)
 	local isragdoll = IsValid(ply.FakeRagdoll) and !IsValid(ply:GetNWEntity("FakeRagdollOld"))
 	local left = ((isragdoll and !ragdollcombat and hg.KeyDown(ply, IN_MOVERIGHT)) or hg.KeyDown(ply, IN_ALT2)) and not hg.KeyDown(ply, IN_ALT1)
 	local right = ((isragdoll and !ragdollcombat and hg.KeyDown(ply, IN_MOVELEFT)) or hg.KeyDown(ply, IN_ALT1)) and not hg.KeyDown(ply, IN_ALT2)
 
-	ply.lean = Lerp(
-		hg.lerpFrameTime( ( left or right ) and 0.045 * ply:GetNetVar("leanSpeedMul",1) or 0.075, dtime * game.GetTimeScale()), 
-		ply.lean or 0,
+	ply.leanBase = Lerp(
+		hg.lerpFrameTime( ( left or right ) and 0.045 * ply:GetNetVar("leanSpeedMul",1) or 0.075, dtime * game.GetTimeScale()),
+		ply.leanBase or 0,
 		hg.IsLocal(ply) and ( (left and right and 0) or (left and 1.3) or (right and -1.3) or 0) or ply:GetNWFloat("PlayerLean", 0)
 	)
 
+	local spineInt = ply:GetNWFloat("hg_spineDisorient", 0)
+	local spineWob = 0
+	if spineInt > 0.01 and !isragdoll then
+		spineWob = spineWobLean(CurTime(), ply:EntIndex()) * spineInt * (1 - math.min(math.abs(ply.leanBase) / 1.3, 0.75))
+	end
+	ply.lean = math.Clamp(ply.leanBase + spineWob, -2, 2)
+
 	if SERVER and !IsValid(ply.FakeRagdoll) then
 		ply.takeOldLeanStamina = ply.takeOldLeanStamina or 0
-		local leanStamina = math.Round(ply.lean,2)
+		local leanStamina = math.Round(ply.leanBase,2)
 
 		if ply.takeOldLeanStamina > leanStamina and leanStamina < 0.9 then
 			ply.organism.stamina.subadd = 0.85 * math.max(ply.organism.stamina[1]/ply.organism.stamina.range,0.85)
@@ -371,8 +386,8 @@ hook.Add("Bones", "homigrad-lean-bone", function(ply, dtime)
 		if ply.takeOldLeanStamina != leanStamina then
 			//ply:SetNetVar("leanSpeedMul", ply.organism.stamina[1]/ply.organism.stamina.range)
 		end
-		if (!ply.SetPlayerLeanCD or ply.SetPlayerLeanCD < CurTime()) and ply.lean != ply:GetNWFloat("PlayerLean",0) then
-			ply:SetNWFloat("PlayerLean",ply.lean)
+		if (!ply.SetPlayerLeanCD or ply.SetPlayerLeanCD < CurTime()) and ply.leanBase != ply:GetNWFloat("PlayerLean",0) then
+			ply:SetNWFloat("PlayerLean",ply.leanBase)
 			ply.SetPlayerLeanCD = CurTime() + 0.15
 		end
 

@@ -64,7 +64,6 @@ local function ForceApplyAppearance(ply, tbl, noModelChange)
         gordon = true,
         groove = true,
         headcrabzombie = true,
-        juggernaut = true,
         metrocop = true,
         nationalguard = true,
         police = true,

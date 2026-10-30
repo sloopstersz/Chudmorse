@@ -363,7 +363,8 @@ function REM_DrawDepressionEffect(org)
 		["$pp_colour_mulb"] = 0
 	}
 
-	local depressionValue = math.Clamp(org.depression or 0, 0, 1) * screenEffectMul
+	local depression = math.Clamp(org.depression or 0, 0, 1)
+	local depressionValue = depression * screenEffectMul
 	state.lerp = LerpFT(0.01, state.lerp or 0, depressionValue)
 
 	if state.lerp > 0.00005 then
@@ -425,7 +426,7 @@ function REM_DrawDepressionEffect(org)
 		end
 	end
 
-	REM_UpdateDepressionAudio(state, math.Clamp(org.depression or 0, 0, 1), org.otrub)
+	REM_UpdateDepressionAudio(state, depression, org.otrub)
 end
 
 local PainLerp = 0
@@ -851,9 +852,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	if not organism then stopthings() return end
 	if not organism.brain then stopthings() return end
 	local org = organism
-	local panicClass = lply.GetPlayerClass and lply:GetPlayerClass()
-	local panicImmune = lply.isTraitor or (panicClass and panicClass.PanicImmune == true)
-		or (zb and zb.CROUND == "chudbeasts")
 
 	updateSeizureEffects(org)
 	
@@ -950,8 +948,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	O2Lerp = LerpFT(0.01, O2Lerp, (30 - o2) * (org.otrub and 2 or 10) + (brain * 100) * (org.otrub and 1 or 5))
 
 	tempLerp = LerpFT(0.01, tempLerp, org.temperature)
-	local panicattackVisual = panicImmune and 0 or math.Clamp(math.Remap(org.panicattack or 0, panicattackFadeStart, panicattackThreshold, 0, 1), 0, 1)
-	PanicAttackLerp = panicImmune and 0 or LerpFT(0.03, PanicAttackLerp, panicattackVisual ^ panicattackVisualExponent)
+	local panicattackVisual = math.Clamp(math.Remap(org.panicattack or 0, panicattackFadeStart, panicattackThreshold, 0, 1), 0, 1)
+	PanicAttackLerp = LerpFT(0.03, PanicAttackLerp, panicattackVisual ^ panicattackVisualExponent)
 
 	if tempLerp > 38 then
 		local heat = (tempLerp - 38) * screenEffectMul
@@ -1122,7 +1120,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	updatePainLayer(painLayers.agony, normalizedPain, painVolume)
 	updatePainLayer(painLayers.excruciating, normalizedPain, painVolume)
 
-	if not panicImmune and PanicAttackLerp > 0.001 and not org.otrub then
+	if PanicAttackLerp > 0.001 and not org.otrub then
 		if (!IsValid(PanicStation) or PanicStation:GetState() != GMOD_CHANNEL_PLAYING) and not PanicStationLoading then
 			PanicStationLoading = true
 			sound.PlayFile(panicattackOverlayPath, "noblock noplay", function(station)

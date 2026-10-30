@@ -12,7 +12,7 @@ local function drop(ply, wep, newWeapon, vel)
 	ply:DoAnimationEvent(ACT_GMOD_GESTURE_MELEE_SHOVE_1HAND)
 	ply:ViewPunch(vpang)
 	timer.Simple(isWep and 0.0 or 0.0,function()
-		if not IsValid(ply) or not IsValid(wep) or wep:GetOwner() ~= ply then return end
+		if not IsValid(ply) or not IsValid(wep) then return end
 		local pos, ang
 		
 		if wep.WorldModel_Transform then
@@ -36,11 +36,6 @@ local function drop(ply, wep, newWeapon, vel)
 		wep.IsSpawned = true
 
 		timer.Simple(0,function()
-            if not IsValid(wep) or not IsValid(ply) or IsValid(wep:GetOwner()) or IsValid(wep:GetParent()) then return end
-            if wep.ismelee2 and hg.PlaceDroppedMelee then
-                hg.PlaceDroppedMelee(wep, pos or wep:GetPos(), ang or wep:GetAngles(), hg.GetCurrentCharacter(ply), ply)
-                return
-            end
 			if pos and ang then
 				local tr = {}
 				tr.start = ply:EyePos()

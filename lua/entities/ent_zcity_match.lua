@@ -10,13 +10,15 @@ ENT.Spawnable = true
 ENT.Model = "models/weapons/gleb/matchhead.mdl"
 ENT.IconOverride = "vgui/wep_jack_hmcd_matchbox"
 
+ENT.BurnTime = 8
+
 ENT.PhysicsSounds = true
 
 function ENT:SetupDataTables()
     self:NetworkVar( "Float", 0, "FireLeft" )
 
 	if SERVER then
-		self:SetFireLeft( 1 )
+		self:SetFireLeft( self.BurnTime )
 	end
 end
 
@@ -55,9 +57,9 @@ function ENT:Initialize()
             end
 
             for _,v in ipairs(hg.gasolinePath) do
-                if v[1]:Distance(pos) > 30 or v[2] ~= false then continue end
+                if v[1]:DistToSqr(pos) > 1600 or v[2] ~= false then continue end
                 v[2] = CurTime()
-                v[3] = owner
+                v[3] = ent1.debil or ent1.owner
             end
             if IsValid(data.HitEntity) and hg.drums[data.HitEntity:EntIndex()] then
                 local drum = hg.drums[data.HitEntity:EntIndex()]
@@ -109,7 +111,7 @@ function ENT:Draw()
         self.eff = CreateParticleSystem(attach,"Lighter_flame",PATTACH_POINT_FOLLOW,1,Vector(0,0,0))
         eff = self.eff
     end
-    local pos = self:GetPos() + self:GetForward() * -1.3 + self:GetUp() * (2 * self:GetFireLeft())
+    local pos = self:GetPos() + self:GetForward() * -1.3 + self:GetUp() * (2 * math.min(self:GetFireLeft(), 1))
     attach:SetPos(pos)
     self:DrawModel()
 end
@@ -118,6 +120,18 @@ local color_b = Color(255,255,255)
 function ENT:Think()
     if SERVER then
         self:SetFireLeft(math.max(0,self:GetFireLeft() - 1 * FrameTime()))
+
+        if self:GetFireLeft() > 0 and (self.NextGasIgnite or 0) < CurTime() then
+            self.NextGasIgnite = CurTime() + 0.3
+
+            local pos = self:GetPos()
+            for _,v in ipairs(hg.gasolinePath) do
+                if v[2] ~= false then continue end
+                if v[1]:DistToSqr(pos) > 2500 then continue end
+                v[2] = CurTime()
+                v[3] = self.debil or self.owner
+            end
+        end
     end
 
     if CLIENT then
@@ -137,7 +151,7 @@ function ENT:Think()
     end
 
     if CLIENT and (not self.ColorCD or self.ColorCD < CurTime()) then
-        color_b:SetLightness(self:GetFireLeft())
+        color_b:SetLightness(self:GetFireLeft() / (self.BurnTime or 1))
 		if color_b:GetLightness() <= 0.1 then
 			self:SetMaterial("models/props_foliage/tree_deciduous_01a_trunk")
 		end

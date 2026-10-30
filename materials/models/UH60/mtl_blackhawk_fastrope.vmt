@@ -1,0 +1,30 @@
+"VertexlitGeneric"
+{
+	"$basetexture" "models/UH60/fastrobe" 
+	"$bumpmap" "models/UH60/fastrobe_n"
+	"$halflambert"     "1"
+	"$translucent"     "0"
+
+	"$ambientocclusion" "1"
+	
+	"$detail" ""
+	"$detailscale" "1"
+	"$detailblendmode" "0"
+	"$phongexponenttexture" "models/UH60/fastrobe_spec"
+
+	"$phong"      "1"
+	"$phongboost"     "0.01"
+	"$normalmapalphaphongmask" "1"
+	"$phongfresnelranges"   "[30 30 30]"
+	$ambientocclusion "1"
+ 
+	"$normalmapalphaenvmapmask" "1"
+ 
+	"$rimlight"     "1"
+	"$rimlightexponent"   "1" 
+	"$rimlightboost"   "0.1"
+	"$rimmask"      "1"
+	
+
+
+}

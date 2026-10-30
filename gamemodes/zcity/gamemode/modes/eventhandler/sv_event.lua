@@ -2,7 +2,7 @@ local MODE = MODE
 
 MODE.name = "event"
 MODE.PrintName = "Event"
-MODE.LootSpawn = true
+MODE.LootSpawn = false
 MODE.GuiltDisabled = true
 MODE.randomSpawns = true
 
@@ -11,7 +11,7 @@ MODE.Chance = 0
 
 MODE.EndLogicType = 2 
 MODE.EventersList = {} 
-MODE.LootEnabled = true
+MODE.LootEnabled = false
 
 local radius = nil
 local mapsize = 7500
@@ -116,13 +116,17 @@ function MODE:RoundStart()
         end
 	end
 
-    -- Chudmorse: Event uses the normal Z-City loot-spawn system.
-    -- Load the saved Event table when the round starts, then let
-    -- sv_lootspawn.lua handle spawning through MODE.LootSpawn.
-    if not self._LootTableLoaded then
-        self:LoadLootTable()
+    if self.LootEnabled then
+        if timer.Exists("EventLootSpawnTimer") then
+            timer.Remove("EventLootSpawnTimer")
+        end
+        
+        timer.Create("EventLootSpawnTimer", 5, 0, function() 
+            if MODE.LootEnabled then
+                hook.Run("Boxes Think")
+            end
+        end)
     end
-    self.LootSpawn = self.LootEnabled
 end
 
 function MODE:GiveWeapons()
@@ -132,9 +136,10 @@ function MODE:GiveEquipment()
 end
 
 function MODE:RoundThink()
-    -- The shared SpawnTheBoxes timer in sv_lootspawn.lua handles Event loot.
-    -- Keeping this synced allows zb_event_loot to toggle it live.
-    self.LootSpawn = self.LootEnabled
+    if self.LootEnabled and (self.nextBoxesThink or 0) < CurTime() then
+        self.nextBoxesThink = CurTime() + 2
+        hook.Run("Boxes Think")
+    end
     
 	if (zb.ROUND_START or 0) + 20 < CurTime() then
 		-- radius = (mapsize * math.max(( (zb.ROUND_START + 300) - CurTime()) / 300,0.025))
@@ -190,17 +195,9 @@ MODE.CustomLootTable = {
     {50, {}}
 }
 
-function MODE:GetCustomLootEntries()
-    self.CustomLootTable = istable(self.CustomLootTable) and self.CustomLootTable or {{50, {}}}
-    self.CustomLootTable[1] = istable(self.CustomLootTable[1]) and self.CustomLootTable[1] or {50, {}}
-    self.CustomLootTable[1][2] = istable(self.CustomLootTable[1][2]) and self.CustomLootTable[1][2] or {}
-    return self.CustomLootTable[1][2]
-end
-
 function MODE:GetLootTable()
-    local custom = self:GetCustomLootEntries()
-    if #custom > 0 then
-        return custom
+    if self.CustomLootTable[1][2] and #self.CustomLootTable[1][2] > 0 then
+        return self.CustomLootTable[1][2]
     end
     
     return self.LootTable[2][2]
@@ -210,7 +207,7 @@ net.Receive("event_loot_request", function(len, ply)
     if not ply:IsAdmin() and not MODE.EventersList[ply:SteamID()] then return end
     
     net.Start("event_loot_sync")
-    net.WriteTable(MODE:GetCustomLootEntries())
+    net.WriteTable(MODE.CustomLootTable[1][2] or {})
     net.Send(ply)
 end)
 
@@ -232,49 +229,36 @@ function MODE:SaveLootTable()
 end
 
 function MODE:LoadLootTable()
-    local path = "zbattle/event_loot/loot_table_" .. serverIdentifier .. ".txt"
-
-    if not file.Exists(path, "DATA") then
+    if not file.Exists("zbattle/event_loot/loot_table_" .. serverIdentifier .. ".txt", "DATA") then
         print("[Event Mode] No saved loot table found for server: " .. serverIdentifier)
-        self.CustomLootTable = {{50, {}}}
-        self._LootTableLoaded = true
+        self.CustomLootTable = { {50, {}} }
         return
     end
     
-    local data = file.Read(path, "DATA")
+    local data = file.Read("zbattle/event_loot/loot_table_" .. serverIdentifier .. ".txt", "DATA")
     if not data or data == "" then
         print("[Event Mode] Empty or corrupt loot table file for server: " .. serverIdentifier)
-        self.CustomLootTable = {{50, {}}}
-        self._LootTableLoaded = true
+        self.CustomLootTable = { {50, {}} }
         return
     end
     
     local success, loadedTable = pcall(util.JSONToTable, data)
-    if not success or not istable(loadedTable) then
+    if not success or not loadedTable then
         print("[Event Mode] Failed to parse loot table JSON for server: " .. serverIdentifier)
-        self.CustomLootTable = {{50, {}}}
-        self._LootTableLoaded = true
+        self.CustomLootTable = { {50, {}} }
         return
     end
-
-    -- Accept both the current nested format and a plain weighted-item list.
-    if istable(loadedTable[1]) and istable(loadedTable[1][2]) then
-        self.CustomLootTable = loadedTable
-    elseif istable(loadedTable[1]) and isnumber(loadedTable[1][1]) and isstring(loadedTable[1][2]) then
-        self.CustomLootTable = {{50, loadedTable}}
-    else
-        print("[Event Mode] Saved loot table has an unsupported format; using defaults")
-        self.CustomLootTable = {{50, {}}}
-    end
-
-    self._LootTableLoaded = true
-    print("[Event Mode] Loot table loaded for server: " .. serverIdentifier .. " with " .. #self:GetCustomLootEntries() .. " items")
+    
+    self.CustomLootTable = loadedTable
+    print("[Event Mode] Loot table loaded for server: " .. serverIdentifier .. " with " .. #self.CustomLootTable[1][2] .. " items")
 end
 
-timer.Simple(0, function()
-    if MODE and MODE.LoadLootTable then
-        MODE:LoadLootTable()
-    end
+hook.Add("Initialize", "ZB_EventLoadLootTable", function()
+    timer.Simple(1, function()
+        if SERVER and MODE and MODE.LoadLootTable then
+            MODE:LoadLootTable()
+        end
+    end)
 end)
 
 net.Receive("event_loot_add", function(len, ply)
@@ -283,11 +267,11 @@ net.Receive("event_loot_add", function(len, ply)
     local itemData = net.ReadTable()
     
     if not itemData or not itemData.weight or not itemData.class then return end
-	if #MODE:GetCustomLootEntries() >= 128 then return end
+	if #MODE.CustomLootTable[1][2] >= 128 then return end
 	if not isnumber(itemData.weight) or itemData.weight < 1 or itemData.weight > 1000 then return end
 	if not isstring(itemData.class) or #itemData.class > 96 or (not scripted_ents.GetStored(itemData.class) and not weapons.GetStored(itemData.class)) then return end
     
-    table.insert(MODE:GetCustomLootEntries(), {itemData.weight, itemData.class})
+    table.insert(MODE.CustomLootTable[1][2], {itemData.weight, itemData.class})
     
     MODE:SaveLootTable()
     
@@ -299,7 +283,7 @@ net.Receive("event_loot_add", function(len, ply)
     end
     
     net.Start("event_loot_sync")
-    net.WriteTable(MODE:GetCustomLootEntries())
+    net.WriteTable(MODE.CustomLootTable[1][2])
     net.Send(recipients)
     
     ply:ChatPrint("Added item: " .. itemData.class .. " with weight " .. itemData.weight)
@@ -310,11 +294,10 @@ net.Receive("event_loot_remove", function(len, ply)
     
     local itemIndex = net.ReadUInt(16)
     
-    local customLoot = MODE:GetCustomLootEntries()
-    if not customLoot[itemIndex] then return end
+    if not MODE.CustomLootTable[1][2][itemIndex] then return end
     
-    local removedItem = customLoot[itemIndex][2]
-    table.remove(customLoot, itemIndex)
+    local removedItem = MODE.CustomLootTable[1][2][itemIndex][2]
+    table.remove(MODE.CustomLootTable[1][2], itemIndex)
     
     MODE:SaveLootTable()
     
@@ -326,7 +309,7 @@ net.Receive("event_loot_remove", function(len, ply)
     end
     
     net.Start("event_loot_sync")
-    net.WriteTable(MODE:GetCustomLootEntries())
+    net.WriteTable(MODE.CustomLootTable[1][2])
     net.Send(recipients)
     
     ply:ChatPrint("Removed item: " .. removedItem)
@@ -349,7 +332,7 @@ concommand.Add("zb_event_loot_reset", function(ply, _, _, _)
     end
     
     net.Start("event_loot_sync")
-    net.WriteTable(MODE:GetCustomLootEntries())
+    net.WriteTable(MODE.CustomLootTable[1][2])
     net.Send(recipients)
     
     ply:ChatPrint("Loot table has been reset")
@@ -402,6 +385,16 @@ concommand.Add("zb_event_loot", function(ply, _, _, args)
     MODE.LootEnabled = enabled
     MODE.LootSpawn = enabled
     
+    if enabled and not timer.Exists("EventLootSpawnTimer") then
+        timer.Create("EventLootSpawnTimer", 5, 0, function() 
+            if MODE.LootEnabled then
+                hook.Run("Boxes Think")
+            end
+        end)
+    elseif not enabled and timer.Exists("EventLootSpawnTimer") then
+        timer.Remove("EventLootSpawnTimer")
+    end
+    
     ply:ChatPrint("Event loot " .. (enabled and "enabled" or "disabled"))
 end)
 
@@ -409,7 +402,7 @@ hook.Add("PlayerInitialSpawn", "ZB_EventLootSync", function(ply)
     timer.Simple(5, function()
         if IsValid(ply) and (ply:IsAdmin() or MODE.EventersList[ply:SteamID()]) then
             net.Start("event_loot_sync")
-            net.WriteTable(MODE:GetCustomLootEntries())
+            net.WriteTable(MODE.CustomLootTable[1][2] or {})
             net.Send(ply)
             
         end
@@ -424,9 +417,19 @@ hook.Add("HG_PlayerSay", "ZB_EventLootCommand", function(ply, txtTbl, text)
 end)
 
 hook.Add("InitPostEntity", "ZB_EventLootInitCheck", function()
-    timer.Simple(0, function()
-        if MODE and not MODE._LootTableLoaded then
-            MODE:LoadLootTable()
+    timer.Simple(3, function()
+        print("[Event Mode] Checking loot system status...")
+        if MODE.LootEnabled then
+            print("[Event Mode] Loot system is enabled")
+            if not timer.Exists("EventLootSpawnTimer") then
+                timer.Create("EventLootSpawnTimer", 5, 0, function() 
+                    if MODE.LootEnabled then
+                        hook.Run("Boxes Think")
+                    end
+                end)
+            end
+        else
+            print("[Event Mode] Loot system is disabled")
         end
     end)
 end)
@@ -493,6 +496,10 @@ function MODE:CanSpawn()
 end
 
 function MODE:EndRound()
+    if timer.Exists("EventLootSpawnTimer") then
+        timer.Remove("EventLootSpawnTimer")
+    end
+    
     timer.Simple(2, function()
         net.Start("event_end")
         local ent = zb:CheckAlive(true)[1]

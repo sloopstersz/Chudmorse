@@ -131,20 +131,29 @@ if SERVER then
 
     net.Receive("Deliver",function( len, ply )
         local wep = IsValid(ply:GetActiveWeapon()) and ply:GetActiveWeapon() or false
-        if not wep or wep:GetClass() ~= "weapon_spawnmenu_pda" then return end
+        if not wep or not IsValid(wep:GetOwner()) or wep:GetClass() ~= "weapon_spawnmenu_pda" then return end
+
+        wep.DeliverFlood = wep.DeliverFlood or 0
+        if wep.DeliverFlood > CurTime() then return end
+        wep.DeliverFlood = CurTime() + 0.2
+
         ply.DeliverCD = ply.DeliverCD or 0
         if ply.DeliverCD > CurTime() then wep:AddNotificate("You can't exucute new deliver. Wait "..( math.Round((ply.DeliverCD - CurTime())/300, 1)).. " min" ) return end
 
         local Cart = net.ReadTable()
+        if not istable(Cart) then wep:AddNotificate("No.") return end
+
         local CartWeight = 0
-        
+
         for k, item in pairs(Cart) do
-            if not item or not item[1] then wep:AddNotificate("No.") return end
+            if not istable(item) or not isstring(item[1]) then wep:AddNotificate("No.") return end
+            if CartWeight >= 140 then wep:AddNotificate("Too much weight to ship.") return end
+
             local entStore = scripted_ents.GetStored(item[1])
             local entTbl = weapons.GetStored(item[1]) or (entStore and entStore.t) or nil
             CartWeight = CartWeight + 5
             if not entTbl or not CategoresAllowed[entTbl.Category] then wep:AddNotificate("No.") return end
-            if not item[1] or BlackList[item[1]] then wep:AddNotificate("No.") return end
+            if BlackList[item[1]] then wep:AddNotificate("No.") return end
         end
 
         if CartWeight > 140 then wep:AddNotificate("Too much weight to ship.") return end
@@ -161,6 +170,7 @@ if SERVER then
         if tr.HitSky then
             wep:AddNotificate("Your order is being assembled, please wait.")
             timer.Create(ply:EntIndex().."_Deliver",Time,1,function()
+                if not IsValid(ply) or not IsValid(wep) then return end
                 wep:AddNotificate("Your package arrived. You have 5 minutes to pick up your stuff.")
                 --ply:ChatPrint("Weapon was called, estimated time of delivery 5-7 seconds.")
                 if not IsValid(ply) then return end

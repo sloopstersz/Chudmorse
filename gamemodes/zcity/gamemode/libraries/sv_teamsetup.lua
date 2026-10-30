@@ -1,11 +1,11 @@
 teams = {
 	[0] = {
 		color = Color(255, 0, 0),
-		name = "Terrorist Chud",
+		name = "Terrorists",
 	},
 	[1] = {
 		color = Color(0, 0, 255),
-		name = "Counter Chud",
+		name = "Counter Terrorists",
 	}
 }
 

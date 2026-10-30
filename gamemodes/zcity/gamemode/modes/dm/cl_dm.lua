@@ -133,8 +133,8 @@ hook.Add("Think", "DMZoneBurstSound", function()
 end)
 
 local fighter = {
-    objective = "Be the top chud. Kill everyone.",
-    name = "Warrior Chud",
+    objective = "Kill everyone.",
+    name = "Fighter",
     color1 = Color(0,120,190)
 }
 

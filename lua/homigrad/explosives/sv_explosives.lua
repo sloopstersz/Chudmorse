@@ -90,6 +90,64 @@ local GasTankMainThinkInterval = 0.03
 local GasTankAngularVelocityScale = 1.8
 local GasTankExplodeDelayMin = 1
 local GasTankExplodeDelayMax = 5
+local GasTankLowGasIgniteRatio = 0.25
+local GasTankIgniteRadius = 150
+
+local BarrelLowFuelRatio = 0.25
+local BarrelIgniteRadius = 150
+
+local function IgniteLowFuelBarrel(ent)
+	local idx = ent:EntIndex()
+	local drum = hg.drums[idx]
+	if drum and drum.loopsound then
+		drum.loopsound:Stop()
+		drum.loopsound = nil
+	end
+
+	local center = ent:WorldSpaceCenter()
+	local tr = util.QuickTrace(center, -vector_up * 500, {ent})
+	local fire = CreateVFire(ent, tr.Hit and tr.HitPos or center - vector_up * 40, tr.Hit and tr.HitNormal or vector_up, 60, ent.LastAttacker or ent)
+	if IsValid(fire) then
+		fire:ChangeLife(45)
+	end
+
+	local owner = ent.LastAttacker or ent
+	for _, target in ipairs(ents_FindInSphere(center, BarrelIgniteRadius)) do
+		if target == ent or not IsValid(target) then continue end
+		if target:GetMoveType() == MOVETYPE_NONE then continue end
+		if istable(target.fires) and next(target.fires) != nil then continue end
+
+		local Tr = hg.ExplosionTrace(center, target:WorldSpaceCenter(), {ent})
+		if Tr.Entity != target then continue end
+
+		if target:IsPlayer() or target:IsRagdoll() or target:IsNPC() or target:IsNextBot() then
+			local targetPos = target:WorldSpaceCenter()
+			local downTrace = util.QuickTrace(targetPos + vector_up * 12, -vector_up * 80, {ent, target})
+			local firePos = downTrace.Hit and downTrace.HitPos or targetPos
+			local fireNormal = downTrace.Hit and downTrace.HitNormal or vector_up
+			local igniteFire = CreateVFire(game.GetWorld(), firePos, fireNormal, 50, owner)
+			if IsValid(igniteFire) then
+				igniteFire:ChangeLife(50)
+			end
+		else
+			local np = target:NearestPoint(center)
+			local normal = np - target:WorldSpaceCenter()
+			if normal:LengthSqr() < 0.001 then
+				normal = vector_up
+			else
+				normal:Normalize()
+			end
+			local igniteFire = CreateVFire(game.GetWorld(), np, normal, 45, owner)
+			if IsValid(igniteFire) then
+				igniteFire:ChangeLife(45)
+			end
+		end
+	end
+
+	hg.drums[idx] = nil
+	table.RemoveByValue(hg.drums2, ent)
+	ent:SetNWBool("EmptyBarrel", true)
+end
 local GasTankLeakBroadcastRate = 0.06
 local GasTankMaxLeaks = 4
 local GasTankMaxClouds = 96
@@ -102,11 +160,81 @@ local CurTime, DamageInfo, EmitSound, SafeRemoveEntity = CurTime, DamageInfo, Em
 local math_Clamp, math_max, math_min, math_random, math_sqrt = math.Clamp, math.max, math.min, math.random, math.sqrt
 local ents_FindInSphere = ents.FindInSphere
 
-local vecCone = Vector(5, 5, 0)
 local BlastWaveSpeed = 5200
 local BlastWaveThickness = 120
 local BlastWaveForce = 50000
 local BlastMaxTargets = 96
+local ShrapnelTraceDistance = 2500
+
+local function ShrapnelTraceHit(tr)
+	if not tr or not tr.Hit or tr.HitSky or tr.HitWorld then return false end
+	local hit = tr.Entity
+	if not IsValid(hit) then return false end
+	if hit:IsPlayer() or hit:IsRagdoll() or hit:IsNPC() or hit:IsNextBot() or hit:IsVehicle() then return true end
+	return string.StartWith(hit:GetClass(), "prop_")
+end
+
+hg.BreakablePropClasses = {
+	["prop_physics"] = true,
+	["prop_physics_multiplayer"] = true,
+	["prop_dynamic"] = true
+}
+
+function hg.DestroyBreakableProp(ent, pos, owner)
+	if not IsValid(ent) then return end
+	local dmginfo = DamageInfo()
+	dmginfo:SetDamage(1000)
+	dmginfo:SetDamageType(DMG_BLAST)
+	dmginfo:SetAttacker(IsValid(owner) and owner or game.GetWorld())
+	dmginfo:SetInflictor(game.GetWorld())
+	dmginfo:SetDamagePosition(pos)
+	dmginfo:SetDamageForce(vector_up * 10000)
+	ent:TakeDamageInfo(dmginfo)
+	if IsValid(ent) then
+		if isfunction(ent.Destruct) then
+			ent:Destruct()
+		else
+			ent:Fire("Break", "", 0)
+		end
+	end
+end
+
+local function IsBlastBreakable(ent)
+	local class = ent:GetClass()
+	if not hg.BreakablePropClasses[class] then return false end
+	if ent.organism or hg.expItems[ent:GetModel()] or hg.GasTank.ActiveTanks[ent:EntIndex()] then return false end
+	return true
+end
+
+local ShrapnelHitForceMul = 12
+
+function hg.ShrapnelDamage(attacker, inflictor, origin, tr, damage)
+	local target = tr.Entity
+	if not IsValid(target) or target:IsWorld() then return end
+
+	local dir = tr.HitPos - origin
+	if dir:LengthSqr() < 1 then
+		dir = target:GetPos() - origin
+	end
+	if dir:LengthSqr() < 1 then return end
+	dir:Normalize()
+
+	local dmginfo = DamageInfo()
+	dmginfo:SetDamage(damage)
+	dmginfo:SetDamageType(bit.bor(DMG_BULLET, DMG_NEVERGIB))
+	dmginfo:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
+	dmginfo:SetInflictor(IsValid(inflictor) and inflictor or game.GetWorld())
+	dmginfo:SetDamagePosition(tr.HitPos)
+	dmginfo:SetDamageForce(dir * damage * ShrapnelHitForceMul)
+	target:TakeDamageInfo(dmginfo)
+
+	if not (target:IsPlayer() or target:IsRagdoll() or target:IsNPC() or target:IsNextBot()) then
+		local phys = target:GetPhysicsObject()
+		if IsValid(phys) and phys:IsMotionEnabled() then
+			phys:ApplyForceOffset(dir * damage * phys:GetMass() * 3, tr.HitPos)
+		end
+	end
+end
 
 local function GetExplosionNetType(ent, defaultType)
 	return ent:GetModel() == PropaneModel and PropaneExplosionNetType or defaultType
@@ -232,6 +360,13 @@ local function ApplyBlastBurst(data)
 		local tracePos = enta:IsPlayer() and (enta:GetPos() + enta:OBBCenter()) or enta:GetPos()
 		local lenSqr = tracePos:DistToSqr(data.Pos)
 		if lenSqr > data.Distance * data.Distance then continue end
+
+		if IsBlastBreakable(enta) then
+			hg.DestroyBreakableProp(enta, tracePos, data.Owner)
+			data.HitPhysCount = data.HitPhysCount + 1
+			continue
+		end
+
 		ApplyBlastDamage(data, enta, tracePos, math_sqrt(lenSqr))
 		hitCount = hitCount + 1
 	end
@@ -243,17 +378,8 @@ local function StartShrapnel(ent, selfPos, owner, force, mass, countMul)
 	if not IsValid(ent) then return end
 	mass = math_max(mass or 10, 1)
 
-	local bullet = {}
-	bullet.Src = selfPos
-	bullet.Spread = vecCone
-	bullet.Force = 0.01
-	bullet.Damage = force
-	bullet.AmmoType = "Metal Debris"
-	bullet.Attacker = owner
-	bullet.Distance = 15000
-	bullet.DisableLagComp = true
-	bullet.Filter = {ent}
-	table.Add(bullet.Filter, hg.drums2)
+	local filter = {ent}
+	table.Add(filter, hg.drums2)
 
 	local multi = math_min(mass / 5, 20)
 	local co
@@ -261,12 +387,19 @@ local function StartShrapnel(ent, selfPos, owner, force, mass, countMul)
 	ent.ShrapnelDone = nil
 	co = coroutine.create(function()
 		local lastShrapnel = SysTime()
+		local traceData = {start = selfPos, mask = MASK_SHOT, filter = filter}
 		for i = 1, multi * countMul do
 			lastShrapnel = SysTime()
 			if not IsValid(ent) then return end
-			bullet.Dir = ent:GetAngles():Forward() * math_random(-1, 1)
-			bullet.Spread = vecCone * (i / mass / 5)
-			ent:FireLuaBullets(bullet, true)
+
+			local dir = VectorRand(-1, 1):GetNormalized()
+			traceData.endpos = selfPos + dir * ShrapnelTraceDistance
+			local Tr = util.TraceLine(traceData)
+
+			if ShrapnelTraceHit(Tr) then
+				hg.ShrapnelDamage(owner, ent, selfPos, Tr, force)
+			end
+
 			lastShrapnel = SysTime() - lastShrapnel
 			if lastShrapnel > 0.001 then
 				coroutine.yield()
@@ -833,6 +966,51 @@ local function IgniteGasCloud(cloud, source)
 	RemoveCloudsForTank(idx)
 end
 
+local function IgniteLowGasTank(ent, owner)
+	local center = ent:WorldSpaceCenter()
+	local ignitions = 0
+
+	for _, target in ipairs(ents_FindInSphere(center, GasTankIgniteRadius)) do
+		if target == ent or not IsValid(target) then continue end
+		if target:GetMoveType() == MOVETYPE_NONE then continue end
+		if istable(target.fires) and next(target.fires) != nil then continue end
+
+		local tracePos = target:IsPlayer() and target:WorldSpaceCenter() or target:GetPos()
+		if target.organism then
+			tracePos = target:WorldSpaceCenter()
+		end
+
+		local Tr = hg.ExplosionTrace(center, tracePos, {ent})
+		if Tr.Entity != target then continue end
+
+		local firePos, fireNormal
+		if target:IsPlayer() or target:IsRagdoll() or target:IsNPC() or target:IsNextBot() then
+			local downTrace = util.QuickTrace(tracePos + vector_up * 12, -vector_up * 80, {ent, target})
+			if downTrace.Hit then
+				firePos = downTrace.HitPos
+				fireNormal = downTrace.HitNormal
+			else
+				firePos = tracePos
+				fireNormal = vector_up
+			end
+		else
+			local np = target:NearestPoint(center)
+			local normal = np - target:WorldSpaceCenter()
+			if normal:LengthSqr() < 0.001 then
+				normal = vector_up
+			else
+				normal:Normalize()
+			end
+			firePos = np
+			fireNormal = normal
+		end
+
+		CreateVFire(game.GetWorld(), firePos, fireNormal, 45, owner or game.GetWorld())
+		ignitions = ignitions + 1
+		if ignitions >= 3 then break end
+	end
+end
+
 function hg.GasTankDetonate(ent)
 	if not IsValid(ent) or ent.IsExploding then return end
 	ent.IsExploding = true
@@ -850,12 +1028,31 @@ function hg.GasTankDetonate(ent)
 
 	hg.GasTank.ActiveTanks[idx] = nil
 
+	local iedBonus, ied = ConsumeIEDBonus(ent)
+
+	if curGas ~= 0 and baseGas ~= 0 and curGas / baseGas < GasTankLowGasIgniteRatio then
+		local center = ent:GetPos() + ent:OBBCenter()
+		local effectdata = EffectData()
+		effectdata:SetOrigin(center)
+		effectdata:SetScale(1.2)
+		util.Effect("eff_hg_co2_leak", effectdata, true, true)
+		hg.PlayExtraExplosionSound(center, ent:EntIndex(), 0.8)
+		IgniteLowGasTank(ent, data and data.Owner or ent.LastAttacker)
+		util.ScreenShake(center, 30, 200, 0.6, 800)
+
+		if IsValid(ied) then
+			ied.KABOOM = true
+			ied.HaveTheBomb = nil
+			ied:Remove()
+		end
+		return
+	end
+
 	local phys = ent:GetPhysicsObject()
 	local mass = IsValid(phys) and phys:GetMass() or 30
-	local iedBonus, ied = ConsumeIEDBonus(ent)
 	hg.PropExplosion(ent, "CustomBarrel", (baseGas * 1.25 * ratio) + iedBonus, mass, {
 		ForceMul = 0.85,
-		RangeMul = 0.9,
+		RangeMul = 1.8,
 		DamageMul = 0.45,
 		KnockbackMul = 0.65,
 		MinForceFrac = 0.1,
@@ -1119,11 +1316,21 @@ hook.Add("EntityTakeDamage", "ExplosiveDamage", function(target, dmginfo)
 				local phys = target:GetPhysicsObject()
 				local mass = IsValid(phys) and phys:GetMass() or 10
 				local iedBonus, ied = ConsumeIEDBonus(target)
-				local explosionVolume = target.Volume and math_max(target.Volume, tbl.Force * 0.65) or tbl.Force
 				target.babahnut = true
-				hg.PropExplosion(target, tbl.ExpType, (explosionVolume * 2) + iedBonus, mass, tbl)
-				if IsValid(ied) then
-					ied:Remove()
+
+				if hg.drums[target:EntIndex()] and target.Volume and target.Volume < BarrelLowFuelRatio then
+					IgniteLowFuelBarrel(target)
+					if IsValid(ied) then
+						ied.KABOOM = true
+						ied.HaveTheBomb = nil
+						ied:Remove()
+					end
+				else
+					local explosionVolume = target.Volume and math_max(target.Volume, tbl.Force * 0.65) or tbl.Force
+					hg.PropExplosion(target, tbl.ExpType, (explosionVolume * 2) + iedBonus, mass, tbl)
+					if IsValid(ied) then
+						ied:Remove()
+					end
 				end
 			end
 		end

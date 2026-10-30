@@ -144,7 +144,7 @@ local function GetIntensityData(index)
     return intensities[index] or intensities[2] or {
         id = "ESCALATED",
         name = "Escalated",
-        description = "Some Chuds are armed, the fire is rising."
+        description = "Some people are armed, the fire is rising."
     }
 end
 
@@ -159,14 +159,14 @@ end
 
 local function GetIntroRoleName(ply, intensityId)
     if GetRiotTeam(ply) == 0 then
-        return "an Angry Chud"
+        return "a Rioter"
     end
 
     if intensityId == "ANARCHY" then
         return "SWAT"
     end
 
-    return "Chud Enforcement"
+    return "Law Enforcement"
 end
 
 function MODE:Intermission()
@@ -310,7 +310,7 @@ function MODE:RoundStart()
 end
 
 local function GiveContainedRioter(ply)
-    zb.GiveRole(ply, "Angry Chud", Color(190, 0, 0))
+    zb.GiveRole(ply, "an Angry Chud", Color(190, 0, 0))
     ply:SetPlayerClass("terrorist")
     ply:SetNetVar("CurPluv", "pluvmajima")
     ply:Give("weapon_hands_sh")
@@ -321,7 +321,7 @@ local function GiveContainedRioter(ply)
 end
 
 local function GiveEscalatedRioter(ply, index, shotgunIndex)
-    zb.GiveRole(ply, "Angry Chud", Color(190, 0, 0))
+    zb.GiveRole(ply, "an Angry Chud", Color(190, 0, 0))
     ply:SetPlayerClass("terrorist")
     ply:SetNetVar("CurPluv", "pluvmajima")
     ply:Give("weapon_hands_sh")
@@ -344,7 +344,7 @@ local function GiveEscalatedRioter(ply, index, shotgunIndex)
 end
 
 local function GiveAnarchyRioter(ply)
-    zb.GiveRole(ply, "Angry Chud", Color(190, 0, 0))
+    zb.GiveRole(ply, "an Angry Chud", Color(190, 0, 0))
     ply:SetPlayerClass("terrorist")
     ply:SetNetVar("CurPluv", "pluvmajima")
     ply:Give("weapon_hands_sh")

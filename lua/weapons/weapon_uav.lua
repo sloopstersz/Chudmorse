@@ -175,6 +175,10 @@ function SWEP:SecondaryAttack()
 	self:SetNextSecondaryFire(CurTime() + 0.2)
 end
 
+function SWEP:OnDrop()
+	if self._uavSpent then self:Remove() end
+end
+
 local function IsRealishRound()
 	local round = CurrentRound()
 	return round and round.name == "realish"
@@ -253,6 +257,9 @@ net.Receive("rem_uav_mark_request", function(_, ply)
 		if IsValid(weapon) then weapon._uavBusy = nil end
 	end)
 
-	ply:DropWeapon(weapon)
+	weapon._uavSpent = true
+	local class = weapon:GetClass()
+	ply:StripWeapon(class)
+	if IsValid(weapon) then weapon:Remove() end
 end)
 end

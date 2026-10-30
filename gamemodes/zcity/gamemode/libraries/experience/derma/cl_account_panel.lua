@@ -7,6 +7,7 @@ local Statics = {
     {"Suicides", "Suicides"},
     {"Deaths", "Deaths"},
     {"K/D", "K/D"},
+    {"Hours", "Hours"},
     --{"Victories being a traitor", "zb_hmcd_t_wins"},
    -- {"Neutralizings a traitor", "zb_hmcd_ino_t_kills"}
 }
@@ -45,6 +46,10 @@ local function GetRawStatValue(ply, key, request)
 end
 
 local function GetStatValue(ply, key, request)
+    if key == "Hours" then
+        local seconds = IsValid(ply) and tonumber(ply:GetNWFloat("ChudPlaytimeSeconds", 0)) or 0
+        return string.format("%.1f", math.max(seconds or 0, 0) / 3600)
+    end
     if key == "K/D" then
         local kills = GetRawStatValue(ply,"Kills",request)
         local deaths = GetRawStatValue(ply,"Deaths",request)
@@ -210,7 +215,7 @@ function PANEL:SetPlayer(ply)
     self.MainInfo:SetPlayer(ply)
     self.MainInfo.PlyLabel:SetText( ply:Nick() )
 
-    for i,stats in pairs(Statics) do
+    for i,stats in ipairs(Statics) do
         local Stat = vgui.Create("DPanel",self.StatPanel)
         Stat:Dock(TOP)
         Stat:DockMargin(0,0,AccountUnit(8),AccountUnit(10))
@@ -241,7 +246,7 @@ function PANEL:SetPlayer(ply)
 end
 
 function PANEL:Udpate(ply)
-    for i,stats in pairs(Statics) do
+    for i,stats in ipairs(Statics) do
         local Stat = self.StatRows[i]
         if IsValid(Stat) then
             Stat:SetText(tostring(GetStatValue(ply,stats[2],false)))

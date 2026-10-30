@@ -2,44 +2,20 @@ COMMANDS = COMMANDS or {}
 
 local validUserGroupSuperAdmin = {
 	superadmin = true,
-	owner = true,
-	coowner = true,
-	["co-owner"] = true,
-	["owner/co-owner"] = true,
 }
 
 local validUserGroup = {
 	admin = true,
 }
 
-local function UserGroupMatches(ply, acceptedGroups)
-	if not IsValid(ply) then return false end
-
-	local group = string.lower(tostring(ply:GetUserGroup() or "user"))
-	local groups = ULib and ULib.ucl and ULib.ucl.groups
-	local visited = {}
-
-	while group ~= "" and not visited[group] do
-		if acceptedGroups[group] then return true end
-
-		visited[group] = true
-		local groupData = groups and groups[group]
-		local parent = groupData and groupData.inherit_from
-		if not isstring(parent) or parent == "" then break end
-
-		group = string.lower(parent)
-	end
-
-	return false
-end
-
 function COMMAND_GETACCES(ply)
 	if ply == Entity(0) then return 2 end
 
-	if UserGroupMatches(ply, validUserGroupSuperAdmin) then
-		return 2
-	elseif UserGroupMatches(ply, validUserGroup) then
+	local group = ply:GetUserGroup()
+	if validUserGroup[group] then
 		return 1
+	elseif validUserGroupSuperAdmin[group] then
+		return 2
 	end
 
 	return 0
@@ -52,46 +28,47 @@ function COMMAND_ACCES(ply,cmd)
 	return true
 end
 
-function COMMAND_GETARGS(input)
-	local text = istable(input) and table.concat(input, " ") or tostring(input or "")
+function COMMAND_GETARGS(args)
 	local newArgs = {}
-	local current = {}
-	local inQuotes = false
+	local waitClose,waitCloseText
 
-	local function PushArgument()
-		if #current == 0 then return end
-		newArgs[#newArgs + 1] = table.concat(current)
-		current = {}
-	end
+	for i,text in pairs(args) do
+		if not waitClose and string.sub(text,1,1) == "\"" then
+			waitClose = true
 
-	for index = 1, #text do
-		local character = string.sub(text, index, index)
+			if string.sub(text,#text,#text) == "\n" then
+				newArgs[#newArgs + 1] = string.sub(text,2,#text - 1)
 
-		if character == "\"" then
-			inQuotes = not inQuotes
-		elseif string.match(character, "%s") and not inQuotes then
-			PushArgument()
-		else
-			current[#current + 1] = character
+				waitClose = nil
+			else
+				waitCloseText = string.sub(text,2,#text)
+			end
+
+			continue
 		end
+
+		if waitClose then
+			if string.sub(text,#text,#text) == "\"" then
+				waitClose = nil
+
+				newArgs[#newArgs + 1] = waitCloseText .. string.sub(text,1,#text - 1)
+			else
+				waitCloseText = waitCloseText .. string.sub(text,1,#text)
+			end
+
+			continue
+		end
+
+		newArgs[#newArgs + 1] = text
 	end
 
-	PushArgument()
 	return newArgs
 end
 
 function COMMAND_Input(ply,args)
-	if not istable(args) or not args[1] then return false end
-
-	args[1] = string.lower(tostring(args[1]))
 	local cmd = COMMANDS[args[1]]
 	if not cmd then return false end
-	if not COMMAND_ACCES(ply,cmd) then
-		if IsValid(ply) then
-			ply:ChatPrint("You do not have permission to use this command.")
-		end
-		return true,false
-	end
+	if not COMMAND_ACCES(ply,cmd) then return true,false end
 
 	table.remove(args,1)
 
@@ -99,33 +76,18 @@ function COMMAND_Input(ply,args)
 end
 -- Мдаааа А ПЛЕЙРСЕЙ ДЛЯ КОГО НУЖЕН????
 hook.Add("HG_PlayerSay","commands-chat",function(ply, txtTbl, text)
-	text = string.Trim(isstring(text) and text or (istable(txtTbl) and txtTbl[1]) or "")
-	if string.sub(text, 1, 1) ~= "!" then return end
-
-	local commandText = string.Trim(string.sub(text, 2))
-	if commandText == "" then return end
-
-	local handled = COMMAND_Input(ply, COMMAND_GETARGS(commandText))
-	if handled and istable(txtTbl) then
-		-- Execute recognized commands without broadcasting the command text.
-		txtTbl[1] = ""
-	end
+	COMMAND_Input(ply, COMMAND_GETARGS(string.Split(string.sub(text, 2, #text), " ")))
 end)
 
 COMMANDS.help = {function(ply,args)
 	local text = ""
 
 	if args[1] then
-		local commandName = string.lower(tostring(args[1]))
-		local cmd = COMMANDS[commandName]
-		if not cmd or not COMMAND_ACCES(ply, cmd) then
-			ply:ChatPrint("Unknown command or insufficient permission: !" .. commandName)
-			return
-		end
+		local cmd = COMMANDS[args[1]]
 		local argsList = cmd[3]
 		if argsList then argsList = " - " .. argsList else argsList = "" end
 
-		text = text .. "	" .. commandName .. argsList .. "\n"
+		text = text .. "	" .. args[1] .. argsList .. "\n"
 	else
 		local list = {}
 		for name in pairs(COMMANDS) do list[#list + 1] = name end
@@ -422,7 +384,12 @@ local VIP_MODEL_WHITELIST = {
 	end
 
 	COMMANDS.setmodel = {function(ply, args)
+        if not IsValid(ply) or not ply:IsPlayer() then return end
 		local canModerateModels = SetModelGroupMatches(ply, SETMODEL_STAFF_GROUPS)
+        if not canModerateModels and not SetModelGroupMatches(ply, {vip = true}) then
+            ply:ChatPrint("This command is available to VIP players and staff.")
+            return
+        end
 		local activeRound = zb and string.lower(tostring(zb.CROUND or "")) or ""
 		local blockedRoundName = SETMODEL_BLOCKED_ROUNDS[activeRound]
 		if blockedRoundName then
@@ -521,4 +488,25 @@ local VIP_MODEL_WHITELIST = {
 	COMMANDS.model = COMMANDS.setmodel
 	COMMANDS.playermodel = COMMANDS.setmodel
 	COMMANDS.setplayermodel = COMMANDS.setmodel
+
+	COMMANDS.setscale = {function(ply, args)
+		if not ply:IsAdmin() then return end
+		local plya = #args > 1 and args[1] or ply:Name()
+		local scale = #args > 1 and args[2] or args[1]
+
+		for i, ply2 in pairs(player.GetListByName(plya)) do
+			if ply2:Alive() then
+				ply2:SetModelScale(scale)
+
+				ply:ChatPrint(ply2:Name().. "'s model scale set to " .. tostring(scale))
+			end
+		end
+	end, 0}
+
+	--// Aliases
+	COMMANDS.setsize = COMMANDS.setscale
+	COMMANDS.scale = COMMANDS.setscale
+	COMMANDS.size = COMMANDS.setscale
+	COMMANDS.setmodelscale = COMMANDS.setscale
+	COMMANDS.modelscale = COMMANDS.setscale
 end

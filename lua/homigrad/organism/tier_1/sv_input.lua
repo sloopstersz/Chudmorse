@@ -570,6 +570,19 @@ local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodi
 local net, math, hg, IsValid = net, math, hg, IsValid
 local takeRagdollDamage
 hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
+    -- The boss uses Source HP; bypass trauma and the later mode damage hook.
+    local juggernaut = ent:IsPlayer() and ent or (hg.RagdollOwner and hg.RagdollOwner(ent))
+    if hg.IsJuggernautHP and hg.IsJuggernautHP(juggernaut) then
+        if ent ~= juggernaut then
+            -- The player owns the HP pool even while their body is a ragdoll.
+            -- Re-enter through the player branch so resistance is applied once.
+            juggernaut:TakeDamageInfo(dmgInfo)
+            hg.UpdateJuggernautHP(juggernaut, juggernaut.organism)
+            return true
+        end
+        dmgInfo:ScaleDamage(0.3)
+        return false
+    end
 	if dmgInfo:IsDamageType(DMG_DISSOLVE) then return end
 
 	local attacker = dmgInfo:GetAttacker()
@@ -980,6 +993,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 		if bullet and hg.ammotypeshuy[bullet.AmmoType] and hg.ammotypeshuy[bullet.AmmoType].BulletSettings.tranquilizer then
 			org.tranquilizer = org.tranquilizer + dmgInfo:GetDamage()
+			hook.Run("ChudAchievementTranqHit", dmgInfo:GetAttacker(), org.owner)
 		end
 
 		if dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT+DMG_SLASH+DMG_BURN) then
@@ -1090,6 +1104,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local damageStack = dmg_before / (dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and RagdollDamageBoneMul[hitgroup] or 1)
 	if dmgInfo:IsDamageType(DMG_SLASH + DMG_CLUB + DMG_GENERIC) then damageStack = damageStack * melee_gib_damage_mul end
 	if hitgroup == HITGROUP_HEAD and IsValid(inf) and inf.HeadGibDamageMul then damageStack = damageStack * inf.HeadGibDamageMul end
+	-- Do not add head-gore damage or trigger an existing stack with zombie melee.
+	local noHeadGib = IsValid(inf) and inf.NoHeadGib or (ZZIsZombie(dmgInfo:GetAttacker()) and IsValid(inf) and inf:GetClass() == "weapon_hands_sh")
+	if noHeadGib and hitgroup == HITGROUP_HEAD then damageStack = 0 end
 	if hitgroup == HITGROUP_HEAD and dmgInfo:IsDamageType(DMG_SLASH) then damageStack = damageStack * 25 end
 	local inflictorClass = IsValid(dmgInfo:GetInflictor()) and dmgInfo:GetInflictor():GetClass() or ""
 	local grenadeBlastMul = string.find(inflictorClass, "ent_hg_grenade") and 1.8 or 1
@@ -1105,6 +1122,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local bodyPartMaxHealth = body_part_health[hitgroup]
 	if bodyPartMaxHealth and hitgrouptolimb[hitgroup] and not org.isPly then bodyPartMaxHealth = 100 end
 	if bodyPartMaxHealth and hitgroup == HITGROUP_HEAD and not org.isPly then bodyPartMaxHealth = 100 end
+	-- Only limb durability is reduced; head, torso and overall damage stay unchanged.
+	if hitgrouptolimb[hitgroup] then
+		damageStack = damageStack * (ZZLimbDamageMultiplier and ZZLimbDamageMultiplier(org.owner) or 1)
+	end
 	local gibStack
 	local headGoreStack
 	if bodyPartMaxHealth then
@@ -1118,7 +1139,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		gibStack = hitgroup == HITGROUP_HEAD and AddGibDamageStack(org, hitgroup, damageStack) or org.dmgstack[hitgroup][1]
 	end
 	org.dmgstack[hitgroup][1] = headGoreStack or gibStack
-	if hitgroup == HITGROUP_HEAD and ent.headexploded and Gib_UpdateHeadGoreStage then
+	if not noHeadGib and hitgroup == HITGROUP_HEAD and ent.headexploded and Gib_UpdateHeadGoreStage then
 		Gib_UpdateHeadGoreStage(ent, headGoreStack or gibStack)
 	end
 	if hitgroup == HITGROUP_STOMACH and not org.stomachgibbed and hg.AttachStomachGore and gibStack >= player_stomach_gib_threshold then
@@ -1135,10 +1156,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	--print(damageStack, org.dmgstack[hitgroup][1], org.dmgstack[hitgroup][3])
 	local blast = dmgInfo:IsDamageType(DMG_BLAST)
 	local slash = dmgInfo:IsDamageType(DMG_SLASH)
-	if instant and blast and hitgroup == HITGROUP_HEAD and !ent.headexploded then
+	if not noHeadGib and instant and blast and hitgroup == HITGROUP_HEAD and !ent.headexploded then
 		hg.ExplodeHead(ent, org.dmgstack[hitgroup][1], false, dirCool * len)
 	end
-	if instant and !blast and hitgroup == HITGROUP_HEAD and !ent.headexploded then
+	if not noHeadGib and instant and !blast and hitgroup == HITGROUP_HEAD and !ent.headexploded then
 		hg.ExplodeHead(ent, org.dmgstack[hitgroup][1], slash, force)
 	end
 
@@ -1186,7 +1207,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 			should = org.dmgstack[hitgroup][1] > hitgroup_max
 			--print(rag, should, hitgroup == HITGROUP_HEAD, bonename, hitgroup, HITGROUP_HEAD)
-			if should and hitgroup == HITGROUP_HEAD then
+			if not noHeadGib and should and hitgroup == HITGROUP_HEAD then
 				hg.ExplodeHead(ent, org.dmgstack[hitgroup][1], slash, force)
 
 				org.dmgstack[hitgroup][1] = nil
@@ -1618,6 +1639,15 @@ local function velocityDamage(ent, data)
 	if hg.FullBodyExplode and !org.fullbodyexploded and hg.CanFullBodyGib and hg.CanFullBodyGib(ent, org, ply) and (speed >= full_body_physics_speed_threshold or rawPhysicsDamage >= full_body_physics_damage_threshold) then
 		if hg.FullBodyExplode(ent, data.OurOldVelocity - data.TheirOldVelocity, dmgInfo) then return end
 	end
+
+	-- Climbing fix (ported from judge): an arm that is gripping something (hand weld
+	-- active) or is being used to push along while moving takes only 10% of the
+	-- impact damage, so hanging off / climbing a wall no longer snaps your arms.
+	if (hitgroup == HITGROUP_LEFTARM and IsValid(ent.ConsLH)) or (hitgroup == HITGROUP_RIGHTARM and IsValid(ent.ConsRH))
+		or ((hitgroup == HITGROUP_LEFTARM or hitgroup == HITGROUP_RIGHTARM) and IsValid(ply) and (ply:KeyDown(IN_FORWARD) or ply:KeyDown(IN_BACK))) then
+		dmg = dmg * 0.1
+	end
+
 	org.fearadd = org.fearadd + dmg * 0.5
 
 	if not org.superfighter then

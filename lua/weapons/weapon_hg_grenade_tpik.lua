@@ -675,22 +675,10 @@ function SWEP:PlaceTrap()
 
 			ent2.Trap = self.Trap
 			ent2:SetNoDraw(true)
-			ent2:AddCallback("PhysicsCollide", function()
-				local trap = ent2.Trap
-				if not IsValid(trap) or not trap.Arm then return end
-				if trap.timer or trap.Exploded or trap.CollisionArmPending then return end
-				trap.CollisionArmPending = true
-				local armTime = CurTime() - trap.timeToBoom + 1
-
-				-- Arm spawns a physics spoon and removes the trigger/constraints.
-				-- None of those operations may run inside PhysicsCollide.
-				timer.Simple(0, function()
-					if not IsValid(trap) then return end
-					trap.CollisionArmPending = nil
-					if not IsValid(ent2) or ent2.Trap ~= trap then return end
-					if trap.timer or trap.Exploded or not trap.Arm then return end
-					trap:Arm(armTime, vector_origin)
-				end)
+			ent2:AddCallback("PhysicsCollide",function()
+				if IsValid(ent2.Trap) and ent2.Trap.Arm then
+					ent2.Trap:Arm(CurTime() - ent2.Trap.timeToBoom + 1, vector_origin)
+				end
 			end)
 
 			--[[ broken

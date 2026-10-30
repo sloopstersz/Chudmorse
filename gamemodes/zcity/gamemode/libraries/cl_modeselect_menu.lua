@@ -302,6 +302,14 @@ if CLIENT then
             ["event"] = true,
             ["bartvshomer"] = true,
         ["chudbeasts"] = true,
+        ["turfwars"] = true,
+        ["chaos"] = true,
+        ["hl2tdm"] = true,
+        ["zzombies"] = true,
+        ["president"] = true,
+        ["vip"] = true,
+        ["juggernaut"] = true,
+        ["framed"] = true,
         }
         
         for i, mode in SortedPairsByMemberValue(zb.availableModes,"canlaunch",true) do
@@ -481,8 +489,48 @@ if CLIENT then
     local statsPanelInstance = nil
     local adminStatsRows = {}
 
+    local pendingAdminStats
+
     net.Receive("ZB_AdminStatsSend", function()
-        adminStatsRows = net.ReadTable() or {}
+        -- Match SendAdminStatsRows: three UInt16 headers, then a JSON batch.
+        local total = net.ReadUInt(16)
+        local chunks = net.ReadUInt(16)
+        local index = net.ReadUInt(16)
+        local part = util.JSONToTable(net.ReadString())
+
+        if chunks < 1 or index < 1 or index > chunks or not istable(part) then
+            pendingAdminStats = nil
+            return
+        end
+
+        if index == 1 then
+            pendingAdminStats = {total = total, chunks = chunks, nextIndex = 1, rows = {}}
+        end
+
+        local pending = pendingAdminStats
+        if not pending or pending.total ~= total or pending.chunks ~= chunks or pending.nextIndex ~= index then
+            pendingAdminStats = nil
+            return
+        end
+
+        for _, row in ipairs(part) do
+            if not istable(row) or not isstring(row.steamid) then
+                pendingAdminStats = nil
+                return
+            end
+            pending.rows[#pending.rows + 1] = row
+        end
+        pending.nextIndex = index + 1
+
+        if #pending.rows > total then
+            pendingAdminStats = nil
+            return
+        end
+        if index ~= chunks then return end
+
+        pendingAdminStats = nil
+        if #pending.rows ~= total then return end
+        adminStatsRows = pending.rows
 
         if IsValid(statsPanelInstance) and statsPanelInstance.RefreshRows then
             statsPanelInstance:RefreshRows()

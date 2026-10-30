@@ -223,27 +223,26 @@ util.AddNetworkString("zb_xp_get")
 util.AddNetworkString("zb_sql_leaderboard")
 
 net.Receive("zb_xp_get",function(len,ply)
-
-    local steamID64 = ply:SteamID64()
-
-    if not zb.Experience.Active then
-        zb.Experience.PlayerInstances[steamID64] = {}
-        return
-    end 
-
+    if not IsValid(ply) then return end
     local get_ply = net.ReadEntity()
-
-    if not IsValid(get_ply) or not get_ply.GetSkill or not get_ply.GetExp then
-        return
-    end
-
+    if not IsValid(get_ply) or not get_ply:IsPlayer() then return end
+    -- Scoreboard statistics are public. Budget each target independently so
+    -- one player's refresh cannot starve the rest of the scoreboard.
+    local now = CurTime()
+    ply.ChudXPRequests = ply.ChudXPRequests or setmetatable({}, {__mode = "k"})
+    if now < (ply.ChudXPRequests[get_ply] or 0) then return end
+    ply.ChudXPRequests[get_ply] = now + 0.5
+    local exp = EnsureExperienceInstance(get_ply)
     net.Start("zb_xp_get")
-        --print( ply:GetExp() )
-        net.WriteEntity( get_ply )
-        net.WriteFloat( get_ply:GetSkill() )
-        net.WriteUInt( math.Clamp(get_ply:GetExp(), 0, 4294967295), 32 )
+        net.WriteEntity(get_ply)
+        net.WriteFloat(get_ply:GetSkill())
+        net.WriteUInt(math.Clamp(get_ply:GetExp(), 0, 4294967295), 32)
+        -- Append to the existing protocol; old clients still read XP/skill.
+        net.WriteUInt(math.Clamp(exp.kills, 0, 4294967295), 32)
+        net.WriteUInt(math.Clamp(exp.deaths, 0, 4294967295), 32)
+        net.WriteUInt(math.Clamp(exp.suicides, 0, 4294967295), 32)
+        net.WriteUInt(math.Clamp(get_ply:GetNWInt("Headshots", 0), 0, 4294967295), 32)
     net.Send(ply)
-
 end)
 
 net.Receive("zb_sql_leaderboard", function(_, ply)

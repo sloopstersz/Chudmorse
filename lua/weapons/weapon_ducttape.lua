@@ -193,7 +193,16 @@ local function BindObjects(ent1, pos1, ent2, pos2, power, bone1, bone2)
 	ent1.DuctTape = ent1.DuctTape or {}
 	ent2.DuctTape = ent2.DuctTape or {}
 	local Strength = ent1.DuctTape and ent1.DuctTape[bone1] and #ent1.DuctTape[bone1] or 1
-	local weld = not ent1:IsRagdoll() and not ent2:IsRagdoll() and constraint.Rope(ent1, ent2, 0, 0, ent1:WorldToLocal(pos1), ent2:WorldToLocal(pos2), (pos1 - pos2):Length(), -.1, (500 + Strength * 100) * 5, 0, "", false) or constraint.Weld(ent1, ent2, bone1, bone2, (500 + Strength * 100) * 15, false, false)
+	local weld
+	if not ent1:IsRagdoll() and not ent2:IsRagdoll() then
+		weld = constraint.Rope(ent1, ent2, 0, 0, ent1:WorldToLocal(pos1), ent2:WorldToLocal(pos2), (pos1 - pos2):Length(), -.1, (500 + Strength * 100) * 5, 0, "", false)
+		if not IsValid(weld) then
+			weld = constraint.Weld(ent1, ent2, bone1, bone2, (500 + Strength * 100) * 15, false, false)
+		end
+	else
+		weld = constraint.Weld(ent1, ent2, bone1, bone2, (500 + Strength * 100) * 15, false, false)
+	end
+	if not IsValid(weld) then return 0 end
 	if not ent1.DuctTape[bone1] then
 		ent1.DuctTape[bone1] = {weld, 1}
 		weld:CallOnRemove("removefromtbl", function() ent1.DuctTape[bone1] = nil end)

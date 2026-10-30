@@ -1,4 +1,4 @@
-local MODE = MODE
+﻿local MODE = MODE
 
 MODE.name = "realish"
 MODE.PrintName = "Realish"
@@ -266,7 +266,6 @@ local function SanitizeAttachments(loadout, choices, attachments)
 end
 
 local function CanDeployNow(ply, round)
-	if GetGlobalFloat("Realish_DoomStart", 0) > 0 then return false end
 	if zb.ROUND_STATE ~= 1 then return false end
 	if not ply:IsBot() and CurTime() < GetGlobalFloat("Realish_DeployTime", 0) then return false end
 
@@ -682,7 +681,6 @@ function MODE:GuiltCheck()
 end
 
 function MODE:Intermission()
-	self:ResetSuddenDoom()
 	game.CleanUpMap()
 
 	self:SetLives(0, self.StartLives)
@@ -1020,7 +1018,6 @@ function MODE:PlayerSpawn(ply)
 end
 
 function MODE:PlayerDeath(ply)
-	if self.DoomNuked then return end
 	if zb.ROUND_STATE ~= 1 then return end
 
 	local teamID = ply:Team()
@@ -1147,7 +1144,6 @@ function MODE:PlayerDeath(ply)
 end
 
 function MODE:CanSpawn(ply)
-	if GetGlobalFloat("Realish_DoomStart", 0) > 0 then return false end
 	if zb.ROUND_STATE ~= 1 then return end
 	if not IsValid(ply) then return end
 
@@ -1161,7 +1157,7 @@ function MODE:GetAliveCount(teamID)
 	local count = 0
 
 	for _, ply in player.Iterator() do
-		if ply:Team() == teamID and ((ply:Alive() and ply.RealishDeployed) or (ply.RealishIsHero and ply.RealishSpawnRequested)) then
+		if ply:Team() == teamID and ply:Alive() and ply.RealishDeployed then
 			count = count + 1
 		end
 	end
@@ -1170,16 +1166,9 @@ function MODE:GetAliveCount(teamID)
 end
 
 function MODE:ShouldRoundEnd()
-    if self.DoomNuked then return true end
-    self:TrySuddenDoom()
-    local doomEnd = GetGlobalFloat("Realish_DoomEnd", 0)
-    if doomEnd > 0 and CurTime() >= doomEnd then
-        self:DetonateSuddenDoom()
-        return true
-    end
 	if self:GetLives(0) <= 0 and self:GetAliveCount(0) <= 0 then return true end
 	if self:GetLives(1) <= 0 and self:GetAliveCount(1) <= 0 then return true end
-	if doomEnd <= 0 and CurTime() >= GetGlobalFloat("Realish_RoundEndTime", math.huge) then return true end
+	if CurTime() >= GetGlobalFloat("Realish_RoundEndTime", math.huge) then return true end
 end
 
 function MODE:EndRound(forcedWinner)
@@ -1192,7 +1181,6 @@ function MODE:EndRound(forcedWinner)
 	local revenantDead = self:GetLives(1) <= 0 and self:GetAliveCount(1) <= 0
 	local timedOut = CurTime() >= GetGlobalFloat("Realish_RoundEndTime", math.huge)
 	local winner = forcedWinner or (atlasDead and 1 or revenantDead and 0 or nil)
-	if self.DoomNuked then winner = nil end
 
 	if not forcedWinner and timedOut and not atlasDead and not revenantDead then
 		winner = nil
@@ -1221,7 +1209,6 @@ function MODE:EndRound(forcedWinner)
 
 	net.Start("realish_end")
 	net.Broadcast()
-	self:ResetSuddenDoom()
 end
 
 local function ForceWin(ply, _, _, teamID)
@@ -1262,7 +1249,6 @@ hook.Add("DefibCanTarget", "RealishDefibTeamCheck", function(owner, target, ply)
 
 	local victim = IsValid(ply) and ply or (IsValid(target) and hg.RagdollOwner and hg.RagdollOwner(target)) or nil
 	if not IsValid(victim) or not victim:IsPlayer() then return end
-	if GetGlobalFloat("Realish_DoomStart", 0) > 0 and not victim:Alive() then return false end
 
 	local ownerTeam = owner:Team()
 	if ownerTeam ~= 0 and ownerTeam ~= 1 then return end
@@ -1801,6 +1787,3 @@ net.Receive("realish_hero_spawn", function(_, ply)
 		end
 	end)
 end)
-
-AddCSLuaFile("realish_doom/cl_doom.lua")
-include("realish_doom/sv_doom.lua")

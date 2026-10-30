@@ -60,8 +60,20 @@ EXP.OpenedAccount = EXP.OpenedAccount or nil
 local needCallback = false
 net.Receive("zb_xp_get",function()
     local ply = net.ReadEntity()
-    ply.skill = net.ReadFloat()
-    ply.exp = net.ReadUInt(32)
+    local skill = net.ReadFloat()
+    local experience = net.ReadUInt(32)
+    if not IsValid(ply) then return end
+    ply.skill = skill
+    ply.exp = experience
+    -- Accept older servers during rollout, but prefer the complete snapshot.
+    if net.BytesLeft() >= 16 then
+        ply.SvDB = ply.SvDB or {}
+        ply.SvDB.Kills = net.ReadUInt(32)
+        ply.SvDB.Deaths = net.ReadUInt(32)
+        ply.SvDB.Suicides = net.ReadUInt(32)
+        ply.SvDB.Headshots = net.ReadUInt(32)
+        if IsValid(EXP.OpenedAccount) then EXP.OpenedAccount:Udpate(ply) end
+    end
     --print(ply.exp,ply.skill)
     if needCallback then
         if IsValid(EXP.OpenedAccount) then

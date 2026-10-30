@@ -1,0 +1,22 @@
+"VertexLitGeneric"
+{
+	"$baseTexture" "models\lfs\ch47_chinook/chinook_c"
+	"$bumpmap" "models\lfs\ch47_chinook/chinook_b"
+
+	"$halflambert" 1
+
+	"$phong" "1"
+	"$basemapalphaphongmask" "1"
+	"$phongexponent" "15"
+	"$phongboost" "3"	
+	"$phongfresnelranges"	"[ .3 1 7 ]"
+	"$halflambert" "1"
+
+	"$rimlight" "1"												// To enable rim lighting (requires phong)
+	"$rimlightexponent" "75"										// Exponent for phong component of rim lighting	
+	"$rimlightboost" "0.1"	
+
+	"$envmap" "env_cubemap"
+	"$envmapcontrast" "1"
+	"$envmaptint" "[ .01 .01 .01 ]"
+}

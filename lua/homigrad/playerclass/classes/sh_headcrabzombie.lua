@@ -67,7 +67,17 @@ local fallbackMats = {
 }
 
 local clr_darkred = Color(75, 0, 0)
-function CLASS.On(self)
+function CLASS.On(self, data)
+    self.ZZNativeZombie = data and data.ZZZombie == true or false
+    -- Z-Zombies owns the selected model and stat budget. Keep the native
+    -- zombie class (claws, sounds and restrictions) without its appearance reset.
+    if self.ZZNativeZombie or (ZZIsZombie and ZZIsZombie(self)) then
+        if SERVER then
+            self:SetNetVar("headcrab", false)
+            if not (data and data.keepAppearance) then self:SetNWString("PlayerName", ZZGetZombieClass(self).name) end
+        end
+        return
+    end
 	--\\ Remember old player cloth to set it later
 	local clothTbl = {}
 	if SERVER then
@@ -175,6 +185,7 @@ end
 
 --// Reset organism and npc relationship
 function CLASS.Off(self)
+    self.ZZNativeZombie = nil
     if CLIENT then return end
 
 	for k, v in ipairs(ents.FindByClass("npc_*")) do
@@ -239,6 +250,10 @@ function CLASS.Think(self)
 			self:SelectWeapon(hands)
 		end
 	end
+
+    -- Class stamina is managed by ZZUpdateZombieOrganism; do not replace
+    -- Runner/Heavy/Shambler values with the native 200-point budget.
+    if ZZIsZombie and ZZIsZombie(self) then return end
 
 	--\\ Organism stuff
 	local org = self.organism
@@ -308,6 +323,7 @@ hook.Add("HG_ReplacePhrase", "ZombPhrases", function(ply, phrase, muffed, pitch)
 end)
 
 hook.Add("HG_CanThoughts", "ZombCantDumat", function(ply)
+    if ZZIsZombie and ZZIsZombie(ply) and ply:GetNWBool("ZZIntelligence", false) then return end
 	if ply.PlayerClassName == "headcrabzombie" then
 		return false
 	end
@@ -321,6 +337,10 @@ hook.Add("PlayerCanPickupWeapon", "ZombCantPickup", function(ply, ent)
 end)
 
 hook.Add("PlayerUse", "ZombCantPickup", function(ply, ent)
+    if ZZIsZombie and ZZIsZombie(ply) and ply:GetNWBool("ZZIntelligence", false) and IsValid(ent) then
+        local c = ent:GetClass()
+        if c == "prop_door_rotating" or c == "func_door" or c == "func_door_rotating" or c == "prop_door" then return end
+    end
 	if IsValid(ply) and ply.PlayerClassName == "headcrabzombie" and ent:GetClass() ~= "func_button" then
 		return false
 	end
@@ -328,11 +348,9 @@ end)
 
 --// Player speed & animation speed stuff
 hook.Add("HG_MovementCalc_2", "ZombSpeed", function(mul, ply, cmd, mv)
+    if ZZIsZombie and ZZIsZombie(ply) then return end
 	if IsValid(ply) and ply.PlayerClassName == "headcrabzombie" then
-        mul[1] = 0.8
-		if ply:IsSprinting() then
-			mul[1] = 1.2
-		end
+		mul[1] = mul[1] * (ply:IsSprinting() and 1.2 or 0.8)
 		if ply.SpeedGainMul ~= 70 then
 			ply.SpeedGainMul = 70
 		end
@@ -391,6 +409,7 @@ if SERVER then
 
 	--// Zombies can't speak
 	hook.Add("HG_PlayerCanHearPlayersVoice", "ZombVoice", function(listener, speaker)
+        if ZZIsZombie and ZZIsZombie(speaker) and speaker:GetNWBool("ZZIntelligence", false) then return end
 		if speaker.PlayerClassName == "headcrabzombie" then
 			return false, false
 		end
@@ -476,6 +495,7 @@ else
 	end
 
 	hook.Add("Post Pre Post Processing", "ZombDrawHeadcrab", function()
+        if lply.ZZNativeZombie or (ZZIsZombie and ZZIsZombie(lply)) then return end
 		if lply.PlayerClassName == "headcrabzombie" and lply:Alive() and lply.organism and not lply.organism.otrub and GetViewEntity() == lply then
 			DrawHeadcrab(lply, "models/nova/w_headcrab.mdl", vector_origin, -50)
 		end
@@ -484,6 +504,7 @@ else
 	--// Change view from head to upper torso because zombie model doesn't have proper head bone..
 	-- "HG_CalcView", ply, origin, angles, fova, znear, zfar
 	hook.Add("HGAddView", "ZombView", function(ply, origin, angles)
+        if ply.ZZNativeZombie or (ZZIsZombie and ZZIsZombie(ply)) then return end
 		if ply:Alive() and ply.PlayerClassName == "headcrabzombie" then
 			local ply_spine_index = ply:LookupBone("ValveBiped.Bip01_Spine4")
 			if !ply_spine_index then return end
@@ -513,6 +534,7 @@ else
 	local zombMat = Material("effects/shaders/zb_grain2") -- Material("effects/shaders/zb_zomb")
 	local zombMat_Add = Material("effects/shaders/zb_heat")
 	hook.Add("Post Post Processing", "ZombShaders", function()
+        if lply.ZZNativeZombie or (ZZIsZombie and ZZIsZombie(lply)) then return end
 		if lply.PlayerClassName == "headcrabzombie" and lply:Alive() and GetViewEntity() == lply then
 			render.UpdateScreenEffectTexture()
 

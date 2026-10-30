@@ -49,24 +49,20 @@ module[2] = function(owner, org, timeValue)
 
 	stamina.sub = 0
 	local velLen = 0
+	local exerting = false
 	if owner:IsPlayer() then
 		local wep = owner:GetActiveWeapon()
 		local walk = owner:KeyDown(IN_FORWARD) or owner:KeyDown(IN_BACK) or owner:KeyDown(IN_MOVELEFT) or owner:KeyDown(IN_MOVERIGHT)
 		velLen = max(min(owner:GetVelocity():Length(), org.moveMaxSpeed), 0) / (owner:GetRunSpeed() / hg_organism_stamina_sprint_mul:GetFloat())-- / ((IsValid(wep) and wep ~= NULL and wep:GetClass() == "weapon_hands_sh" and owner:KeyDown(IN_WALK)) and 1.3 or 0.58))
 		--print(velLen)
-		if (owner:OnGround() or owner:WaterLevel() >= 2) and walk and not owner:InVehicle() and owner.hg_isJogging and org.stamina[1] > 20 then
+		if (owner:OnGround() or owner:WaterLevel() >= 2) and walk and not owner:InVehicle() and owner.hg_isJogging and org.stamina[1] > 0 then
 			stamina.sub = (owner:WaterLevel() >= 2 and 2 or 1) * (velLen ^ 0.5) * 1.1 
-		elseif (owner:OnGround() or owner:WaterLevel() >= 2) and walk and not owner:InVehicle() and owner.hg_isSprinting and org.stamina[1] > 20 then
-			stamina.sub = (owner:WaterLevel() >= 2 and 2 or 1) * (velLen ^ 0.5) * 1.51 
-		end
-
-		-- Chud Beasts can sprint without spending stamina. This clears only
-		-- sprint movement drain; attack and other stamina costs are added below.
-		if owner.hg_isSprinting and (owner.PlayerClassName == "chudbeast"
-			or (zb and zb.CROUND == "chudbeasts")) then
-			stamina.sub = 0
+		elseif (owner:OnGround() or owner:WaterLevel() >= 2) and walk and not owner:InVehicle() and owner.hg_isSprinting and org.stamina[1] > 0 then
+			stamina.sub = (owner:WaterLevel() >= 2 and 2 or 1) * (velLen ^ 0.5) * 1.51 * (6 / 11) 
 		end
 	end
+
+	exerting = stamina.sub > 0 or stamina.subadd > 0
 
 	if org.superfighter then
 		org.stamina.subadd = org.stamina.subadd / 4
@@ -79,6 +75,11 @@ module[2] = function(owner, org, timeValue)
 
 	stamina.sub = stamina.sub + stamina.subadd + (org.painkiller > 1.6 and (stamina[1] > 10 and 0.8 or 0) or 0) + (org.analgesia > 1.7 and (stamina[1] > 10 and 2 or 0) or 0)
 	stamina.sub = stamina.sub * (owner.StaminaExhaustMul or 1)
+    local zombieClass = ZZGetZombieClass and ZZGetZombieClass(owner)
+    if zombieClass then
+        stamina.range = zombieClass.stamina
+        stamina.sub = stamina.sub * 0.5
+    end
 	stamina.sub = stamina.sub / (1 + org.berserk)
 	
 	if org.o2[1] < 10 then
@@ -98,7 +99,7 @@ module[2] = function(owner, org, timeValue)
 	//org.o2[1] = org.o2[1] - min(stamina.sub * timeValue, org.o2.regen * timeValue)
 	
 	//local old = stamina[1]
-	stamina[1] = min(stamina[1] + stamina.regen * timeValue * 9.15 * 1.5 * math.max(org.stamina[1] / org.stamina.max, 0.2) ^ 0.5 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * ((owner:IsPlayer() and owner:Crouching() and velLen < 0.1) and 1.1 or 1) * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0), stamina.max)
+	stamina[1] = min(stamina[1] + (exerting and 0 or stamina.regen) * timeValue * 9.15 * 1.5 * math.max(org.stamina[1] / org.stamina.max, 0.2) ^ 0.5 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * ((owner:IsPlayer() and owner:Crouching() and velLen < 0.1) and 1.1 or 1) * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0), stamina.max)
 
 	-- local painfrommoving = (stamina[1] < 150 and 1 or 0) * (stamina[1] - old) * (org.chest)
 	-- org.painadd = org.painadd + painfrommoving * timeValue * 5
@@ -113,10 +114,13 @@ module[2] = function(owner, org, timeValue)
 	-- 	end
 	-- end
 
-	if hg_infstamina:GetBool() then
-		stamina.sub = 0
-		stamina[1] = stamina.max
-	end
+    -- Unlimited stamina belongs to the Runner, never to the entire server.
+    -- Ignore an archived global cheat value for humans and other classes.
+    local zombieClass = ZZGetZombieClass and ZZGetZombieClass(owner)
+    if zombieClass and zombieClass.infinite then
+        stamina.sub = 0
+        stamina[1] = stamina.max
+    end
 end
 
 function hg.organism.AddNaturalAdrenaline(org, fAmount)
@@ -145,6 +149,10 @@ hook.Add("FinishMove", "!homigrad-organism", function(ply, move)
 
 	if !ply.organism then return end
 
-	if vel ~= vecZero then ply.organism.stamina[1] = max(ply.organism.stamina[1] - ply:GetJumpPower() / 10,0) end
+	if vel ~= vecZero then
+        local data = ZZGetZombieClass and ZZGetZombieClass(ply)
+        local drain = data and (data.infinite and 0 or 0.5) or 1
+        ply.organism.stamina[1] = max(ply.organism.stamina[1] - ply:GetJumpPower() / 10 * drain, 0)
+    end
 	ply.organism.moveMaxSpeed = move:GetMaxSpeed()
 end)

@@ -38,6 +38,7 @@ function hg.organism.Add(ent)
 end
 
 function hg.organism.Clear(org)
+	if not istable(org) then return end
 	hook_Run("Org Clear", org)//.owner.organism_internal)
 	if IsValid(org.owner) then org.owner.fullsend = true end
 	hg.send_organism(org)
@@ -103,17 +104,30 @@ timer.Create("homigrad-organism", tickrate, 0, function()
 		if not IsValid(owner) or org.owner ~= owner then hg.organism.list[owner] = nil continue end
 		if not istable(org.o2) then hg.organism.EnsureO2(org) end
 		if org.godmode then continue end
-		hook_Run("Org Think", owner, org, mulTime)
+		if hg.IsJuggernautHP and hg.IsJuggernautHP(owner) then
+		hg.UpdateJuggernautHP(owner, org)
+	else
+		if ZZUpdateZombieOrganism then ZZUpdateZombieOrganism(owner, org) end
+        hook_Run("Org Think", owner, org, mulTime)
+        if ZZUpdateZombieOrganism then ZZUpdateZombieOrganism(owner, org) end
+	end
 	end
 end)
 
 local lastcall = SysTime()
 hook.Add("Org Think Call", "homigrad-organism", function(owner, org)
+	if not IsValid(owner) or not org or org.owner ~= owner then return end
 	local sysTime = SysTime()
 	if (sysTime - lastcall) < tickrate then return end
 	lastcall = sysTime
 	if not istable(org.o2) then hg.organism.EnsureO2(org) end
-	hook_Run("Org Think", owner, org, 0.00001)
+	if hg.IsJuggernautHP and hg.IsJuggernautHP(owner) then
+		hg.UpdateJuggernautHP(owner, org)
+	else
+		if ZZUpdateZombieOrganism then ZZUpdateZombieOrganism(owner, org) end
+        hook_Run("Org Think", owner, org, 0.00001)
+        if ZZUpdateZombieOrganism then ZZUpdateZombieOrganism(owner, org) end
+	end
 end)
 
 

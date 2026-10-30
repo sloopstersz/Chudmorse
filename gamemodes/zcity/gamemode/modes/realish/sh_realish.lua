@@ -2,6 +2,7 @@
 
 MODE.name = "realish"
 MODE.PrintName = "Realish"
+MODE.DisableMental = true
 
 zb = zb or {}
 zb.Points = zb.Points or {}

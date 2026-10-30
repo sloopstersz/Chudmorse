@@ -671,11 +671,13 @@ MODE.Lootables = hg.loot_boxes
 MODE.LootTable = {
 	{30, {
 		{15,"weapon_smallconsumable"},
+		{15,"weapon_vodka_tpik"},
 		{12,"weapon_bigconsumable"},
 		{8,"weapon_tourniquet"},
 		{8,"weapon_bandage_sh"},
 		{7,"weapon_ducttape"},
 		{6,"weapon_painkillers"},
+		{6,"weapon_antidepressants"},
 		{5,"weapon_bloodbag"},
 		{5,"weapon_hammer"},
 		{4,"weapon_walkie_talkie"},
@@ -723,9 +725,11 @@ MODE.LootTable = {
 		{8, "ent_armor_helmet2"},
 		-- Добавил это так как банально через время верхний тир падает РЕЖЕ в раз сто чем этот.
 		{0.3,"weapon_smallconsumable"},
+		{0.3,"weapon_vodka_tpik"},
 		{0.25,"weapon_bigconsumable"},
 		{0.24,"weapon_walkie_talkie"},
 		{0.23,"weapon_painkillers"},
+		{0.23,"weapon_antidepressants"},
 		{0.2,"weapon_medkit_sh"},
 		-- крутая медицина
 		{0.2,"weapon_morphine"},

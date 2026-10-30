@@ -1,0 +1,6 @@
+VertexLitGeneric
+{
+$baseTexture "models/hybridPhysx/helicopter_news_adj"
+$envmap env_cubemap
+$envmapmask "models\props_vehicles\helicopter_news_ref"
+}

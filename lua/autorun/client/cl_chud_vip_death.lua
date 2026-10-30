@@ -1,0 +1,2 @@
+-- Retired: VIP uses the standard ZCity spectator camera after death.
+-- Keep this replacement file to disable the legacy Deceased overlay on existing installs.

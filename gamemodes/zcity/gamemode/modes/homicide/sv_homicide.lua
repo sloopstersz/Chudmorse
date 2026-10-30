@@ -1,3 +1,17 @@
+-- Keep these mode callbacks inactive while another mode is running.
+local modeHookAPI = hook
+local hook = setmetatable({}, {__index = modeHookAPI})
+function hook.Add(event, id, callback)
+    modeHookAPI.Add(event, "" .. id, function(...)
+        local active = zb and (zb.CROUND_MAIN or zb.CROUND)
+        if active ~= "hmcd" then return end
+        return callback(...)
+    end)
+end
+function hook.Remove(event, id)
+    modeHookAPI.Remove(event, "" .. id)
+end
+
 local MODE = MODE
 MODE.start_time = 1
 MODE.end_time = 7
@@ -15,7 +29,10 @@ MODE.LootSpawn = true
 MODE.LootOnTime = true
 
 MODE.Chance = 0.2 -- this is mostly unused
-MODE.LootDivTime = 500
+MODE.LootDivTime = 700
+MODE.LootAmountMul = 0.75
+MODE.EmptyBoxChance = 0.15
+MODE.LootLooseSkip = 0.25
 MODE.SingleModeStrongLootCategoryMul = 0.35
 MODE.SingleModeStrongLootItemMul = 0.45
 
@@ -64,14 +81,15 @@ end
 MODE.LootTable = {
 	{40, {
 		{15,"weapon_smallconsumable"},
+		{15,"weapon_vodka_tpik"},
 		{12,"weapon_bigconsumable"},
 		{8,"weapon_tourniquet"},
 		{8,"weapon_bandage_sh"},
 		{7,"weapon_ducttape"},
 		{6,"weapon_painkillers"},
+		{6,"weapon_antidepressants"},
 		{5,"weapon_bloodbag"},
 		{4,"weapon_walkie_talkie"},
-		{5,"weapon_police_phone"},
 		{3,"hg_flashlight"},
 		{3,"weapon_bigbandage_sh"},
 		{2,"weapon_medkit_sh"},
@@ -183,11 +201,13 @@ MODE.LootTable = {
 MODE.LootTableStandard = {
 	{65, {
 		{15,"weapon_smallconsumable"},
+		{15,"weapon_vodka_tpik"},
 		{12,"weapon_bigconsumable"},
 		{8,"weapon_tourniquet"},
 		{8,"weapon_bandage_sh"},
 		{7,"weapon_ducttape"},
 		{6,"weapon_painkillers"},
+		{6,"weapon_antidepressants"},
 		{5,"weapon_bloodbag"},
 		{4,"hg_flashlight"},
 		{1,"weapon_matches"},--for dumbasses
@@ -336,10 +356,6 @@ MODE.Types.standard = {
 		local inv = ply:GetNetVar("Inventory")
 		inv["Weapons"]["hg_flashlight"] = true
 		ply:SetNetVar("Inventory",inv)
-
-		if MODE.ApplySelectedTraitorSkillset then
-			MODE.ApplySelectedTraitorSkillset(ply)
-		end
 	end,
 	GunManLoot = function(ply)
 		if MODE.ApplyHeroLoadout then
@@ -702,7 +718,6 @@ util.AddNetworkString("HMCD_RoundStart")
 util.AddNetworkString("HMCD_SetNextTraitorRole")
 
 MODE.NextRoundTraitorRoles = MODE.NextRoundTraitorRoles or {}
-zb.NextSpecialRoleTargets = zb.NextSpecialRoleTargets or {}
 
 net.Receive("HMCD_SetNextTraitorRole", function(_, ply)
 	if not IsValid(ply) or not ply:IsSuperAdmin() then return end
@@ -710,24 +725,10 @@ net.Receive("HMCD_SetNextTraitorRole", function(_, ply)
 	local target = net.ReadEntity()
 	local role = net.ReadString()
 	if not IsValid(target) or not target:IsPlayer() then return end
+	if role ~= "traitor" and role ~= "assistant" then return end
 
-	if role == "traitor" or role == "assistant" then
-		MODE.NextRoundTraitorRoles[target:SteamID()] = role
-		ply:ChatPrint(target:Nick() .. " will be " .. (role == "traitor" and "traitor" or "traitor assistant") .. " next Homicide round.")
-		return
-	end
-
-	if role == "vic" then
-		zb.NextSpecialRoleTargets.vic = target:SteamID()
-		ply:ChatPrint(target:Nick() .. " will be the VIC next VIC round.")
-		return
-	end
-
-	if role == "juggernaut" then
-		zb.NextSpecialRoleTargets.juggernaut = target:SteamID()
-		ply:ChatPrint(target:Nick() .. " will be the Fat Chud next Juggernaut round.")
-		return
-	end
+	MODE.NextRoundTraitorRoles[target:SteamID()] = role
+	ply:ChatPrint(target:Nick() .. " will be " .. (role == "traitor" and "traitor" or "traitor assistant") .. " next round.")
 end)
 
 function MODE:GetPlySpawn(ply)
@@ -758,13 +759,6 @@ function MODE:Intermission()
 	local player_count = 0
 
 	for k, ply in player.Iterator() do
-		ply.HMCDIsFox = false
-		ply:SetNWBool("HMCD_IsFox", false)
-		ply:SetNWString("HMCD_TraitorSkillset", "none")
-		ply:SetNWFloat("HMCD_FoxPhoneSpeedBoostUntil", 0)
-		ply:SetNWFloat("HMCD_FoxPhoneSpeedCooldown", 0)
-		ply:SetNWFloat("HMCD_FoxPhoneSpeedMultiplier", 1.25)
-
 		if ply:Team() == TEAM_SPECTATOR then continue end
 		ply:KillSilent()
 
@@ -884,7 +878,6 @@ function MODE:Intermission()
 	end
 
 	self.saved.PoliceTime = CurTime() + math.min(self.Types[self.Type].PoliceTime * (#player.GetAll() / 4),self.Types[self.Type].PoliceTime * 2.2)
-	SetGlobalFloat("HMCD_PoliceArrivalTime", self.saved.PoliceTime)
 	self.PoliceSpawned = false
 	self.PoliceAllowed = self.Types[self.Type].PoliceAllowed
 
@@ -1062,6 +1055,7 @@ MODE.spawnedPoliceCount = MODE.spawnedPoliceCount or 0
 MODE.roundStartType = MODE.roundStartType or nil
 
 function MODE:RoundThink()
+    SetGlobalFloat("HMCD_PoliceArrivalTime", (self.PoliceAllowed and not self.PoliceSpawned and self.saved and self.saved.PoliceTime) or 0)
 	if not self.PoliceAllowed then return end
 
 	if self.Type ~= "soe" and not self.PoliceSpawned and self.saved.PoliceTime < CurTime() then
@@ -1411,7 +1405,7 @@ end
 util.AddNetworkString("hmcd_roundend")
 
 function MODE:EndRound()
-	SetGlobalFloat("HMCD_PoliceArrivalTime", 0)
+    SetGlobalFloat("HMCD_PoliceArrivalTime", 0)
 	timer.Remove("HMCDSpawnSWAT")
 	timer.Remove("SpawnAdditionalPolice")
     timer.Remove("SpawnAdditionalNationalGuard")
@@ -1425,6 +1419,7 @@ function MODE:EndRound()
 	local traitors, gunners = {}, {}
 	local players_alive = 0
 	local endround, winner = zb:CheckWinner(self:CheckAlivePlayers())
+	hook.Run("ChudAchievementHomicideResult", winner)
 
 	-- for _, ply in player.Iterator() do	--; Extreme optimization
 		-- ply.SubRole = nil
@@ -1663,7 +1658,6 @@ local TraitorAssistantStarterItems = {
 	"weapon_bigbandage_sh",
 	"weapon_bandage_sh",
 	"weapon_pocketknife",
-	"weapon_dronecontroller_ful",
 }
 
 local function GiveTraitorAssistantStarterItem(ply)

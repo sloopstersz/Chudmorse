@@ -60,15 +60,7 @@ end )
 
 if CLIENT then
 	hook.Add( "PlayerBindPress", "SpawnMenuBindGuard", function( ply, bind, pressed )
-        bind = string.lower(string.Trim(bind or ""))
-        if bind == "+menu" or bind == "+hg_radial" then
-            -- +menu is the gameplay wheel, not permission to spawn entities.
-            if hg and hg.HandleRadialBind then
-                return hg.HandleRadialBind(bind, pressed)
-            end
-            return
-        end
-        if bind ~= "+menu_context" then return end
+		if bind ~= "+menu" and bind ~= "+menu_context" then return end
 
 		local lp = LocalPlayer()
 		if not IsValid( lp ) then return true end

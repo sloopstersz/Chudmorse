@@ -1,0 +1,34 @@
+"VertexlitGeneric"
+{
+	"$basetexture" "icons/camo/camo_flora" 
+	"$bumpmap" "models/UH60/body_n"
+	"$halflambert"     "1"
+
+	"$ambientocclusion" "1"
+	
+	"$detail" "models/UH60/uh60_camo"
+	"$detailscale" "1"
+	"$detailblendmode" "2"
+	"$phongexponenttexture" "models/UH60/body_spec"
+
+	"$phong"      "1"
+	"$phongboost"     "0.005"
+	"$normalmapalphaphongmask" "1"
+	"$phongfresnelranges"   "[30 30 30]"
+	$ambientocclusion "1"
+ 
+	"$normalmapalphaenvmapmask" "1"
+//	"$envmap"      "env_cubemap"
+	"$envmaptint"     "[ 0.001 0.001 0.001 ]"
+	"$envmapfresnel"   "1"
+	"$envmapFresnelMinMaxExp" "[0 4 .4]"
+ 
+	"$rimlight"     "1"
+	"$rimlightexponent"   "1" 
+	"$rimlightboost"   "0.1"
+	"$rimmask"      "1"
+	
+
+	
+
+}

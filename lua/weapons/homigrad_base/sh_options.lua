@@ -38,11 +38,15 @@ else
 	util.AddNetworkString("changeAmmoType")
 
 	net.Receive("unload_ammo", function(len, ply)
+        if (ply.cooldown_unloadammo or 0) > CurTime() then return end
+        ply.cooldown_unloadammo = CurTime() + 0.5
+
 		local wep = net.ReadEntity()
+		if not IsValid(wep) or wep:GetOwner() ~= ply or not ishgweapon(wep) or not wep.CanUse or not wep:CanUse() then return end
         if ply:GetNWFloat("willsuicide", 0) > 0 then return end -- you cant escape.
         if ply:GetNWFloat("rem_urges_end", 0) > CurTime() then return end
         wep.drawBullet = nil
-        if wep and wep:GetOwner() == ply and ishgweapon(wep) and wep:Clip1() > 0 and wep:CanUse() then
+        if wep:Clip1() > 0 then
 			ply:GiveAmmo(wep:Clip1(), wep:GetPrimaryAmmoType(), true)
 			wep:SetClip1(0)
 			if wep.Unload then

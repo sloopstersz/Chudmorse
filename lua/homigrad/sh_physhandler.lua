@@ -54,49 +54,53 @@ function IsReasonable( pos )
 	return true
 end
 
--- OnCrazyPhysics is raised by the physics engine. Recovery must not change
--- collision rules, teleport physics objects, or remove constraints in that call.
-local pendingRecovery = setmetatable({}, {__mode = "k"})
-hook.Add("OnCrazyPhysics", "crazy_physics", function(ent, physobj)
-	if not IsValid(ent) or not IsValid(physobj) then return end
-	if pendingRecovery[physobj] then return end
-	pendingRecovery[physobj] = true
+hook.Add("OnCrazyPhysics","crazy_physics",function(ent, physobj)--function(a,msg,c,d, r,g,b)
+	local a = ent:GetPos()
+	local angles = ent:GetAngles()
+	local x, y, z = a.x, a.y, a.z
+	local p, yaw, r = angles.x, angles.y, angles.z
 
-	timer.Simple(0, function()
-		pendingRecovery[physobj] = nil
-		if not IsValid(ent) or not IsValid(physobj) then return end
+	local badang = math.BadNumber(p) or p==0
+				or math.BadNumber(yaw) or yaw==0
+				or math.BadNumber(r) or r==0
+		
+	local badpos = math.BadNumber(x) or x==0
+				or math.BadNumber(y) or y==0
+				or math.BadNumber(z) or z==0
 
-		-- No collision filter was changed, so CollisionRulesChanged is unnecessary.
+	local pos = ent:GetPos()
+
+	ent:CollisionRulesChanged()
+
+	if physobj:IsValid() then
 		physobj:EnableMotion(false)
 		physobj:Sleep()
 		physobj:SetPos(vector_origin)
 		physobj:SetAngles(angle_zero)
 		physobj:SetVelocity(vector_origin)
 		physobj:SetAngleVelocity(vector_origin)
+	end
 
-		ent:SetLocalAngularVelocity(angle_zero)
-		ent:SetVelocity(vector_origin)
-		ent:SetLocalVelocity(vector_origin)
-		SetAbsVelocity(ent, vector_origin)
+	ent:SetLocalAngularVelocity(angle_zero)
+	ent:SetVelocity(vector_origin)
+	ent:SetLocalVelocity(vector_origin)
 
-		-- Keep the existing constrained-entity cleanup, outside the callback.
-		if SERVER then
-			local constrained = constraint.GetAllConstrainedEntities(ent)
-			for _, linked in pairs(constrained or {}) do
-				if IsValid(linked) then
-					local connected = constraint.GetAllConstrainedEntities(linked)
-					for _, other in pairs(connected or {}) do
-						if other ~= ent and IsValid(other) and not other.__removed__ then
-							other.__removed__ = true
-							other:Remove()
-						end
-					end
-					if IsValid(linked) and not linked.__removed__ then
-						linked.__removed__ = true
-						linked:Remove()
-					end
+	SetAbsVelocity(ent, vector_origin)
+	if SERVER then
+		local t = constraint.GetAllConstrainedEntities(ent)
+		for k,v in next, t or {} do
+			local t = constraint.GetAllConstrainedEntities(v)
+			for k,v in next, t or {} do
+				if ent ~= v and IsValid(v) and not v.__removed__ then
+					v.__removed__ = true
+					v:Remove()
 				end
 			end
+
+			if IsValid(v) and not v.__removed__ then
+				v.__removed__ = true
+				v:Remove()
+			end
 		end
-	end)
+	end
 end)

@@ -14,11 +14,16 @@ if(CLIENT)then
 end
 
 local HeroWeaponData = {
+	["weapon_revolver357"] = {extraClips = 0},
+	["weapon_draco"] = {extraClips = 0},
+	["weapon_revolver2"] = {extraClips = 0},
+	["weapon_m870mcs"] = {extraClips = 0, sling = true},
+	["weapon_m1911compact"] = {extraClips = 0},
+	["weapon_fn45"] = {extraClips = 0},
+	["weapon_cz75"] = {extraClips = 0},
 	["weapon_px4beretta"] = {extraClips = 0},
 	["weapon_glock17"] = {extraClips = 0},
 	["weapon_hk_usp"] = {extraClips = 0},
-	["weapon_revolver357"] = {extraClips = 0},
-	["weapon_draco"] = {extraClips = 0, sling = true},
 	["weapon_remington870"] = {extraClips = 0, sling = true},
 	["weapon_remington870_long"] = {extraClips = 0, sling = true},
 	["weapon_remington870_sawed_off"] = {extraClips = 0},
@@ -26,25 +31,30 @@ local HeroWeaponData = {
 	["weapon_vpo209"] = {extraClips = 0},
 	["weapon_vpo136"] = {extraClips = 0},
 	["weapon_mosin"] = {extraClips = 0, sling = true},
-	["weapon_revolver2"] = {extraClips = 0},
-	["weapon_cz75"] = {extraClips = 0},
-	["weapon_m870mcs"] = {extraClips = 0},
-	["weapon_m1911compact"] = {extraClips = 0},
-	["weapon_fn45"] = {extraClips = 0},
 }
 
 local HeroUpgradeData = {
+	["hero_revolver357_ammo"] = {parent = "weapon_revolver357", type = "ammo", extraClips = 1},
+	["hero_draco_silencer"] = {parent = "weapon_draco", type = "attachment", attachment = "supressor8"},
+	["hero_draco_ammo"] = {parent = "weapon_draco", type = "ammo", extraClips = 1},
+	["hero_revolver2_ammo"] = {parent = "weapon_revolver2", type = "ammo", extraClips = 1},
+	["hero_m870mcs_silencer"] = {parent = "weapon_m870mcs", type = "attachment", attachment = "supressor5"},
+	["hero_m870mcs_ammo"] = {parent = "weapon_m870mcs", type = "ammo", extraClips = 1},
+	["hero_m1911compact_ammo"] = {parent = "weapon_m1911compact", type = "ammo", extraClips = 1},
+	["hero_m1911compact_laser"] = {parent = "weapon_m1911compact", type = "attachment", attachment = "laser5"},
+	["hero_fn45_ammo"] = {parent = "weapon_fn45", type = "ammo", extraClips = 1},
+	["hero_fn45_laser"] = {parent = "weapon_fn45", type = "attachment", attachment = "laser5"},
+	["hero_fn45_silencer"] = {parent = "weapon_fn45", type = "attachment", attachment = "supressor4"},
+    ["hero_cz75_ammo"] = {parent = "weapon_cz75", type = "ammo", extraClips = 1},
+    ["hero_cz75_silencer"] = {parent = "weapon_cz75", type = "attachment", attachment = "supressor4"},
 	["hero_px4_silencer"] = {parent = "weapon_px4beretta", type = "attachment", attachment = "supressor4"},
 	["hero_px4_ammo"] = {parent = "weapon_px4beretta", type = "ammo", extraClips = 1},
-	["hero_revolver357_ammo"] = {parent = "weapon_revolver357", type = "ammo", extraClips = 1},
 	["hero_glock_silencer"] = {parent = "weapon_glock17", type = "attachment", attachment = "supressor4"},
 	["hero_glock_rmr"] = {parent = "weapon_glock17", type = "attachment", attachment = "holo16"},
 	["hero_glock_laser"] = {parent = "weapon_glock17", type = "attachment", attachment = "laser3"},
 	["hero_glock_ammo"] = {parent = "weapon_glock17", type = "ammo", extraClips = 1},
 	["hero_usp_silencer"] = {parent = "weapon_hk_usp", type = "attachment", attachment = "supressor4"},
 	["hero_usp_ammo"] = {parent = "weapon_hk_usp", type = "ammo", extraClips = 1},
-	["hero_draco_ammo"] = {parent = "weapon_draco", type = "ammo", extraClips = 1},
-	["hero_draco_silencer"] = {parent = "weapon_draco", type = "attachment", attachment = "supressor8"},
 	["hero_remington_sight"] = {parent = "weapon_remington870", type = "attachment", attachment = "holo16"},
 	["hero_remington_ammo"] = {parent = "weapon_remington870", type = "ammo", extraClips = 1},
 	["hero_remington_long_sight"] = {parent = "weapon_remington870_long", type = "attachment", attachment = "holo16"},
@@ -62,16 +72,6 @@ local HeroUpgradeData = {
 	["hero_mosin_silencer"] = {parent = "weapon_mosin", type = "attachment", attachment = "supressor1"},
 	["hero_mosin_scope"] = {parent = "weapon_mosin", type = "attachment", attachment = "optic12"},
 	["hero_mosin_ammo"] = {parent = "weapon_mosin", type = "ammo", extraClips = 1},
-	["hero_revolver2_ammo"] = {parent = "weapon_revolver2", type = "ammo", extraClips = 1},
-	["hero_cz75_ammo"] = {parent = "weapon_cz75", type = "ammo", extraClips = 1},
-	["hero_cz75_silencer"] = {parent = "weapon_cz75", type = "attachment", attachment = "supressor4"},
-	["hero_m870mcs_ammo"] = {parent = "weapon_m870mcs", type = "ammo", extraClips = 1},
-	["hero_m870mcs_silencer"] = {parent = "weapon_m870mcs", type = "attachment", attachment = "supressor5"},
-	["hero_m1911compact_ammo"] = {parent = "weapon_m1911compact", type = "ammo", extraClips = 1},
-	["hero_m1911compact_laser"] = {parent = "weapon_m1911compact", type = "attachment", attachment = "laser5"},
-	["hero_fn45_silencer"] = {parent = "weapon_fn45", type = "attachment", attachment = "supressor4"},
-	["hero_fn45_laser"] = {parent = "weapon_fn45", type = "attachment", attachment = "laser5"},
-	["hero_fn45_ammo"] = {parent = "weapon_fn45", type = "ammo", extraClips = 1},
 }
 
 local function ParseLoadoutString(dataStr)
@@ -104,44 +104,10 @@ local LegacyTraitorLoadout = {
 }
 
 local TraitorSkillsetSubRoles = {
+	["fox"] = "traitor_fox",
 	["infiltrator"] = "traitor_infiltrator",
 	["assassin"] = "traitor_assasin",
 	["chemist"] = "traitor_chemist",
-	["fox"] = "traitor_fox",
-}
-
-local function GetSelectedTraitorSkillset(ply)
-	local loadout = ParseLoadoutString(ply:GetInfo("hmcd_traitor_loadout"))
-	return isstring(loadout.skillset) and loadout.skillset or "none", loadout
-end
-
-local function ApplySelectedTraitorSkillset(ply, skillset)
-	skillset = skillset or GetSelectedTraitorSkillset(ply)
-
-	local isFox = skillset == "fox"
-	ply.HMCDIsFox = isFox
-	ply:SetNWBool("HMCD_IsFox", isFox)
-	ply:SetNWString("HMCD_TraitorSkillset", skillset)
-	ply:SetNWFloat("HMCD_FoxPhoneSpeedBoostUntil", 0)
-	ply:SetNWFloat("HMCD_FoxPhoneSpeedCooldown", 0)
-	ply:SetNWFloat("HMCD_FoxPhoneSpeedMultiplier", 1.25)
-
-	if isFox then
-		ply.SubRole = "traitor_fox"
-	end
-
-	return skillset
-end
-
-MODE.GetSelectedTraitorSkillset = GetSelectedTraitorSkillset
-MODE.ApplySelectedTraitorSkillset = ApplySelectedTraitorSkillset
-
-local TraitorSidearmWeapons = {
-	["weapon_pm9"] = true,
-	["weapon_p22"] = true,
-	["weapon_tokarev"] = true,
-	["weapon_tranquilizer"] = true,
-	["weapon_taser"] = true,
 }
 
 local function ApplyTraitorLoadout(ply)
@@ -149,9 +115,9 @@ local function ApplyTraitorLoadout(ply)
 	if not loadout.skillset and not istable(loadout.weapons) then loadout = LegacyTraitorLoadout end
 
 	local skillset = loadout.skillset or "none"
+	if SERVER then ply.ChudAppliedTraitorSkillset = skillset end
 	local weaponsList = loadout.weapons or {}
 	ply.SubRole = TraitorSkillsetSubRoles[skillset] or ply.SubRole
-	ApplySelectedTraitorSkillset(ply, skillset)
 
 	ply.organism.stamina.max = 220
 	ply.organism.recoilmul = 1
@@ -173,21 +139,8 @@ local function ApplyTraitorLoadout(ply)
 	local hasP22 = false
 	local hasPL15 = false
 	local hasTaser = false
-	local selectedSidearm = nil
-	local selectedExplosive = nil
 
-	for _, wep in ipairs(weaponsList) do
-		-- IED and FPV Drone share one loadout slot, including saved loadouts.
-		if wep == "weapon_traitor_ied" or wep == "weapon_dronecontroller_ful" then
-			if selectedExplosive then continue end
-			selectedExplosive = wep
-		end
-		-- PM9, P22, Tokarev, Tranquilizer and Taser share one sidearm slot.
-		-- The client menu already enforces this; keep a server-side guard too.
-		if TraitorSidearmWeapons[wep] then
-			if selectedSidearm then continue end
-			selectedSidearm = wep
-		end
+	for _, wep in pairs(weaponsList) do
 		if wep == "weapon_p22_silencer" then
 			timer.Simple(0.5, function()
 				if IsValid(ply) and ply:HasWeapon("weapon_p22") then
@@ -203,54 +156,15 @@ local function ApplyTraitorLoadout(ply)
 				end
 			end)
 		elseif wep == "weapon_p22_ammo" then
-    timer.Simple(0.5, function()
-        if IsValid(ply) and ply:HasWeapon("weapon_p22") then
-            local w = ply:GetWeapon("weapon_p22")
-            if IsValid(w) and w:GetPrimaryAmmoType() >= 0 then
-                ply:GiveAmmo(w:GetMaxClip1(), w:GetPrimaryAmmoType(), true)
-            end
-        end
-    end)
-      
-elseif wep == "weapon_tranquilizer_ammo" then
-    timer.Simple(0.5, function()
-        if IsValid(ply) and ply:HasWeapon("weapon_tranquilizer") then
-            local w = ply:GetWeapon("weapon_tranquilizer")
-
-            if IsValid(w) and w:GetPrimaryAmmoType() >= 0 then
-                ply:GiveAmmo(
-                    w:GetMaxClip1(),
-                    w:GetPrimaryAmmoType(),
-                    true
-                )
-            end
-        end
-    end)
-	            
-	elseif wep == "weapon_tokarev_ammo" then
-    timer.Simple(0.5, function()
-        if IsValid(ply) and ply:HasWeapon("weapon_tokarev") then
-            local w = ply:GetWeapon("weapon_tokarev")
-
-            if IsValid(w) and w:GetPrimaryAmmoType() >= 0 then
-                ply:GiveAmmo(
-                    w:GetMaxClip1(),
-                    w:GetPrimaryAmmoType(),
-                    true
-                )
-            end
-        end
-    end)
-		elseif wep == "weapon_pm9_ammo" then
-	timer.Simple(0.5, function()
-		if IsValid(ply) and ply:HasWeapon("weapon_pm9") then
-			local w = ply:GetWeapon("weapon_pm9")
-			if IsValid(w) and w:GetPrimaryAmmoType() >= 0 then
-				ply:GiveAmmo(w:GetMaxClip1(), w:GetPrimaryAmmoType(), true)
-			end
-		end
-	end)
-else
+			timer.Simple(0.5, function()
+				if IsValid(ply) and ply:HasWeapon("weapon_p22") then
+					local w = ply:GetWeapon("weapon_p22")
+					if IsValid(w) and w:GetPrimaryAmmoType() >= 0 then
+						ply:GiveAmmo(w:GetMaxClip1(), w:GetPrimaryAmmoType(), true)
+					end
+				end
+			end)
+		else
 			local w = ply:Give(wep)
 			if wep == "weapon_zoraki" then
 				timer.Simple(1, function() if IsValid(w) then w:ApplyAmmoChanges(2) end end)
@@ -351,11 +265,16 @@ MODE.ApplyTraitorLoadout = ApplyTraitorLoadout
 MODE.ApplyHeroLoadout = ApplyHeroLoadout
 
 MODE.SubRoles = {
+    ["traitor_fox"] = {
+        Name = "Technician",
+        Description = "Use the radial menu to scan for map traps. Aim at a trap and press E to activate it.",
+        Objective = "Use map traps and your loadout to eliminate your targets.",
+    },
 	["traitor_custom"] = {
 		Name = "Traitor",
 		Description = [[You are the custom traitor.
 Your abilities and loadout are based on your selected preset or loadout.]],
-		Objective = "You are EVIL! Kill everyone.",
+		Objective = "Use your loadout to murder everyone here.",
 		SpawnFunction = function(ply)
 			ApplyTraitorLoadout(ply)
 		end,
@@ -370,13 +289,6 @@ Has no weapons or any tools.
 Despite being zombie, still bears appearance of a normal human.]],
 		Objective = "You're the zombie. Infect everyone to win. Avoid doctor.",
 		SpawnFunction = function(ply)
-		end,
-	},
-	["traitor_fox"] = {
-		Name = "Technician",
-		Description = [[Track police calls and use the Hack Tablet to shock phones or remotely activate map traps.]],
-		SpawnFunction = function(ply)
-			ApplyTraitorLoadout(ply)
 		end,
 	},
 }
@@ -458,14 +370,14 @@ MODE.RoleChooseRoundTypes = {
 MODE.Roles = {}
 MODE.Roles.standard = {
 	traitor = {
-		objective = "You are EVIL! Kill everyone.",
-		name = "Evil Chud",
+		objective = "You've been preparing for this for a long time. Kill everyone.",
+		name = "Evil chud",
 		color = Color(190,0,0)
 	},
 
 	gunner = {
-		objective = "You own a gun. Protect the Innocent Chuds.",
-		name = "Gun Owning Chud",
+		objective = "You're the hero. Use your loadout to stop the murderer.",
+		name = "Gun owning chud",
 		color = Color(158,0,190)
 	},
 

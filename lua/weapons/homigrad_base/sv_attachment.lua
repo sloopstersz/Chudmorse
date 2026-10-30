@@ -14,6 +14,9 @@ util.AddNetworkString("ZB_AttachAdd")
 util.AddNetworkString("ZB_AttachRemove")
 util.AddNetworkString("ZB_AttachDrop")
 net.Receive("ZB_AttachAdd", function(len, ply)
+	if (ply.cooldown_addatt or 0) > CurTime() then return end
+	ply.cooldown_addatt = CurTime() + 0.5
+
 	local att = net.ReadString()
 	local wep = ply:GetActiveWeapon()
 	hg.AddAttachment(ply,wep,att)
@@ -21,12 +24,11 @@ net.Receive("ZB_AttachAdd", function(len, ply)
 end)
 
 function hg.AddAttachment(ply,wep,att)
-	if wep:GetNWFloat("addAttachment", 0) + 1 > CurTime() then return end
-
-	if not IsValid(wep) or not wep.attachments or att == "" then return end
+	if not IsValid(wep) or not wep.attachments or not isstring(att) or att == "" then return end
 	if not IsValid(ply) then return end
+	if not istable(ply.inventory) or not istable(ply.inventory.Attachments) then return end
 	if not table.HasValue(ply.inventory.Attachments, att) then return end --oops :(
-	if ply.organism.larmamputated or ply.organism.rarmamputated then return end -- зубами
+	if not istable(ply.organism) or ply.organism.larmamputated or ply.organism.rarmamputated then return end -- зубами
 
 	if att and istable(att) then
 		for i,atta in pairs(att) do
@@ -41,18 +43,21 @@ function hg.AddAttachment(ply,wep,att)
 		placement = tbl[att] and tbl[att][1] or placement
 	end
 
+	if not placement then return end
+	if not istable(hg.attachments[placement]) or not istable(hg.attachments[placement][att]) then return end
+	if not istable(wep.attachments[placement]) then return end
 	if not wep.attachments[placement].noblock then
 		local restrictAtt = hg.attachments[placement][att].restrictatt
 		
 		for i,att in pairs(wep.attachments) do
 			if not att or not istable(att) or table.IsEmpty(att) or att[1] == "empty" then continue end
 			if restrictAtt then
-				if hg.attachments[i][att[1]][1] == restrictAtt then
+				if istable(hg.attachments[i]) and istable(hg.attachments[i][att[1]]) and hg.attachments[i][att[1]][1] == restrictAtt then
 					ply:ChatPrint("There is no space for this attachment.")
 					return
 				end
 			else
-				if not wep.availableAttachments[i].noblock and hg.attachments[i][att[1]].restrictatt and hg.attachments[i][att[1]].restrictatt == placement then
+				if istable(wep.availableAttachments[i]) and not wep.availableAttachments[i].noblock and hg.attachments[i] and hg.attachments[i][att[1]] and hg.attachments[i][att[1]].restrictatt == placement then
 					ply:ChatPrint("There is no space for this attachment.")
 					return
 				end
@@ -159,12 +164,15 @@ function hg.AddAttachmentForce(ply,wep,att)
 end
 
 net.Receive("ZB_AttachRemove", function(len, ply)
+	if (ply.cooldown_removeatt or 0) > CurTime() then return end
+	ply.cooldown_removeatt = CurTime() + 1
+
 	local att = net.ReadString()
 	local wep = ply:GetActiveWeapon()
 	if not IsValid(wep) or not wep.attachments then return end
-	if wep:GetNWFloat("addAttachment", 0) + 1 > CurTime() then return end
 	if not IsValid(ply) then return end
-	if ply.organism.larmamputated or ply.organism.rarmamputated then return end
+	if not isstring(att) or att == "" then return end
+	if not istable(ply.organism) or ply.organism.larmamputated or ply.organism.rarmamputated then return end
 	--[[if table.HasValue(ply.inventory.Attachments, att) then
 		ply:ChatPrint("You already have that attachment.")
 		return
@@ -176,8 +184,12 @@ net.Receive("ZB_AttachRemove", function(len, ply)
 	end
 
 	if not placement then return end
+	if not istable(hg.attachments[placement]) or not istable(hg.attachments[placement][att]) then return end
+	if not istable(wep.attachments[placement]) then return end
 	if wep.attachments[placement][1] != att then return end
 	if table.IsEmpty(wep.attachments[placement]) or wep.attachments[placement][1] == "empty" then return end
+	if not istable(ply.inventory) or not istable(ply.inventory.Attachments) then return end
+	if not istable(wep.availableAttachments) or not istable(wep.availableAttachments[placement]) then return end
 	if wep.availableAttachments[placement].cannotremove then return end
 	ply.inventory.Attachments[#ply.inventory.Attachments + 1] = att
 	local i
@@ -198,14 +210,21 @@ net.Receive("ZB_AttachRemove", function(len, ply)
 end)
 
 net.Receive("ZB_AttachDrop", function(len, ply)
+	if not IsValid(ply) then return end
+	if (ply.cooldown_dropatt or 0) > CurTime() then return end
+	ply.cooldown_dropatt = CurTime() + 1
+
 	local att = net.ReadString()
+	if not isstring(att) or att == "" then return end
 	local placement = nil
 	for plc, tbl in pairs(hg.attachments) do
 		placement = tbl[att] and tbl[att][1] or placement
 	end
 
 	if not placement then return end
+	if not istable(hg.attachments[placement]) or not istable(hg.attachments[placement][att]) then return end
 
+	if not istable(ply.inventory) or not istable(ply.inventory.Attachments) then return end
 	if not table.HasValue(ply.inventory["Attachments"],att) then return end
 
 	if hg.attachments[placement][att] then

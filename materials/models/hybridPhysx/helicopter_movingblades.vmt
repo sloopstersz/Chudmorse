@@ -1,0 +1,6 @@
+VertexLitGeneric
+{
+$baseTexture "models\props_vehicles/helicopter_movingblades"
+$translucent 1
+$nocull 1
+}

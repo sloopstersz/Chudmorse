@@ -449,6 +449,7 @@ local function BuildSplitRagdolls(ply, rag, force)
 	if IsValid(ply) then
 		torsoStates[ply] = state
 		ply.__hgTorsoLower = lower
+		hook.Run("ChudAchievementSplit", ply)
 	end
 	splitStates[state] = true
 
@@ -648,13 +649,14 @@ local function QueueBlastTorso(target, dmgInfo)
 
 	local force = dmgInfo:GetDamageForce()
 	local targetRef = IsValid(target) and target or nil
+	local isCurrentBody = not targetRef or targetRef == ply or targetRef == ply.FakeRagdoll
 	ply.__hgTorsoBlastQueued = true
 	timer.Simple(0, function()
 		if not IsValid(ply) then return end
 		ply.__hgTorsoBlastQueued = nil
 		if ply:GetNWBool("hgTorsoSevered", false) then return end
 		if IsValid(targetRef) and targetRef:GetNWBool("hgTorsoSevered", false) then return end
-		if ply:Alive() then
+		if ply:Alive() and isCurrentBody then
 			EnsureFakeAndSplit(ply, force, true)
 		else
 			SplitDeadRagdoll(ply, targetRef, force)

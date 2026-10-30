@@ -1,3 +1,17 @@
+-- Keep these mode callbacks inactive while another mode is running.
+local modeHookAPI = hook
+local hook = setmetatable({}, {__index = modeHookAPI})
+function hook.Add(event, id, callback)
+    modeHookAPI.Add(event, "" .. id, function(...)
+        local active = zb and (zb.CROUND_MAIN or zb.CROUND)
+        if active ~= "hmcd" then return end
+        return callback(...)
+    end)
+end
+function hook.Remove(event, id)
+    modeHookAPI.Remove(event, "" .. id)
+end
+
 local MODE = MODE
 local vgui_color_main = Color(150, 80, 0, 255)
 local vgui_color_warning = Color(150, 0, 0, 255)
@@ -190,7 +204,7 @@ local traitor_panel = {
     avatar_size = 24, 
     fade_speed = 3,
     instance = nil,
-    visible = true,
+    visible = false,
     target_x = 0,
     smooth_toggle = 0,
     alpha = 255,
@@ -232,9 +246,48 @@ local function CreateAvatarPanel(steamid)
 end
 
 
+local traitorOutlineRoster = {}
+net.Receive("HMCD_TraitorOutlineRoster", function()
+    traitorOutlineRoster = {}
+    for i = 1, net.ReadUInt(16) do
+        traitorOutlineRoster[i] = net.ReadUInt(16)
+    end
+end)
+local traitorOutlineColor = Color(255, 35, 35)
+
+local function CanShowTraitorOutlines(ply)
+    return IsValid(ply) and ply:Alive() and ply.isTraitor
+        and zb and zb.CROUND == "hmcd" and zb.ROUND_STATE == 1
+end
+
+hook.Add("Think", "ChudTraitorOutlineReset", function()
+    if not CanShowTraitorOutlines(LocalPlayer()) then traitor_panel.visible = false end
+end)
+
+hook.Add("PreDrawHalos", "ChudTraitorTeammateOutlines", function()
+    local ply = LocalPlayer()
+    if not traitor_panel.visible or not CanShowTraitorOutlines(ply) then return end
+
+    local targets, seen = {}, {}
+    for _, index in ipairs(traitorOutlineRoster) do
+        local teammate = Entity(index)
+        if IsValid(teammate) and teammate:IsPlayer() and teammate ~= ply and teammate:Alive() then
+            local character = hg.GetCurrentCharacter(teammate)
+            if IsValid(character) and not character:GetNoDraw() and not seen[character] then
+                seen[character] = true
+                targets[#targets + 1] = character
+            end
+        end
+    end
+    if #targets > 0 then
+        -- ignoreZ=false keeps the halo depth-tested against walls and other cover.
+        halo.Add(targets, traitorOutlineColor, 2, 2, 1, true, false)
+    end
+end)
+
 hook.Add("PlayerButtonDown", "TraitorPanelToggle", function(ply, btn)
     if ply ~= LocalPlayer() or btn ~= KEY_F4 then return end
-    if not LocalPlayer().isTraitor then return end 
+    if not CanShowTraitorOutlines(ply) then return end 
     
 
     local current_time = CurTime()

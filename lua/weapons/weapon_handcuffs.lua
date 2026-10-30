@@ -140,6 +140,7 @@ function SWEP:Tie(tr)
 		if IsValid(ent) and IsValid(self) and IsValid(self:GetOwner()) and self:GetOwner():Alive() and self:GetOwner():GetPos():Distance(ent:GetPos()) < 500 then 
 			if IsValid(ent) and (ent:IsRagdoll() or (ent:IsPlayer() and ent:GetVelocity():Length() < 1)) and hg.RagdollOwner(ent) ~= self:GetOwner() then
 				--if ent.handcuffed then return end
+				if SERVER then hook.Run("ChudAchievementArrest", self:GetOwner(), ent:IsPlayer() and ent or hg.RagdollOwner(ent)) end
 				self:GetOwner():ChatPrint("Threat handcuffed.")
 				
 				if ent:IsRagdoll() then handcuff(ent) end

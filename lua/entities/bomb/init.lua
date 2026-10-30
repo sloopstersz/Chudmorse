@@ -43,17 +43,21 @@ function BombInSite(pos, site)
 end
 
 net.Receive("bomb_enter",function(len, ply)
+	if (ply.cooldown_bombenter or 0) > CurTime() then return end
+	ply.cooldown_bombenter = CurTime() + 0.5
+
 	if !ply:Alive() then return end
 	
 	local org = ply.organism
 
-	if !org.canmove then return end
+	if !istable(org) or !org.canmove then return end
 
 	local txt = net.ReadString()
-	local num = tonumber(txt)
 	
-	--ply:ChatPrint(txt)
 	local ent = ply.bomb
+	
+	if not isstring(txt) or #txt != 6 or !txt:find("^%d+$") then return end
+	if not IsValid(ent) then return end
 	
 	if ent.isbomb then
 		if not ent.active then

@@ -1,3 +1,17 @@
+-- Keep these mode callbacks inactive while another mode is running.
+local modeHookAPI = hook
+local hook = setmetatable({}, {__index = modeHookAPI})
+function hook.Add(event, id, callback)
+    modeHookAPI.Add(event, "" .. id, function(...)
+        local active = zb and (zb.CROUND_MAIN or zb.CROUND)
+        if active ~= "hmcd" then return end
+        return callback(...)
+    end)
+end
+function hook.Remove(event, id)
+    modeHookAPI.Remove(event, "" .. id)
+end
+
 local MODE = MODE
 MODE.SendFootStepEvery = 3
 -- MODE.SendFootStepEvery = 1
@@ -6,8 +20,10 @@ util.AddNetworkString("HMCD_Professions_Abilities_AddFootstep")
 util.AddNetworkString("HMCD_Professions_Abilities_DisplayOrganismInfo")
 
 function MODE.DisplayOrganismInfo(organism, ply)
-	local text_info = ""
-	text_info = text_info .. " Saturation" .. organism.o2 .. "\n"
+    if not IsValid(ply) then return end
+    local oxygen = istable(organism) and organism.o2 or nil
+    if istable(oxygen) then oxygen = oxygen[1] end
+    local text_info = " Saturation: " .. (isnumber(oxygen) and tostring(oxygen) or "Unavailable") .. "\n"
 	
 	net.Start("HMCD_Professions_Abilities_DisplayOrganismInfo")
 		net.WriteString(text_info)

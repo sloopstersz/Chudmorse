@@ -1,0 +1,26 @@
+
+"VertexlitGeneric"
+{
+
+	$basetexture "models\lfs\Littlebird\Body4"
+	"$bumpmap" "models\lfs\Littlebird\Body_n"
+	"$halflambert" "1"				
+                "$alphatest" 1		
+
+	"$normalmapalphaenvmapmask" 1				
+	"$envmap" "env_cubemap"					
+	"$envmaptint" "[ .005 .005 .005 ]"					
+ 	"$envmapFresnel" "0.5"					
+
+	"$phong" "1"						
+	"$phongexponenttexture" "models\lfs\Littlebird\Body_n"
+	"$phongboost" "0.5"						
+	"$phongfresnelranges"	"[ .2 1.2 8]"	
+
+	"$PhongAlbedoTint" "1"	
+
+	"$rimlight"     "1"
+	"$rimlightexponent"   "1" 
+	"$rimlightboost"   "0.1"
+	"$rimmask"      "1"
+}

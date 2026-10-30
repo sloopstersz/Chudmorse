@@ -6,7 +6,7 @@ ENT.RemoveOnPress = false
 ENT.Model = Model("models/weapons/w_bugbait.mdl")
 
 local function IsTraitorPlayer(ply)
-    return FoxPhoneHack and FoxPhoneHack.CanAct(ply)
+    return ChudTechnicianTraps and ChudTechnicianTraps.CanAct(ply)
 end
 
 function ENT:Initialize()
@@ -70,8 +70,8 @@ end
 
 -- Keep the legacy console entry point subject to the same tablet validation.
 function ENT:TraitorUse(ply)
-    return FoxPhoneHack and FoxPhoneHack.TryActivateTrap
-        and FoxPhoneHack.TryActivateTrap(ply, self) or false
+    return ChudTechnicianTraps and ChudTechnicianTraps.TryActivateTrap
+        and ChudTechnicianTraps.TryActivateTrap(ply, self) or false
 end
 
 function ENT:UpdateTransmitState()

@@ -16,13 +16,13 @@ end)
 local teams = {
 	[0] = {
 		objective = "",
-		name = "Terrorist Chud",
+		name = "a Terrorist",
 		color1 = Color(190,0,0),
 		color2 = Color(190,0,0)
 	},
 	[1] = {
 		objective = "",
-		name = "Counter Chud",
+		name = "a Counter Terrorist",
 		color1 = Color(0,120,190),
 		color2 = Color(0,120,190)
 	},

@@ -1,0 +1,16 @@
+"VertexlitGeneric"
+{
+	"$basetexture" 		"models/lfs/uh1y/glass"
+	"$bumpmap"		 	"models/lfs/uh1y/window_normal"
+	"$nodecal" "1"
+	"$nocull" "1"
+	"$translucent" 1
+	"$halflambert" 1
+	"$phong" "1" 
+	"$phongboost" "5" 
+	"$phongexponent" "55"
+	"$phongfresnelranges" "[4 1 4]"
+	"$surfaceprop" "Glass"
+	"$envmapFresnel" "1"
+	"$carpenisenabled" "1"
+ }

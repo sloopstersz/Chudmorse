@@ -1,0 +1,1 @@
+-- CHAOS now owns its implementation in this folder. No Homicide inheritance.

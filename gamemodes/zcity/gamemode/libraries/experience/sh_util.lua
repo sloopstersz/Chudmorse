@@ -142,7 +142,8 @@ end
 local plyMeta = FindMetaTable("Player")
 
 function plyMeta:GetAwards()
-    if CLIENT then
+    if CLIENT and IsValid(self) and CurTime() >= (self.NextSQBRequest or 0) then
+        self.NextSQBRequest = CurTime() + 1
         net.Start("zb_xp_get")
             net.WriteEntity(self)
         net.SendToServer()
@@ -152,10 +153,9 @@ end
 
 function plyMeta:GetStatVal(dataName, fallback)
     if not CLIENT then return end
-    net.Start("get_svPData")
-        net.WriteEntity( self )
-        net.WriteString( dataName )
-    net.SendToServer()
+    if not IsValid(self) then return fallback end
+    -- The XP reply carries a complete snapshot, so no counter can be starved.
+    self:GetAwards()
     if self.SvDB and self.SvDB[dataName] then
         return self.SvDB[dataName] 
     end
@@ -174,14 +174,19 @@ if SERVER then
 
     net.Receive( "get_svPData", function( len, ply )
         if not IsValid(ply) then return end
-        if (ply.svPDataCD or 0) > CurTime() then return end
-        ply.svPDataCD = CurTime() + 1
 
         local ent = net.ReadEntity()
         local dataName = net.ReadString()
         if not IsValid(ent) or not ent:IsPlayer() then return end
         if ent ~= ply and not ply:IsAdmin() then return end
         if not isstring(dataName) or not svPData[dataName] then return end
+        -- A four-counter refresh is one normal UI operation. A shared cooldown
+        -- discarded Deaths/Suicides whenever Kills arrived first.
+        -- Key by the fixed whitelist, keeping requests bounded even for admins.
+        ply.SvStatReplyTimes = ply.SvStatReplyTimes or {}
+        local now = CurTime()
+        if now < (ply.SvStatReplyTimes[dataName] or 0) then return end
+        ply.SvStatReplyTimes[dataName] = now + 1
         local getter = ent["Get"..dataName]
         if type(getter) ~= "function" then return end
         local value = getter(ent)
@@ -193,20 +198,35 @@ if SERVER then
         net.Send(ply)
     end)
 
-    hook.Add("PlayerDeath","ZB_GiveKills", function(ply)
+    hook.Add("PlayerDeath","ZB_GiveKills", function(ply, inflictor, engineAttacker)
+        if not IsValid(ply) then return end
+        ply:GiveDeaths(1)
+        -- Retain this life's harm table even if round cleanup replaces the map.
+        local harm = zb.HarmDone and zb.HarmDone[ply] or {}
+        local org = ply.organism
+        -- A direct killbind has no harm entry. Organ failure also calls Kill(),
+        -- so exclude that path instead of labelling every bleed-out a suicide.
+        local directSuicide = engineAttacker == ply and inflictor == ply
+            and (not org or (org.alive ~= false and not org.deathStateKilled and not org.incapacitated))
         timer.Simple(.1,function()
             if not IsValid(ply) then return end
             local most_harm,biggest_attacker = 0,nil
                 --print(ply)
-            for attacker,attacker_harm in pairs(zb.HarmDone[ply] or {}) do
+            for attacker,attacker_harm in pairs(harm) do
                 --print(attacker)
-                if not IsValid(attacker) then continue end
+                if not IsValid(attacker) or not attacker:IsPlayer() or not isnumber(attacker_harm) then continue end
                 if most_harm < attacker_harm then
                     most_harm = attacker_harm
                     biggest_attacker = attacker
                 end
             end
-            ply:GiveDeaths(1)
+            if directSuicide then biggest_attacker = ply end
+            -- NPC/world entries cannot receive player statistics. Preserve the
+            -- harm-based credit for organ deaths, which internally call Kill().
+            if not IsValid(biggest_attacker) and IsValid(engineAttacker)
+                and engineAttacker:IsPlayer() and engineAttacker ~= ply then
+                biggest_attacker = engineAttacker
+            end
             if IsValid(biggest_attacker) then
                 if biggest_attacker == ply then
                     biggest_attacker:GiveSuicides(1)
@@ -221,6 +241,7 @@ else
         local ent = net.ReadEntity()
         local dataName = net.ReadString()
         local dataType = net.ReadFloat()
+        if not IsValid(ent) then return end
         ent.SvDB = ent.SvDB or {}
         ent.SvDB[dataName] = dataType
         if IsValid(zb.Experience.OpenedAccount) then

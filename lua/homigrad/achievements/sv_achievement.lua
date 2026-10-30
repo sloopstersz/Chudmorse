@@ -185,6 +185,7 @@ function hg.achievements.SetPlayerAchievement(ply, key, val)
         net.Start("hg_NewAchievement")
             net.WriteString(ach.name)
             net.WriteString(ach.img)
+            net.WriteString(ach.category or "general")
         net.Send(ply)
     end
 
@@ -204,8 +205,16 @@ util.AddNetworkString("req_ach")
 net.Receive("req_ach", function(len, ply)
     if (ply.ach_cooldown or 0) > CurTime() then return end
     ply.ach_cooldown = CurTime() + 2
+    local data = hg.achievements.GetPlayerAchievements(ply)
+    local visible, visibleData = {}, {}
+    for key, info in pairs(hg.achievements.GetAchievements()) do
+        if not info.secret or (tonumber(data[key] and data[key].value) or 0) >= info.needed_value then
+            visible[key] = info
+            visibleData[key] = data[key]
+        end
+    end
     net.Start("req_ach")
-        net.WriteTable(hg.achievements.GetAchievements())
-        net.WriteTable(hg.achievements.GetPlayerAchievements(ply))
+        net.WriteTable(visible)
+        net.WriteTable(visibleData)
     net.Send(ply)
 end)

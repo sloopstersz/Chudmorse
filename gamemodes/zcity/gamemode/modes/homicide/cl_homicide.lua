@@ -194,7 +194,7 @@ MODE.TypeObjectives.standard = {
 	},
 
 	innocent = {
-		objective = "You are a chud, Do whatever and survive the Traitor.",
+		objective = "You are a chud, Do whatever and survive the Evil Chud.",
 		name = "a Chud",
 		color1 = Color(0,120,190)
 	},

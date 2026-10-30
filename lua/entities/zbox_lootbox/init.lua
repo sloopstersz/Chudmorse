@@ -103,29 +103,30 @@ function ZBox.LootSystem.SendLootTable( ent, ply, tbl ) --| Отправка к�
     return true
 end
 
-net.Receive( "ZBox_LootSystem_net", function( len, ply ) 
-    local Container = net.ReadEntity()
-    Container.TakeCD = Container.TakeCD or 0
-    if Container.TakeCD > CurTime() then 
-        print( "[ ZBox | LootSystem ]: ".. ply .. "[SteamID:".. ply:SteamID() .. "]" .." trying TAKE ITEM but, cooldown is on." ) 
-        return false 
-    end
+net.Receive( "ZBox_LootSystem_net", function( len, ply )
+	local Container = net.ReadEntity()
 
-    Container.TakeCD = CurTime() + 0.1
+	if not IsValid(Container) or Container:GetClass() ~= "zbox_lootbox" then return end
+	if not istable(Container.Loot) then return end
+	if not istable(Container.ShowContainer) or not Container.ShowContainer[ply:EntIndex()] then return end
 
-    if ( ply:GetPos() - Container:GetPos() ):Length() > 400 then 
-        print( "[ ZBox | LootSystem ]: ".. ply .. "[SteamID:".. ply:SteamID() .. "]" .." trying TAKE ITEM but, he not in radius CHEATS?!" ) 
-        return false 
-    end
+	if ( ply.lootCD or 0 ) > CurTime() then
+		return false
+	end
 
-    local ItemID = net.ReadUInt(10)
+	ply.lootCD = CurTime() + 0.1
 
-    if not Container.Loot[ItemID] then 
-        print( "[ ZBox | LootSystem ]: ".. ply .. "[SteamID:".. ply:SteamID() .. "]" .." trying TAKE ITEM but, item is invalid." ) 
-        return false 
-    end
+	if ( ply:GetPos() - Container:GetPos() ):Length() > 400 then
+		return false
+	end
 
-    Container:TakeItem( ply, ItemID ) 
+	local ItemID = net.ReadUInt(10)
+
+	if not Container.Loot[ItemID] then
+		return false
+	end
+
+	Container:TakeItem( ply, ItemID )
 end)
 
 local SendLootTable = ZBox.LootSystem.SendLootTable

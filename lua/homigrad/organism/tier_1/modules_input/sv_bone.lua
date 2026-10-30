@@ -1,5 +1,6 @@
 --local Organism = hg.organism
 local player_crush_amputation_threshold = 7
+local spine_damage_mul = 0.35
 
 local function isCrush(dmgInfo)
 	return (not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST)) or dmgInfo:GetInflictor().RubberBullets
@@ -11,12 +12,6 @@ end
 
 local halfValue2 = util.halfValue2
 local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet, nodmgchange)
-	-- Chud Beasts keeps normal health damage, but completely disables the
-	-- organism fracture system for this gamemode.
-	if zb and zb.CROUND == "chudbeasts" and org.isPly then
-		return 1, vector_origin
-	end
-
 	local crush = isCrush(dmgInfo)
 	
 	if dmgInfo:IsDamageType(DMG_SLASH) and dmg > 1.5 then
@@ -125,6 +120,7 @@ local function hasNewThoughts(org)
 end
 
 local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, ricochet)
+	dmg = dmg * (ZZLimbDamageMultiplier and ZZLimbDamageMultiplier(org.owner) or 1)
 	local oldDmg = org[key]
 	local dmg = dmg * 4
 	local amputateThreshold = org.isPly and player_crush_amputation_threshold or 4
@@ -154,7 +150,7 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 			hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true)
 		end
 
-		org.painadd = org.painadd + 55
+		org.painadd = org.painadd + 40
 		org.owner:AddNaturalAdrenaline(1)
 		org.immobilization = org.immobilization + dmg * 25
 		org.fearadd = org.fearadd + 0.5
@@ -173,7 +169,7 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 			hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true)
 		end
 
-		org.painadd = org.painadd + 35
+		org.painadd = org.painadd + 25
 		org.owner:AddNaturalAdrenaline(0.5)
 		org.immobilization = org.immobilization + dmg * 10
 		org.fearadd = org.fearadd + 0.5
@@ -193,6 +189,7 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 end
 
 local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, ricochet)
+	dmg = dmg * (ZZLimbDamageMultiplier and ZZLimbDamageMultiplier(org.owner) or 1)
 	local oldDmg = org[key]
 	local dmg = dmg * 4
 	local amputateThreshold = org.isPly and player_crush_amputation_threshold or 4
@@ -222,7 +219,7 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 			hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true)
 		end
 
-		org.painadd = org.painadd + 55
+		org.painadd = org.painadd + 40
 		org.owner:AddNaturalAdrenaline(1)
 		org.fearadd = org.fearadd + 0.5
 
@@ -240,7 +237,7 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		end
 		//org[key] = 0.5
 
-		org.painadd = org.painadd + 35
+		org.painadd = org.painadd + 25
 		org.owner:AddNaturalAdrenaline(0.5)
 		org.fearadd = org.fearadd + 0.5
 
@@ -279,7 +276,7 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 	if org[name] >= hg.organism[name2] then return 0 end
 	local oldDmg = org[name]
 
-	local result, vecrand = damageBone(org, 0.1, isCrush(dmgInfo) and dmg * 2 or dmg * 2, dmgInfo, name, boneindex, dir, hit, ricochet)
+	local result, vecrand = damageBone(org, 0.1, dmg * 2 * spine_damage_mul, dmgInfo, name, boneindex, dir, hit, ricochet)
 	
 	hg.AddHarmToAttacker(dmgInfo, (org[name] - oldDmg) * 5, "Spine bone damage harm")
 	
@@ -296,7 +293,7 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 		if org.owner:IsPlayer() then
 			sendThought(org, "Your spine is broken.", "thought_" .. name, 4, Color(255, 210, 210))
 		end
-		org.painadd = org.painadd + 25
+		org.painadd = org.painadd + 18
 	end
 	
 	if dmg > 0.2 then
@@ -330,6 +327,18 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 
 	hg.AddHarmToAttacker(dmgInfo, (org.jaw - oldDmg) * 3, "Jaw bone damage harm")
 
+	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and org.jaw > oldDmg then
+		local delta = org.jaw - oldDmg
+		org.brain = math.min(org.brain + delta * 0.03, 1)
+		org.consciousness = math.Approach(org.consciousness, 0, delta)
+		org.shock = org.shock + delta * 12
+
+		if org.jaw == 1 and math.Rand(0, 1) < 0.2 then
+			local debrie = hg.organism.AddBrainHemorrhage
+			if debrie then debrie(org, math.Rand(0.05, 0.15), 0.0015) end
+		end
+	end
+
 	if org.jaw == 1 and (org.jaw - oldDmg) > 0 and org.isPly then
 		if !hasNewThoughts(org) then org.owner:Notify(jaw_broken_msg[math.random(#jaw_broken_msg)], true, "jaw", 2) end
 		sendThought(org, "Your jaw is broken.", "thought_jaw", 4, Color(255, 210, 210))
@@ -339,7 +348,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 
 	if org.jaw == 1 then
 		org.shock = org.shock + dmg * 40
-		org.avgpain = org.avgpain + dmg * 30
+		org.avgpain = org.avgpain + dmg * 20
 
 		if oldDmg != 1 then
 			playBoneFractureSound(org.owner)
@@ -351,7 +360,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 
 	if dislocated then
 		org.shock = org.shock + dmg * 20
-		org.avgpain = org.avgpain + dmg * 20
+		org.avgpain = org.avgpain + dmg * 15
 		
 		if !org.jawdislocation then
 			playBoneFractureSound(org.owner)
@@ -391,7 +400,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	if org.skull == 1 then
 		org.shock = org.shock + dmg * 40
-		org.avgpain = org.avgpain + dmg * 30
+		org.avgpain = org.avgpain + dmg * 20
 
 		if oldDmg != 1 then
 			playSkullFractureSound(org.owner)
@@ -401,10 +410,26 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	org.shock = org.shock + dmg * 3
 
+	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then
+		org.shock = org.shock + dmg * 15
+		org.avgpain = org.avgpain + dmg * 7
+	end
+
 	local rnd = math.random(10) == 1 or dmgInfo:IsDamageType(DMG_CRUSH)
 	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 2 or 0)
 
 	org.brain = math.min(org.brain + (rnd and dmg * 0.05 or 0), 1)
+
+	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and org.skull > oldDmg then
+		local delta = org.skull - oldDmg
+		org.brain = math.min(org.brain + delta * 0.12, 1)
+		org.consciousness = math.Approach(org.consciousness, 0, delta * 8)
+
+		if math.Rand(0, 1) < math.Clamp(delta * 0.45, 0, 0.75) then
+			local debrie = hg.organism.AddBrainHemorrhage
+			if debrie then debrie(org, math.Rand(0.04, 0.12), math.Rand(0.001, 0.003)) end
+		end
+	end
 
 	if math.random(1, 4) == 1 then
 		local eye_dmg = dmg * math.Rand(0.8, 1.5)

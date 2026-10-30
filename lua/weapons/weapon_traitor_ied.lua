@@ -125,8 +125,18 @@ SWEP.MaxDialTime = 10
 SWEP.MaxDialDistance = 3000
 SWEP.CallSound = "rem_iedcall.mp3"
 SWEP.CallSoundLevel = 100
-SWEP.DisorientationRange = 15
+SWEP.DisorientationRange = 7
 SWEP.FireEntForceBonus = 70
+
+local SHRAPNEL_TRACE_DISTANCE = 2500
+
+local function ShrapnelTraceHit(tr)
+	if not tr or not tr.Hit or tr.HitSky or tr.HitWorld then return false end
+	local hit = tr.Entity
+	if not IsValid(hit) then return false end
+	if hit:IsPlayer() or hit:IsRagdoll() or hit:IsNPC() or hit:IsNextBot() or hit:IsVehicle() then return true end
+	return string.StartWith(hit:GetClass(), "prop_")
+end
 SWEP.AttachedBombModel = "models/props_junk/cardboard_jox004a.mdl"
 SWEP.AttachedBombScale = 0.4
 SWEP.ExplosionSounds = {
@@ -443,12 +453,23 @@ ExplodeTheItem = function(self,ent)
 			local disorientation_dis = self.DisorientationRange / 0.01905
 			for _, enta in ipairs(ents.FindInSphere(EntPos, disorientation_dis)) do
 				local tracePos = enta:IsPlayer() and (enta:GetPos() + enta:OBBCenter()) or enta:GetPos()
-				local tr = hg.ExplosionTrace(EntPos, tracePos, {ent})
 
 				local phys = enta:GetPhysicsObject()
 				local force = (enta:GetPos() - EntPos)
 				local len = force:Length()
-				force:Div(len)
+
+				if hg.BreakablePropClasses and hg.BreakablePropClasses[enta:GetClass()] and not enta.organism and not hg.expItems[enta:GetModel()] and not hg.GasTank.ActiveTanks[enta:EntIndex()] then
+					hg.DestroyBreakableProp(enta, tracePos, self:GetOwner())
+					continue
+				end
+
+				local tr = hg.ExplosionTrace(EntPos, tracePos, {ent})
+
+				if len > 0 then
+					force:Div(len)
+				else
+					force:Set(vector_up)
+				end
 				local frac = math.Clamp((disorientation_dis - len) / disorientation_dis, 0.1, 1)  
 				local physics_frac = math.Clamp((dis - len) / dis, 0.5, 1)  
 				local forceadd = force * physics_frac * 50000  
@@ -496,6 +517,7 @@ ExplodeTheItem = function(self,ent)
 			if mat == MAT_METAL and entValid and IsValid(ent:GetPhysicsObject()) then
 				local co = coroutine.create(function()
 					local LastShrapnel = SysTime()
+					local traceData = {start = EntPos, mask = MASK_SHOT, filter = {ent}}
 
 					for i = 1, math.Round(ent:GetPhysicsObject():GetMass() * 50) do
 							LastShrapnel = SysTime()
@@ -504,22 +526,11 @@ ExplodeTheItem = function(self,ent)
 							dir[3] = dir[3] > 0 and math.abs(dir[3] - 0.5) or -math.abs(dir[3] + 0.5)
 							dir:Normalize()
 
-							local Tr = util.QuickTrace(EntPos, dir * 205, ent)
+							traceData.endpos = EntPos + dir * SHRAPNEL_TRACE_DISTANCE
+							local Tr = util.TraceLine(traceData)
 
-							if Tr.Hit and !Tr.HitSky and !Tr.HitWorld then
-								local bullet = {}
-								bullet.Dir = dir
-								bullet.Src = EntPos
-								bullet.Force = 0.01
-								bullet.Damage = BlastDamage
-								bullet.AmmoType = "Metal Debris"
-								bullet.Attacker = self:GetOwner()
-								bullet.Distance = 205
-								bullet.DisableLagComp = true
-								bullet.Filter = {ent}
-								bullet.Penetration = 4
-								--bullet.Spread = vecCone * i / self.Fragmentation
-								ent:FireLuaBullets(bullet, true)
+							if Tr.Hit and ShrapnelTraceHit(Tr) then
+								hg.ShrapnelDamage(self:GetOwner(), ent, EntPos, Tr, BlastDamage)
 							end
 
 							LastShrapnel = SysTime() - LastShrapnel

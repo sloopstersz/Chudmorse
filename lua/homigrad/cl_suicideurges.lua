@@ -5,6 +5,51 @@ local wasActive = false
 local wasSelfHarmActive = false
 local urgeSound
 
+local refuseFovTarget = 0
+local refuseFov = 0
+
+local refuseSnd = nil
+local refusePitch = 100
+local refuseLastCall = 0
+
+net.Receive("rem_suicide_attempt", function()
+	local frac = net.ReadFloat() or 0
+	local now = CurTime()
+
+	if now - refuseLastCall > 2 then
+		refusePitch = 100
+	end
+
+	refuseLastCall = now
+
+	refusePitch = math.max(refusePitch - 5, 60)
+
+	if not refuseSnd then
+		refuseSnd = CreateSound(LocalPlayer(), "rem_refuse.mp3")
+	end
+
+	refuseSnd:Stop()
+	refuseSnd:PlayEx(1, refusePitch)
+
+	refuseFovTarget = 1
+
+	hg.CreateShakyNotification(frac >= 0.45 and "Just do it." or "You shouldnt do this.", 1.5, frac)
+end)
+
+hook.Add("HG_CalcView", "REM_SuicideRefuseFov", function(ply, origin, angles, fova)
+	if not istable(fova) then return end
+	if refuseFov > 0.001 and ply ~= LocalPlayer() then return end
+
+	fova[1] = fova[1] - refuseFov * 18
+end)
+
+hook.Add("Think", "REM_SuicideRefuseFovThink", function()
+	local target = refuseFovTarget > 0 and 1 or 0
+
+	refuseFov = LerpFT(0.04, refuseFov, target)
+	refuseFovTarget = math.max(refuseFovTarget - FrameTime() * 1.6, 0)
+end)
+
 local urgeLoopPath = "sound/rem_earsringaswounddeepens.ogg"
 local urgeLoop = nil
 local urgeLoopLoading = false

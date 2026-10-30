@@ -2,13 +2,13 @@
 hg.organism.module = hg.organism.module or {}
 local module = hg.organism.module
 hg.organism.lastindex = hg.organism.lastindex or 1000000
-local panicattack_threshold = 0.45
+local panicattack_threshold = .65
 local panicattack_add_decay_time = 90
 local panicattack_rise_time = 10
 local panicattack_decay_time = 200
--- Balance: fewer panic gains, with half the previous buildup per event.
-local panicattack_gain_chance = 5
-local panicattack_gain_mul = 0.2
+-- Panic needs sustained stress: a 1-in-8 buildup roll and reduced gain.
+local panicattack_gain_chance = 8
+local panicattack_gain_mul = .15
 local panicattack_disorientation = 0.45
 local panicattack_adrenaline_add_target = 4
 local panicattack_adrenaline_add_rise_time = 14
@@ -399,6 +399,7 @@ end
 
 local function is_panic_immune(org)
 	if not org then return false end
+    if ZZIsZombie and ZZIsZombie(org.owner) then return true end
 
 	local owner = org.owner
 	if not IsValid(owner) or not owner:IsPlayer() then return false end
@@ -879,7 +880,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 		if curTime >= org.deathStateEnd and not org.deathStateKilled then
 			org.deathStateKilled = true
-			owner:Kill()
+			hook.Run("ChudAchievementPoisonDeath", owner, org) owner:Kill()
 			return
 		end
 	else
@@ -917,7 +918,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if IsValid(rag) and rag:IsRagdoll() and (not owner.lastFake or owner.lastFake == 0) then rag:SetCollisionGroup((rag:GetVelocity():LengthSqr() > (200*200)) and COLLISION_GROUP_NONE or COLLISION_GROUP_WEAPON) end
 	if isPly then
 		if org.otrub or org.fake then hg.Fake(owner,nil,true) end
-		if not org.alive and owner:Alive() then owner:Kill() end
+		if not org.alive and owner:Alive() then hook.Run("ChudAchievementPoisonDeath", owner, org) owner:Kill() end
 	end
 
 	if not org.otrub and isPly then
@@ -1213,7 +1214,7 @@ local finally_fixed = {
 local function fixlimb(org, key, fixer)
 	if math.random(100) > (97 + (fixer != org.owner and (fixer.organism and fixer.organism.pain or 0) or 0) - (org.analgesia * 50 + org.painkiller * 15) - (fixer != org.owner and 30 or 0) - (fixer.tries or 0) * 10 - (fixer.Profession == "doctor" and 100 or 0) - (org.owner == fixer and (IsValid(org.owner.FakeRagdoll) or (org.owner.Crouching and org.owner:Crouching())) and 10 or 0)) then
 		org[key.."dislocation"] = false
-		if hg.fakeBoneFlop and hg.fakeBoneFlop.ClearStoredLimb(org, key) then
+		if (org[key] or 0) < 1 and hg.fakeBoneFlop and hg.fakeBoneFlop.ClearStoredLimb(org, key) then
 			hg.fakeBoneFlop.ScheduleRebuild(org.owner)
 		end
 		org.painadd = org.painadd + 5 * math.random(1, 3)

@@ -1,0 +1,19 @@
+"VertexlitGeneric"
+{
+
+	"$basetexture" "models\Kali\vehicles\Ghosts\NH90\NH90_Glass_A_C"
+	"$bumpmap" "models\Kali\vehicles\Ghosts\NH90\NH90_Glass_N"
+	"$halflambert" "1"				
+	"$nocull" 1	
+	"$translucent" 1	
+
+	"$phong" "1"						
+	"$phongexponenttexture" "models\Kali\vehicles\Ghosts\NH90\NH90_Glass_Exp"
+	"$phongboost" "0.5"						
+	"$phongfresnelranges"	"[ .2 1.2 8]"	
+
+	"$PhongAlbedoTint" "1"		
+
+}
+
+
