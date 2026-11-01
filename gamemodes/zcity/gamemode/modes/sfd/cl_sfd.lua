@@ -225,7 +225,7 @@ end
 --CreateEndMenu = function()
 	end
 	Dynamic = 0
-	hmcdEndMenu = vgui.Create("ZFrame")
+	--hmcdEndMenu = vgui.Create("ZFrame")
 
     surface.PlaySound("ambient/alarms/warningbell1.wav")
 
@@ -343,8 +343,8 @@ function MODE:RoundStart()
 		ply.won = nil
     end
 
-    if IsValid(hmcdEndMenu) then
-        hmcdEndMenu:Remove()
-        hmcdEndMenu = nil
+   -- if IsValid(hmcdEndMenu) then
+    --    hmcdEndMenu:Remove()
+     --   hmcdEndMenu = nil
     end
 end
