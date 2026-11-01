@@ -4,6 +4,10 @@ MODE.name = "zzombies"
 MODE.PrintName = "Z-Zombies"
 MODE.Description = "Survive three phases of the outbreak, then get to the extraction point before the National Guard's window closes."
 
+-- Infected players are on the survivors' team, so shooting a zombie counted as a teamkill.
+-- Same flag the VIP and Juggernaut modes use to turn karma/guilt loss off.
+MODE.GuiltDisabled = true
+
 -- Three phases inside one round.
 MODE.PhaseCount = 3
 MODE.PhaseDuration = 300
