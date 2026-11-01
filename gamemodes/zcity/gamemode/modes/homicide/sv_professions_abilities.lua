@@ -84,11 +84,6 @@ hook.Add("PlayerPostThink", "HMCD_Professions_Abilities", function(ply)
 			end
 		end
 	end
-		
-		if(ply.Profession == "reporter")then
-			
-		end
-	end
 end)
 
 concommand.Add("hg_create_pipebomb", function(ply)
