@@ -327,7 +327,6 @@ MODE.Professions = {
 	["reporter"] = {
 		Name = "Reporter",
 		SpawnFunction = function(ply)
-			ply:Give("weapon_ffviewfinder")
 		    ply:Give("weapon_tpik_microphone")
 			hg.AddArmor(ply, "ent_armor_helmet3")
 		end,
