@@ -211,9 +211,17 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
 
     if Attacker == Victim then return end
 
-    -- Do not penalize damage needed to kill a stage 2+ infected survivor.
-    if rnd.name == "zzombies" and ZZInfection and ZZInfection.InfectedSurvivorStage
-        and ZZInfection.InfectedSurvivorStage(Victim) >= 2 then return end
+    if rnd.name == "zzombies" then
+        -- Zombies and survivors are both on team 0, so the team check below never
+        -- skips them. Fighting the infection is never team damage, in either
+        -- direction: shooting a zombie (even while infected yourself) and a zombie
+        -- biting or scratching a survivor must not cost karma.
+        if ZZIsZombie and (ZZIsZombie(Victim) or ZZIsZombie(Attacker)) then return end
+
+        -- Do not penalize damage needed to kill a stage 2+ infected survivor.
+        if ZZInfection and ZZInfection.InfectedSurvivorStage
+            and ZZInfection.InfectedSurvivorStage(Victim) >= 2 then return end
+    end
 
     zb.GuiltTable[Attacker] = zb.GuiltTable[Attacker] or {}
     zb.GuiltTable[Victim] = zb.GuiltTable[Victim] or {}
