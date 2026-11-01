@@ -324,6 +324,14 @@ MODE.Professions = {
 			--; It's a bad practice to give professions any weapons or tools
 		end,
 	},
+	["reporter"] = {
+		Name = "Reporter",
+		SpawnFunction = function(ply)
+			ply:Give("weapon_ffviewfinder")
+		--ply:Give("weapon_tpik_microphone") add when slood adds the microphone
+			hg.AddArmor(ply, "ent_armor_helmet3")
+		end,
+	},
 	["builder"] = {
 		Name = "Builder",
 		SpawnFunction = function(ply)
@@ -357,6 +365,9 @@ MODE.RoleChooseRoundTypes = {
 				Chance = 1,
 			},
 			["cook"] = {
+				Chance = 1,
+			},
+			["reporter"] = {
 				Chance = 1,
 			},
 			["builder"] = {
