@@ -28,7 +28,7 @@ local ZB_FORCED_MODE_POOL = {
         ["president"] = true,
         ["vip"] = true,
         ["bartvshomer"] = true,
-        ["chudbeasts"] = true,
+        ["superfighters"] = true,
         ["turfwars"] = true,
         ["chaos"] = true,
         ["hl2tdm"] = true,
@@ -39,6 +39,7 @@ local ZB_NO_BACK_TO_BACK_MODES = {
         ["dm"] = true,
         ["tdm"] = true,
         ["riot"] = true,
+	    ["superfighters"] = true,
         ["juggernaut"] = true,
         ["president"] = true
 }
