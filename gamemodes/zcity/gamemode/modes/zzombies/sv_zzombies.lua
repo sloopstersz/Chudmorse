@@ -2,6 +2,7 @@ local MODE = MODE
 
 MODE.name = "zzombies"
 MODE.PrintName = "Z-Zombies"
+MODE.GuiltDisabled = true
 MODE.Chance = 0.02
 
 -- Pre-round time before Phase One. The 7 second startup screen plays inside this.
