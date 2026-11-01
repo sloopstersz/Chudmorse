@@ -195,7 +195,7 @@ net.Receive("supfight_end",function()
 		MODE.SoundStation = nil
 	end
 	
-    -- CreateEndMenu()
+    CreateEndMenu()
 end)
 
 local colGray = Color(85,85,85,255)
@@ -223,7 +223,6 @@ if IsValid(hmcdEndMenu) then
 end
 
 CreateEndMenu = function()
-	return false
 	end
 	Dynamic = 0
 	hmcdEndMenu = vgui.Create("ZFrame")
