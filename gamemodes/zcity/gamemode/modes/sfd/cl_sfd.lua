@@ -222,7 +222,7 @@ if IsValid(hmcdEndMenu) then
     hmcdEndMenu = nil
 end
 
-CreateEndMenu = function()
+--CreateEndMenu = function()
 	end
 	Dynamic = 0
 	hmcdEndMenu = vgui.Create("ZFrame")
