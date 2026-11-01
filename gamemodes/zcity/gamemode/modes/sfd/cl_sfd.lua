@@ -195,7 +195,7 @@ net.Receive("supfight_end",function()
 		MODE.SoundStation = nil
 	end
 	
-    CreateEndMenu()
+    --CreateEndMenu()
 end)
 
 local colGray = Color(85,85,85,255)
@@ -217,9 +217,9 @@ local Dynamic = 0
 
 BlurBackground = BlurBackground or hg.DrawBlur
 
-if IsValid(hmcdEndMenu) then
-    hmcdEndMenu:Remove()
-    hmcdEndMenu = nil
+--if IsValid(hmcdEndMenu) then
+--    hmcdEndMenu:Remove()
+--    hmcdEndMenu = nil
 end
 
 --CreateEndMenu = function()
