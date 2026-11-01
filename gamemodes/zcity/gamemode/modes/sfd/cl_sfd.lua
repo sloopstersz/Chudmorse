@@ -195,7 +195,7 @@ net.Receive("supfight_end",function()
 		MODE.SoundStation = nil
 	end
 	
-    CreateEndMenu()
+    --CreateEndMenu()
 end)
 
 local colGray = Color(85,85,85,255)
@@ -217,18 +217,15 @@ local Dynamic = 0
 
 BlurBackground = BlurBackground or hg.DrawBlur
 
-if IsValid(hmcdEndMenu) then
-    hmcdEndMenu:Remove()
-    hmcdEndMenu = nil
+--if IsValid(hmcdEndMenu) then
+--    hmcdEndMenu:Remove()
+--    hmcdEndMenu = nil
 end
 
-CreateEndMenu = function()
-	if IsValid(hmcdEndMenu) then
-		hmcdEndMenu:Remove()
-		hmcdEndMenu = nil
+--CreateEndMenu = function()
 	end
 	Dynamic = 0
-	hmcdEndMenu = vgui.Create("ZFrame")
+	--hmcdEndMenu = vgui.Create("ZFrame")
 
     surface.PlaySound("ambient/alarms/warningbell1.wav")
 
@@ -346,8 +343,8 @@ function MODE:RoundStart()
 		ply.won = nil
     end
 
-    if IsValid(hmcdEndMenu) then
-        hmcdEndMenu:Remove()
-        hmcdEndMenu = nil
+   -- if IsValid(hmcdEndMenu) then
+    --    hmcdEndMenu:Remove()
+     --   hmcdEndMenu = nil
     end
 end
