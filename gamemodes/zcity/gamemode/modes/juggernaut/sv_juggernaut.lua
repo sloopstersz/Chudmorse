@@ -39,41 +39,6 @@ end
 AddMaterials("materials/arty/codmw2022/mp/dmz/alqatala/juggernaut")
 AddMaterials("materials/arty/codmw2022/shared")
 
--- Models that are not precached can fail util.IsValidModel on the server, which skipped SetModel.
-local function JuggernautModelAvailable(mode)
-	util.PrecacheModel(mode.JuggernautModel)
-	return util.IsValidModel(mode.JuggernautModel) or file.Exists(mode.JuggernautModel, "GAME")
-end
-
-local function ApplyJuggernautLook(mode, ply)
-	if not IsValid(ply) then return end
-	if mode.JuggernautModelOK and string.lower(ply:GetModel() or "") ~= string.lower(mode.JuggernautModel) then
-		ply:SetModel(mode.JuggernautModel)
-	end
-	ply:SetBodyGroups("000000000000")
-	ply:SetSubMaterial()
-	ply:SetNetVar("Accessories", "none")
-	ply:SetNetVar("AccessoryColors", {})
-	ply:SetNWString("BandageGlovesMdl", "")
-	ply:SetPlayerColor(Vector(1, 1, 1))
-	ply:SetNWVector("PlayerColor", Vector(1, 1, 1))
-	-- Verified in the supplied MDL: group 11, value 1 is the empty mesh.
-	ply:SetBodygroup(11, 1)
-end
-
--- The appearance system can re-apply the player's normal model after GiveEquipment runs.
--- Keep checking the Juggernaut and put the model back if anything changed it.
-timer.Create("ChudJuggernautModelKeeper", 0.25, 0, function()
-	local mode = CurrentRound()
-	if not mode or mode.name ~= "juggernaut" or not mode.JuggernautModelOK then return end
-	if zb.ROUND_STATE ~= 0 and zb.ROUND_STATE ~= 1 then return end
-	local jug = mode.Juggernaut
-	if not IsValid(jug) or not jug:Alive() or jug:Team() == TEAM_SPECTATOR then return end
-	if string.lower(jug:GetModel() or "") ~= string.lower(mode.JuggernautModel) then
-		ApplyJuggernautLook(mode, jug)
-	end
-end)
-
 local function Participants()
 	local result = {}
 	for _, ply in player.Iterator() do
@@ -90,7 +55,6 @@ function MODE:Intermission()
 	game.CleanUpMap()
 	self.Winner = nil
 	self.MissingModelWarning = nil
-	self.JuggernautModelOK = nil
 	self.Players = Participants()
 	table.Shuffle(self.Players)
     local assigned = ChudTakeNextModeRole and ChudTakeNextModeRole("juggernaut", self.Players)
@@ -125,14 +89,23 @@ function MODE:GiveEquipment()
 			zb.GiveRole(ply, isJuggernaut and "Juggernaut" or "Scared Chud", Color(190, 30, 30))
 			if isJuggernaut then
 				ply:SetPlayerClass("chud_juggernaut")
-				self.JuggernautModelOK = JuggernautModelAvailable(self)
-				if not self.JuggernautModelOK and not self.MissingModelWarning then
+				if util.IsValidModel(self.JuggernautModel) then
+					ply:SetModel(self.JuggernautModel)
+				elseif not self.MissingModelWarning then
 					self.MissingModelWarning = true
 					local message = "[Juggernaut] Missing model: " .. self.JuggernautModel
 					ErrorNoHalt(message .. "\n")
 					ply:ChatPrint(message .. ". Install the model content on the server and clients.")
 				end
-				ApplyJuggernautLook(self, ply)
+				ply:SetBodyGroups("000000000000")
+				ply:SetSubMaterial()
+				ply:SetNetVar("Accessories", "none")
+				ply:SetNetVar("AccessoryColors", {})
+				ply:SetNWString("BandageGlovesMdl", "")
+				ply:SetPlayerColor(Vector(1, 1, 1))
+				ply:SetNWVector("PlayerColor", Vector(1, 1, 1))
+				-- Verified in the supplied MDL: group 11, value 1 is the empty mesh.
+				ply:SetBodygroup(11, 1)
 			end
 			if isJuggernaut then
 				local inv = ply:GetNetVar("Inventory", {})

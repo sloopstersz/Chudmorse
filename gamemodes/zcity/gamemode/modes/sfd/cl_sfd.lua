@@ -223,6 +223,9 @@ if IsValid(hmcdEndMenu) then
 end
 
 CreateEndMenu = function()
+	if IsValid(hmcdEndMenu) then
+		hmcdEndMenu:Remove()
+		hmcdEndMenu = nil
 	end
 	Dynamic = 0
 	hmcdEndMenu = vgui.Create("ZFrame")
@@ -234,7 +237,7 @@ CreateEndMenu = function()
 
 	hmcdEndMenu:SetPos(posX,posY)
 	hmcdEndMenu:SetSize(sizeX,sizeY)
-	hmcdEndMenu:SetBackgroundColor(colGray)
+	--hmcdEndMenu:SetBackgroundColor(colGray)
 	hmcdEndMenu:MakePopup()
 	hmcdEndMenu:SetKeyboardInputEnabled(false)
 	hmcdEndMenu:ShowCloseButton(false)

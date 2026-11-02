@@ -379,11 +379,6 @@ function MODE:CanSpawn() return self.Deploying == true end
 -- Prep deaths and late joiners stay out until the next round.
 function MODE:PlayerDeathThink() return false end
 function MODE:PlayerSpawn(ply)
-    -- Getting up from a ragdoll (hg.FakeUp) re-runs ply:Spawn() with OverrideSpawn set.
-    -- That is the same life continuing, not a late join or a respawn, so leave it alone;
-    -- otherwise the check below silently kills the player the moment they stand up.
-    if OverrideSpawn then return end
-
     if not self.Deploying and ply:GetNWBool("ChudVIPPreparing", false) then
         timer.Simple(0, function()
             if IsValid(ply) and CurrentRound() == self and not self.Deploying

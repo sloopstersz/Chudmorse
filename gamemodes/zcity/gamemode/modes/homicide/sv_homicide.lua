@@ -1850,7 +1850,7 @@ function MODE.SpawnPlayers(spawn_with_subroles)
 			if current_ply.isTraitor and not current_ply.MainTraitor then
 				GiveTraitorAssistantStarterItem(current_ply)
 			end
-					
+
             local hands = current_ply:Give("weapon_hands_sh")
             current_ply:SetActiveWeapon(hands)
             current_ply:SetNetVar("flashlight", false)
