@@ -1,4 +1,3 @@
-print("[Chudmorse] Z-Zombies karma fix loaded")
 -- СДЕЛАЙТЕ СИНХРУ С СКУЭЛЬ УЖЕ // ЛАДНО Я САМ СДЕЛАЮ
 zb = zb or {}
 
@@ -211,9 +210,6 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
     if rnd.GuiltDisabled or GetConVar("zb_dev"):GetBool() then return end
 
     if Attacker == Victim then return end
-
-    -- Z-Zombies: zombies are on the survivors' team, so hitting one is not a teamkill.
-    if ZZIsZombie and ZZIsZombie(Victim) then return end
 
     -- Do not penalize damage needed to kill a stage 2+ infected survivor.
     if rnd.name == "zzombies" and ZZInfection and ZZInfection.InfectedSurvivorStage

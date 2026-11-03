@@ -1,5 +1,0 @@
-SDK_VertexLitGeneric
-{
-	// Original shader: VertexLitMaskedEnvMappedTexture
-	"$basetexture" "models/gloves/odessa_sheet"
-}

@@ -1,7 +1,0 @@
-VertexLitGeneric
-{
-$baseTexture "models\props_vehicles/helicopter_news2"
-$selfillum 1
-$envmap env_cubemap
-$envmapmask "models\props_vehicles\helicopter_news2_ref"
-}

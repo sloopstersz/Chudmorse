@@ -1,6 +1,0 @@
-"VertexLitGeneric"
-{
-	"$basetexture" "models/lfs/Littlebird/pilots/cobra_pilot_woodland_body_sp_col"
-
-        "$bumpmap" "models/lfs/Littlebird/pilots/cobra_pilot_woodland_body_sp_col_nomal"
-}

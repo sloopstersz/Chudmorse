@@ -1,7 +1,0 @@
-"VertexLitGeneric"
-{
-	// Original shader: VertexLitTexture
-	"$basetexture" "models/lfs/Littlebird/pilots/citizen_sheet"
-	"$bumpmap"     "models/lfs/Littlebird/pilots/citizen_sheet_normal"
-	"$halflambert" 1
-}

@@ -1,6 +1,5 @@
 if not SERVER then return end
 local MODE = MODE
-print("[Chudmorse] VIP ragdoll fix v2 loaded")
 util.AddNetworkString("chud_vip_prepare")
 util.AddNetworkString("chud_vip_loadout")
 util.AddNetworkString("chud_vip_menu")
@@ -109,7 +108,6 @@ end
 
 function MODE:Intermission()
     game.CleanUpMap()
-    for _, p in player.Iterator() do p.ChudVIPInPlay = nil end
     self.Players = Participants()
     self.Started = false
     self.LoadoutEnds = CurTime() + self.LoadoutDuration
@@ -257,7 +255,6 @@ function MODE:RoundStart()
     self.Deploying = true
     for _, ply in ipairs(self.Players or {}) do
         if IsValid(ply) and ply.ChudVIPSpawn then
-        local deployed, deployError = pcall(function()
             local spawn = ply.ChudVIPSpawn
             ply.ChudSpectating = nil
             ply.chosenSpectEntity, ply.lastSpectTarget = nil, nil
@@ -267,7 +264,6 @@ function MODE:RoundStart()
             ply:SetNotSolid(false)
             ply:SetupTeam(ply.ChudVIPTeam or 0)
             ply:Spawn()
-            ply.ChudVIPInPlay = true -- deployed: respawn hooks must leave them alone
             ply:SetMoveType(MOVETYPE_WALK)
             ply:SetNoDraw(false)
             ply:SetNotSolid(false)
@@ -288,10 +284,6 @@ function MODE:RoundStart()
             local role = ply:GetNWString("ChudVIPRole")
             zb.GiveRole(ply, role, ply.ChudVIPTeam == 1 and Color(60,130,255) or Color(190,35,35))
             ply:ScreenFade(SCREENFADE.IN, Color(0,0,0), 0.4, 0)
-        end)
-        if not deployed then
-            ErrorNoHalt("[VIP] Failed to deploy " .. ply:Nick() .. ": " .. tostring(deployError) .. "\n")
-        end
         end
     end
     self.Deploying = false
@@ -324,9 +316,6 @@ function MODE:ShouldRoundEnd()
 end
 
 function MODE:RoundThink()
-    for _, ply in ipairs(self.Players or {}) do
-        if IsValid(ply) and ply.ChudVIPInPlay and not ply:Alive() then ply.ChudVIPInPlay = nil end
-    end
     if self:ShouldRoundEnd() then return end
     local point = self.Route and self.Route[self.Stage]
     if not point then self.Winner = 3 return end
@@ -352,7 +341,6 @@ function MODE:RoundThink()
 end
 
 function MODE:EndRound()
-    for _, p in player.Iterator() do p.ChudVIPInPlay = nil end
     if self.Winner == 1 and IsValid(self.VIC) and self.VIC:Alive() then
         local guardAlive = false
         for _, ply in ipairs(self.Players or {}) do
@@ -391,9 +379,6 @@ function MODE:CanSpawn() return self.Deploying == true end
 -- Prep deaths and late joiners stay out until the next round.
 function MODE:PlayerDeathThink() return false end
 function MODE:PlayerSpawn(ply)
-    -- Getting up from a ragdoll (hg.FakeUp) re-spawns the player with OverrideSpawn set.
-    -- That is not a real spawn: it must never remove the player. The base gamemode does the same.
-    if OverrideSpawn then return end
     if not self.Deploying and ply:GetNWBool("ChudVIPPreparing", false) then
         timer.Simple(0, function()
             if IsValid(ply) and CurrentRound() == self and not self.Deploying
@@ -404,23 +389,10 @@ function MODE:PlayerSpawn(ply)
         return
     end
     if zb.ROUND_STATE == 1 and not self.Deploying then
-        -- Backup guard: anyone deployed and still alive stays. Only late joiners and the dead are removed.
-        if ply.ChudVIPInPlay then return end
         timer.Simple(0, function()
-            if IsValid(ply) and CurrentRound() == self and zb.ROUND_STATE == 1 and not ply.ChudVIPInPlay then
-                print("[VIP] Removing " .. ply:Nick() .. " (spawned mid-round without being deployed)")
-                ply:KillSilent()
-            end
+            if IsValid(ply) and CurrentRound() == self and zb.ROUND_STATE == 1 then ply:KillSilent() end
         end)
     end
-end
-
--- A real death takes the player out of play, so a respawn afterwards is still blocked.
-local function ChudVIPLeftPlay(ply)
-    if IsValid(ply) then ply.ChudVIPInPlay = nil end
-end
-for _, name in ipairs({"PlayerDeath", "PlayerSilentDeath", "PostPlayerDeath", "DoPlayerDeath"}) do
-    hook.Add(name, "ChudVIPLeftPlay", ChudVIPLeftPlay)
 end
 
 function MODE:ShowSpare1(ply)
