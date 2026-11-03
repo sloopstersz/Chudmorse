@@ -1,6 +1,6 @@
-***Chudmorse version 4***
+***Chudmorse VERSION 4***
 
-*Not too late*
+*about damn time*
 
 https://steamcommunity.com/sharedfiles/filedetails/?id=3793275026
 
