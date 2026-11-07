@@ -61,7 +61,7 @@ end
 
 function EFFECT:Think()
 	-- local bullet = self.bullet
-	-- print(self.Pos, self.Velocity)
+	
 
 	if not self.Pos or not self.Velocity then return end
 

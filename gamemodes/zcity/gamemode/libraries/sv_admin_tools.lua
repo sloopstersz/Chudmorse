@@ -125,29 +125,56 @@ local function GetActiveAdminStatsRows()
     return rows
 end
 
-local ADMIN_STATS_CHUNK_SIZE = 15
+local statsTransfers = {}
+local statsSerial = 0
+local STATS_BYTES = 4096
+util.AddNetworkString("ZB_AdminStatsChunkV2")
+util.AddNetworkString("ZB_AdminStatsAckV2")
+
+local function SendStatsChunk(ply, transfer)
+    if statsTransfers[ply] ~= transfer or not AdminStatsAllowed(ply) then statsTransfers[ply] = nil return end
+    local first = (transfer.index - 1) * STATS_BYTES + 1
+    local bytes = transfer.data:sub(first, first + STATS_BYTES - 1)
+    transfer.sentAt = CurTime()
+    transfer.awaiting = true
+    net.Start("ZB_AdminStatsChunkV2")
+        net.WriteUInt(transfer.id, 32)
+        net.WriteUInt(transfer.count, 16)
+        net.WriteUInt(transfer.index, 16)
+        net.WriteUInt(#bytes, 16)
+        net.WriteData(bytes, #bytes)
+    net.Send(ply)
+end
 
 local function SendAdminStatsRows(ply, rows)
-    local total = #rows
-    local chunks = math.max(1, math.ceil(total / ADMIN_STATS_CHUNK_SIZE))
-
-    for index = 1, chunks do
-        local from = (index - 1) * ADMIN_STATS_CHUNK_SIZE + 1
-        local to = math.min(from + ADMIN_STATS_CHUNK_SIZE - 1, total)
-        local part = {}
-
-        for i = from, to do
-            part[#part + 1] = rows[i]
-        end
-
-        net.Start("ZB_AdminStatsSend")
-            net.WriteUInt(total, 16)
-            net.WriteUInt(chunks, 16)
-            net.WriteUInt(index, 16)
-            net.WriteString(util.TableToJSON(part))
-        net.Send(ply)
-    end
+    if not AdminStatsAllowed(ply) then return end
+    local json = util.TableToJSON(rows)
+    if not json or #json > 32 * 1024 * 1024 then ply:ChatPrint("SQL stats are too large to transfer.") return end
+    local data = util.Compress(json)
+    if not data or #data > 8 * 1024 * 1024 then ply:ChatPrint("SQL stats are too large to transfer.") return end
+    statsSerial = (statsSerial + 1) % 4294967296
+    local transfer = {id = statsSerial, data = data, count = math.max(1, math.ceil(#data / STATS_BYTES)), index = 1}
+    statsTransfers[ply] = transfer
+    SendStatsChunk(ply, transfer)
 end
+
+net.Receive("ZB_AdminStatsAckV2", function(_, ply)
+    local id, index = net.ReadUInt(32), net.ReadUInt(16)
+    local transfer = statsTransfers[ply]
+    if not AdminStatsAllowed(ply) or not transfer or not transfer.awaiting
+        or transfer.id ~= id or transfer.index ~= index then return end
+    transfer.awaiting = false
+    if index == transfer.count then statsTransfers[ply] = nil return end
+    transfer.index = index + 1
+    timer.Simple(0.1, function() SendStatsChunk(ply, transfer) end)
+end)
+
+hook.Add("PlayerDisconnected", "ChudSQLTransferCleanup", function(ply) statsTransfers[ply] = nil end)
+timer.Create("ChudSQLTransferTimeout", 5, 0, function()
+    for ply, transfer in pairs(statsTransfers) do
+        if not IsValid(ply) or CurTime() - (transfer.sentAt or 0) > 30 then statsTransfers[ply] = nil end
+    end
+end)
 
 local function SendAdminStatsSaveResult(ply, ok, message)
     if not IsValid(ply) then return end
@@ -170,6 +197,11 @@ end
 
 local function SendAdminStats(ply)
     if not AdminStatsAllowed(ply) then return end
+    local now = CurTime()
+    if statsTransfers[ply] or now < (ply.ChudSQLRequestAfter or 0) then return end
+    if ply.ChudSQLQueryAt and now - ply.ChudSQLQueryAt < 30 then return end
+    ply.ChudSQLRequestAfter = now + 2
+
 
     if not AdminStatsSQLReady() then
         SendAdminStatsRows(ply, GetActiveAdminStatsRows())
@@ -181,7 +213,12 @@ local function SendAdminStats(ply)
         active[ply2:SteamID64()] = ply2
     end
 
+    local queryToken = {}
+    ply.ChudSQLQueryToken = queryToken
+    ply.ChudSQLQueryAt = now
     mysql:RawQuery([[SELECT e.steamid, e.steam_name, e.skill, e.experience, e.deaths, e.kills, e.suicides, g.value AS karma, a.achievements FROM zb_experience e LEFT JOIN zb_guilt g ON g.steamid = e.steamid LEFT JOIN hg_achievements a ON a.steamid = e.steamid]], function(result)
+        if not IsValid(ply) or ply.ChudSQLQueryToken ~= queryToken then return end
+        ply.ChudSQLQueryAt = nil
         if not AdminStatsAllowed(ply) then return end
 
         local rows = {}

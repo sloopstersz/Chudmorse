@@ -35,7 +35,7 @@ end
 
 function MODE:ShouldRoundEnd()
 	local endround, winner = zb:CheckWinner(self:CheckAlivePlayers())
-	--print("ShouldRoundEnd", endround, winner)
+	
 	return endround
 end
 
@@ -153,7 +153,8 @@ function MODE:EndRound()
 	elseif team0 == 0 and team1 == 0 then
 		winnerteam = 3 -- everybody died
 	end
-	--print("Endround winnerteam ", winnerteam)
+	if ChudCoinRewards then ChudCoinRewards.TeamWin(self, winnerteam) end
+	
 	self:ClearPlayerRoles()
 	timer.Simple(2,function()
 		net.Start("hl2dm_roundend")

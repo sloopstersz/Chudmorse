@@ -221,13 +221,14 @@ function MODE:EndRound()
 	end)
 
 	local endround, winner = zb:CheckWinner(self:CheckAlivePlayers())
+	if ChudCoinRewards then ChudCoinRewards.TeamWin(self, winner) end
 	for k,ply in player.Iterator() do
 		if ply:Team() == winner then
 			ply:GiveExp(math.random(15,30))
 			ply:GiveSkill(math.Rand(0.1,0.15))
-			--print("give",ply)
+			
 		else
-			--print("take",ply)
+			
 			ply:GiveSkill(-math.Rand(0.05,0.1))
 		end
 	end

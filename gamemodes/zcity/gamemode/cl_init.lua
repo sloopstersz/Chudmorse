@@ -377,7 +377,7 @@ local function addToPlayerInfo(ply, muted, volume)
 		end
 	end
 
-	//PrintTable(hg.playerInfo)
+	
 end
 
 gameevent.Listen("player_connect")

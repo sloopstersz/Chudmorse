@@ -114,7 +114,7 @@ end)
 //zb.GetAllPoints()
 
 hook.Add( "Initialize", "LoadMapPoints", zb.CreateMapDir )
---PrintTable(zb.Points.Example.Points)
+
 -- pointData = { pos = Vector(), ang = Angle() } // Таблица пойнта
 COMMANDS.pointnew = {function(ply,args)
     if not args[1] then

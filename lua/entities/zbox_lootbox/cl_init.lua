@@ -28,7 +28,7 @@ end
 local function getIconThing(i)
     if weapons.Get(i) then
         local GunTable = weapons.Get(i)
-        --print(GunTable.WepSelectIcon2)
+        
         local Icon = (GunTable.WepSelectIcon2 ~= nil and GunTable.WepSelectIcon2) or GunTable.WepSelectIcon
         local Overide = GunTable.WepSelectIcon2 == nil and true or false
         local HaveIcon = true
@@ -38,7 +38,7 @@ local function getIconThing(i)
     local entss = scripted_ents.Get(i)
     if entss then 
         local GunTable = scripted_ents.Get(i)
-        --print(GunTable.WepSelectIcon2)
+        
         local Icon = (GunTable.IconOverride ~= nil and GunTable.IconOverride) or GunTable.IconOverride
         local Overide = GunTable.IconOverride == nil and true or false
         if not GunTable.IconOverride then return Icon, false, false, false end
@@ -231,7 +231,7 @@ hook.Add("PostDrawOpaqueRenderables","Draw3D2DFrameContainer",function()
     local ent = hg.OpenedContainer
 
 	if IsValid(ent) and IsValid(zbContainerMenu) and !zbContainerMenu.Closing then
-        --print(ent:GetModel())
+        
 		local pos,ang = LocalToWorld(modelOffset[ent:GetModel()] and modelOffset[ent:GetModel()][1] or offsetVec1, modelOffset[ent:GetModel()] and modelOffset[ent:GetModel()][2] or offsetAng1, ent:GetPos(), ent:GetAngles())
         local veiwSetup = render.GetViewSetup()
         local angle = ( pos - veiwSetup.origin ):GetNormalized():Angle()
@@ -242,7 +242,7 @@ hook.Add("PostDrawOpaqueRenderables","Draw3D2DFrameContainer",function()
         ang = Angle(0,angle.y,veiwSetup.angles[1]) - (modelOffset[ent:GetModel()] and modelOffset[ent:GetModel()][2] or offsetAng1)
 		vgui.Start3D2D(pos + ang:Forward() * -12.7 - ang:Right() * 7 + ang:Up() * 5, ang, 0.04)
             zbContainerMenu:Paint3D2D()
-            --print("asd")
+            
 		vgui.End3D2D()
 	end
 end)

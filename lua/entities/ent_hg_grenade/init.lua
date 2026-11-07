@@ -312,7 +312,8 @@ function ENT:Explode()
 		if enta.organism then
 			if IsValid(enta.organism.owner) and enta.organism.owner:IsPlayer() then
 				local frac = math.Clamp((disorientation_dis - len) / disorientation_dis, 0.1, 1)
-				hg.ExplosionDisorientation(enta, 5 * frac, 6 * frac)
+				local shieldCover = hg.GetShieldBlastMultiplier and hg.GetShieldBlastMultiplier(enta, selfPos) or 1
+				hg.ExplosionDisorientation(enta, (5 * frac) * shieldCover, (6 * frac) * shieldCover)
 				hg.RunZManipAnim(enta.organism.owner, "shieldexplosion")
 			end
 		end
@@ -332,7 +333,8 @@ function ENT:Explode()
 		end
 
 		local physics_frac = math.Clamp((dis - len) / dis, 0.5, 1)
-		local forceadd = force * physics_frac * GRENADE_KNOCKBACK_FORCE
+		local shieldBlast = hg.GetShieldBlastMultiplier and hg.GetShieldBlastMultiplier(enta, selfPos) or 1
+		local forceadd = force * physics_frac * GRENADE_KNOCKBACK_FORCE * shieldBlast
 		local liftForce = Vector(0, 0, GRENADE_LIFT_FORCE * physics_frac * GRENADE_LIFT_FRAC)
 		local tracePos = enta:IsPlayer() and (entPos + enta:OBBCenter()) or entPos
 		local tr = hg.ExplosionTrace(selfPos, tracePos, {self})

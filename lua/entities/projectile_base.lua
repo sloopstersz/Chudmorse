@@ -184,7 +184,8 @@ if SERVER then
 			local behindwall = tr.Entity != enta and tr.MatType != MAT_GLASS
 			if behindwall then continue end
 
-			hg.ExplosionDisorientation(enta, 5 * frac, 6 * frac)
+			local shieldCover = hg.GetShieldBlastMultiplier and hg.GetShieldBlastMultiplier(enta, SelfPos) or 1
+			hg.ExplosionDisorientation(enta, (5 * frac) * shieldCover, (6 * frac) * shieldCover)
 			hg.RunZManipAnim(enta.organism.owner, "shieldexplosion")
 		end
 
@@ -301,7 +302,7 @@ elseif CLIENT then
 		if SERVER then return end
 		local view = render.GetViewSetup(true)
 		local time = pos:Distance(view.origin) / 17836
-		--print(time)
+		
 		timer.Simple(time, function()
 			local owner = Entity(0)
 			if not isOnWater then
@@ -320,7 +321,7 @@ elseif CLIENT then
 		local self = net.ReadEntity()
 		local onWater = net.ReadBool()
 		local watersnd = net.ReadString() or ""
-		--print("huy")
+		
 		PlaySndDist(sndfar,snd,pos,onWater,watersnd)
 	end)
 end

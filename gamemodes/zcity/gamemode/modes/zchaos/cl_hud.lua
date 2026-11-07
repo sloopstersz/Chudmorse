@@ -118,6 +118,25 @@ hook.Add("HUDPaint", "CHAOS_SubRoles_Abilities", function()
 				end
 			end
 			
+			if(ply.SubRole == "traitor_martialartist")then
+				local aim_ent, other_ply, btrace = MODE.GetPlayerTraceToOther(ply, nil, 160)
+
+				if(IsValid(other_ply) and other_ply:IsPlayer() and other_ply:Alive())then
+					local text = "[ALT + E] MARTIAL ARTIST"
+					if(IsValid(other_ply:GetNWEntity("FakeRagdoll")))then
+						text = "[ALT + E] Giantswing"
+					end
+
+					local tw, th = surface.GetTextSize(text)
+					local cx, cy = btrace.HitPos:ToScreen().x, btrace.HitPos:ToScreen().y
+					cy = cy + y_offset
+
+					draw_shadow_text(text, cx, cy)
+
+					y_offset = y_offset + th + after_text_offset
+				end
+			end
+
 			if(ply.SubRole == "traitor_chemist")then
 				local after_side_bar_offset = 5
 				local bar_border = 5

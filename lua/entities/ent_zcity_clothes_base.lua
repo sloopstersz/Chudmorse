@@ -89,8 +89,8 @@ end
         for _,v in pairs(Clothes) do
             local cloth = Entity(v)
             if !IsValid(cloth) then continue end
-            --PrintTable(v.SlotOccupation)
-            --PrintTable(self.SlotOccupation)
+            
+            
             for slot, _ in pairs(cloth.SlotOccupation) do
                 if isnumber(slot) and self.SlotOccupation[slot] then return false end
             end

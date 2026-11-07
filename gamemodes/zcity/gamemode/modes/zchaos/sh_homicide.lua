@@ -104,6 +104,7 @@ local LegacyTraitorLoadout = {
 }
 
 local TraitorSkillsetSubRoles = {
+    ["martialartist"] = "traitor_martialartist",
 	["fox"] = "traitor_fox",
 	["infiltrator"] = "traitor_infiltrator",
 	["assassin"] = "traitor_assasin",
@@ -115,6 +116,9 @@ local function ApplyTraitorLoadout(ply)
 	if not loadout.skillset and not istable(loadout.weapons) then loadout = LegacyTraitorLoadout end
 
 	local skillset = loadout.skillset or "none"
+    if SERVER then
+        ply:SetNWBool("ChudDragonStyle", skillset == "martialartist" and loadout.dragonstyle == true and ChudDragonStyle and ChudDragonStyle.Unlocked(ply) or false)
+    end
 	if SERVER then ply.ChudAppliedTraitorSkillset = skillset end
 	local weaponsList = loadout.weapons or {}
 	ply.SubRole = TraitorSkillsetSubRoles[skillset] or ply.SubRole
@@ -129,6 +133,18 @@ local function ApplyTraitorLoadout(ply)
 		ply.organism.stamina.max = 300
 	elseif skillset == "chemist" then
 		if CleanChemicalsOfPlayer then CleanChemicalsOfPlayer(ply) end
+	elseif skillset == "martialartist" then
+		ply.organism.stamina.max = 340
+		ply.organism.legstrength = 1.5		-- stronger kicks
+		ply.organism.meleespeed = 1.35		-- faster fists
+		ply.organism.painresist = 0.6		-- pain resistance
+		ply.MeleeDamageMul = 1.4			-- stronger fists and nunchucks
+		ply.MAMeleeApplied = true
+		if file.Exists("models/models/danguyen/c_nunchucks.mdl", "GAME") then
+			ply:Give("weapon_hg_nunchuks")
+		else
+			ply:ChatPrint("[Martial Artist] The nunchucks content isn't installed on this server, so you start without them.")
+		end
 	end
 
 	local inv = ply:GetNetVar("Inventory", {})
@@ -155,10 +171,11 @@ local function ApplyTraitorLoadout(ply)
 					if hg and hg.AddAttachmentForce then hg.AddAttachmentForce(ply, w, "supressor4") end
 				end
 			end)
-		elseif wep == "weapon_p22_ammo" then
+		elseif wep == "weapon_p22_ammo" or wep == "weapon_pm9_ammo" then
+			local parentWeapon = wep == "weapon_pm9_ammo" and "weapon_pm9" or "weapon_p22"
 			timer.Simple(0.5, function()
-				if IsValid(ply) and ply:HasWeapon("weapon_p22") then
-					local w = ply:GetWeapon("weapon_p22")
+				if IsValid(ply) and ply:HasWeapon(parentWeapon) then
+					local w = ply:GetWeapon(parentWeapon)
 					if IsValid(w) and w:GetPrimaryAmmoType() >= 0 then
 						ply:GiveAmmo(w:GetMaxClip1(), w:GetPrimaryAmmoType(), true)
 					end
@@ -265,6 +282,11 @@ MODE.ApplyTraitorLoadout = ApplyTraitorLoadout
 MODE.ApplyHeroLoadout = ApplyHeroLoadout
 
 MODE.SubRoles = {
+    ["traitor_martialartist"] = {
+        Name = "MARTIAL ARTIST",
+        Description = "Martial Artist: nunchucks, enhanced martial arts, and Alt + E takedowns. Requires 15,000 total EXP.",
+        Objective = "Use martial arts and your loadout to eliminate your targets.",
+    },
     ["traitor_fox"] = {
         Name = "Technician",
         Description = "Use the radial menu to scan for map traps. Aim at a trap and press E to activate it.",

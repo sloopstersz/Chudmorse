@@ -498,7 +498,7 @@ function zb.CheckRTVVotes(needPrint)
     return false
 end
 local function rtv(ply, args)
-    --print(zb.votestarted)
+    
 	if zb.votestarted then
 		zb.RTVMenu(ply)
 		return

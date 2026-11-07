@@ -12,7 +12,7 @@ function MODE:CreateTimer(name, delay, repetitions, func)
 	self.saved.Timers = self.saved.Timers or {}
 
 	if timer.Exists(name) then
-		--print("Fear: Attempted to create an already existing timer: " .. name)
+		
 		return
 	end
 

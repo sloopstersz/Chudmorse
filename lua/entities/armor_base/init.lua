@@ -83,7 +83,7 @@ function ENT:ApplyData(ply,equipment)
 end
 
 function ENT:ReciveData(ply,equipment)
-	--print(ply,equipment, ply:GetNWString("ArmorMaterials" .. equipment, self.mat))
+	
 	self.mat = ply:GetNWString("ArmorMaterials" .. equipment, self.mat)
 	self:SetSubMaterial(0,self.mat)
 

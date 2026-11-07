@@ -373,7 +373,7 @@ function MODE:SelectTheBestVictim()
 			max_interest = tbl.calculated_interest
 			vicitm = tbl.ply
 		end
-		-- print(tbl.calculated_interest, tbl.ply)
+		
 	end
 
 	return vicitm
@@ -501,12 +501,12 @@ function MODE:RoundThink()
 
 	local ply = self.CurrentVictim
 	
-	-- print(ply, CurTime(), MODE.saved.KillTime)
+	
 
 	if !IsValid(ply) then return end
 	if CurTime() < self.saved.KillTime then return end
 
-	--print(ply, CurTime(), MODE.saved.KillTime, true)
+	
 
 	if #players == 1 then
 		ply:KillSilent()

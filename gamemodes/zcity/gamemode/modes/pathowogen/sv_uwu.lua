@@ -892,7 +892,7 @@ function MODE:SpawnGlideHelicopter()
 		-- end
 
 		for i, weld in pairs(constraint.FindConstraints(this, "Weld")) do
-			//PrintTable(weld)
+			
 			if weld.Ent2:IsRagdoll() then
 				local ply = hg.RagdollOwner(weld.Ent2)
 				//ply:ChatPrint("fuckyou")

@@ -114,8 +114,8 @@ local SHTable = zb.Experience
 function zb.Experience.GetAwards( self )
     local skill = self.skill or 0
     local exp = self.exp or 0
-    --print(skill,exp)
-    --print(MedalTab.skill[1])
+    
+    
     local Medal = nil
     for i = 1, #SHTable.SkillMedals do
         local MedalTab = SHTable.SkillMedals[i]
@@ -211,9 +211,9 @@ if SERVER then
         timer.Simple(.1,function()
             if not IsValid(ply) then return end
             local most_harm,biggest_attacker = 0,nil
-                --print(ply)
+                
             for attacker,attacker_harm in pairs(harm) do
-                --print(attacker)
+                
                 if not IsValid(attacker) or not attacker:IsPlayer() or not isnumber(attacker_harm) then continue end
                 if most_harm < attacker_harm then
                     most_harm = attacker_harm

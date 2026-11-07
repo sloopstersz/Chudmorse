@@ -1021,7 +1021,7 @@ function MODE:CheckAlivePlayers()
 		end
 		
 		if ply.isTraitor and not ply:GetNetVar("handcuffed",false) then
-			--print(ply)
+			
 			AlivePlyTbl[1][#AlivePlyTbl[1] + 1] = ply
 		elseif(not ply.isPolice)then
 			AlivePlyTbl[0][#AlivePlyTbl[0] + 1] = ply

@@ -12,7 +12,7 @@ function ENT:Draw()
 		self:CallOnRemove("Remove_CLMDL", function() self.RModel:Remove() end)
 	end
 
-	--print(self.RModel)
+	
 	local Vel, Ang = self:GetVelocity(), self:GetAngles()
 	if Vel:Length() > 100 then
 		Ang = Vel:Angle()

@@ -99,6 +99,14 @@ local function GiveGun(ply, class)
     end
 end
 
+-- Match the existing HL2 class distribution; participants are shuffled first.
+local function CombineVariant(index, playerCount)
+    if index == 1 then return "elite", "Elite" end
+    if index == 2 then return "shotgunner", "Shotgunner" end
+    if index == 3 and playerCount > 6 then return "sniper", "Sniper" end
+    return "default", "Soldier"
+end
+
 function MODE:GiveEquipment()
     if self.VoteInProgress or not self.SelectedScenario or self.Equipped then return end
     self.Equipped = true
@@ -119,8 +127,19 @@ function MODE:GiveEquipment()
         ply:Give("weapon_hands_sh")
         local role
         if side == 1 then
-            role = self.SelectedScenario == 2 and "Civil Protection" or "Combine"
-            ply:SetPlayerClass(self.SelectedScenario == 2 and "Metrocop" or "Combine", {})
+            if self.SelectedScenario == 2 then
+                role = "Civil Protection"
+                ply:SetPlayerClass("Metrocop", {})
+            else
+                local subclass, title = CombineVariant(i - friendlyCount, #players)
+                role = title
+                ply.subClass = subclass
+                ply:SetSkin(0)
+                ply:SetPlayerClass("Combine", {})
+                -- The class consumes subClass while applying model, armor and
+                -- weapons. Publish the variant afterward for its HUD/visor.
+                ply.leader = subclass == "elite" or nil
+            end
         elseif self.SelectedScenario == 1 then
             role = "National Guard"
             ply:SetPlayerClass("nationalguard", {})
@@ -140,6 +159,7 @@ function MODE:GiveEquipment()
         ply:SetTeam(side)
         ply:SetNWString("HL2TDMRole", role)
         zb.GiveRole(ply, role, side == 1 and Color(80, 190, 230) or Color(230, 145, 60))
+        if side == 1 and self.SelectedScenario ~= 2 then ply:SetNWString("PlayerRole", role) end
         ply:SelectWeapon("weapon_hands_sh")
         net.Start("HL2TDMIntro")
         net.WriteUInt(self.SelectedScenario, 3)
@@ -178,6 +198,8 @@ function MODE:EndRound()
     local alive = self:CheckAlivePlayers()
     local scenario = self.Scenarios[self.SelectedScenario or 3]
     local winner = #alive[1] > 0 and scenario.opposition or #alive[2] > 0 and (self.SelectedScenario == 2 and "Civil Protection" or "Combine") or "Nobody"
+    local winningSide = #alive[1] > 0 and 0 or (#alive[2] > 0 and 1 or nil)
+    if ChudCoinRewards then ChudCoinRewards.TeamWin(self, winningSide) end
     PrintMessage(HUD_PRINTTALK, "Half-Life 2 TDM: " .. winner .. " wins.")
     self:SendState()
 end

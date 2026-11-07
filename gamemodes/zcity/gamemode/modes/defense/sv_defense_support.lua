@@ -87,14 +87,14 @@ local function FindAirdropPosition()
                         return finalPos, Vector(finalPos.x, finalPos.y, math.min(adjustedStartHeight, skyCheckHeight))
                     else
                        
-                        --print("[DEFENSE] Airdrop path blocked at height: " .. dropPathTrace.HitPos.z)
+                        
                     end
                 end
             end
         end
     end
     
-    --print("[DEFENSE] Could not find suitable airdrop position after " .. attempts .. " attempts")
+    
     return nil
 end
 

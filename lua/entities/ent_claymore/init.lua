@@ -136,10 +136,11 @@ function ENT:ActivateExplosive()
 	for _, ply in ipairs(ents.FindInSphere(selfPos,self.ConcussionDis)) do
 		if not ply:IsPlayer() then continue end
 		local tr = hg.ExplosionTrace(selfPos,ply:GetPos(),{self})
+		local shieldBlast = hg.GetShieldBlastMultiplier and hg.GetShieldBlastMultiplier(ply, selfPos) or 1
 		if tr.Entity != ply then continue end
 		local dist = ply:GetPos():Distance(selfPos)
 		local tinnitusDuration = math.Clamp(10 * (1 - dist/self.ConcussionDis), 2, 10)
-		ply:AddTinnitus(math.max(tinnitusDuration,1.5), true)
+		ply:AddTinnitus(math.max(tinnitusDuration,1.5) * shieldBlast, true)
 	end
 	   
 	--util.BlastDamage(self, attacker, selfPos, self.ShrapnelDis, self.BlastDamage)

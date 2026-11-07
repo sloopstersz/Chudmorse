@@ -74,7 +74,7 @@ net.Receive("zb_xp_get",function()
         ply.SvDB.Headshots = net.ReadUInt(32)
         if IsValid(EXP.OpenedAccount) then EXP.OpenedAccount:Udpate(ply) end
     end
-    --print(ply.exp,ply.skill)
+    
     if needCallback then
         if IsValid(EXP.OpenedAccount) then
             EXP.OpenedAccount:Remove()

@@ -255,6 +255,7 @@ function MODE:EndRound()
         end
     end
 
+    if ChudCoinRewards then ChudCoinRewards.TeamWin(self, winner) end
     local winnerprt = (winner == 1 and "Counter-Terrorists") or (winner == 0 and "Terrorists") or "Nobody"
     
     PrintMessage(HUD_PRINTTALK, winnerprt.." have won the round.")
@@ -403,7 +404,7 @@ hook.Add("HarmDone", "MoneyGive", function(ply, victim, amt)
     
     add = math.Round(add,0)
 
-    --print(add,ply,ply:GetNWInt("TDM_Money"),victim)
+    
 
     ply:SetNWInt( "TDM_Money", math.max(ply:GetNWInt( "TDM_Money" ) + add, 0) )
 

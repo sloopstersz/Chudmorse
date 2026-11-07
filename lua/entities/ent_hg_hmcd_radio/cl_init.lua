@@ -374,7 +374,7 @@ function ENT:Think()
 		if self:GetPos():Distance(view.origin) > 1000 then
 			playingents[self:EntIndex()][3]:SetVolume(0)
 			playingents[self:EntIndex()][3]:SetPos(self:GetPos())
-		   -- print("huy")
+		   
 		else
 			playingents[self:EntIndex()][3]:SetVolume( playingents[self:EntIndex()][5] or 1 )
 		end

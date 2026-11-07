@@ -133,7 +133,7 @@ hook.Add("PrePlayerDraw", "CHAOS_SubRoles_Abilities", function(ply, flags)
 		-- if(IsValid(victim))then
 			-- local ragdoll = victim.FakeRagdoll or victim:GetNWEntity("RagdollDeath", victim.FakeRagdoll)
 			
-			-- print(ply, ragdoll)
+			
 			
 			-- if(IsValid(ragdoll))then
 				

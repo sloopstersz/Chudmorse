@@ -342,6 +342,7 @@ end
 
 function MODE:EndRound()
     if self.Winner == 1 and IsValid(self.VIC) and self.VIC:Alive() then
+        if (self.Stage or 0) > 3 then hook.Run("ChudAchievementVIPEscort", self.VIC, self) end
         local guardAlive = false
         for _, ply in ipairs(self.Players or {}) do
             if IsValid(ply) and ply ~= self.VIC and ply:Alive() then
@@ -379,6 +380,9 @@ function MODE:CanSpawn() return self.Deploying == true end
 -- Prep deaths and late joiners stay out until the next round.
 function MODE:PlayerDeathThink() return false end
 function MODE:PlayerSpawn(ply)
+    -- FakeUp calls Spawn while restoring the same living character.
+    -- Never queue loadout cleanup or an anti-respawn death for that restoration.
+    if OverrideSpawn then return end
     if not self.Deploying and ply:GetNWBool("ChudVIPPreparing", false) then
         timer.Simple(0, function()
             if IsValid(ply) and CurrentRound() == self and not self.Deploying

@@ -213,7 +213,7 @@ function hg.GenerateLoot(ply,ent,func)
 	local on_ground = not IsValid(ply)
 
 	local time = CurTime() - (zb.ROUND_START or CurTime())
-	--print(time)
+	
 	
 	local mul = hook.Run("ZB_LootMultiplier", ply)
 
@@ -261,7 +261,7 @@ function hg.GenerateLoot(ply,ent,func)
 		end
 	end
 
-	--print(tab)
+	
 
 	local _, entName = hg.WeightedRandomSelect(tab)
 
@@ -708,7 +708,7 @@ hook.Add("Boxes Think", "SpawnBoxes", function()
 				mask = MASK_VISIBLE
 			})
 			if IsValid(tr.Entity) and tr.Entity == ply then
-				--print("Fuck") 
+				
 				return
 			end
 		end
@@ -751,7 +751,7 @@ hook.Add("Boxes Think", "SpawnBoxes", function()
 	if round.LootLooseSkip and math.Rand(0, 1) < round.LootLooseSkip then return end
 
 	local entName, AmmoCount, Tab = hg.GenerateLoot()
-	//print(entName)
+	
 	if not entName or entName == "" then return end
 
 	local huy = ents.Create(entName)

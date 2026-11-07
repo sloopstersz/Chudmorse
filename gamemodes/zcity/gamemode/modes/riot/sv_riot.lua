@@ -291,6 +291,9 @@ end
 
 
 function MODE:EndRound()
+    local ended, sideIndex = zb:CheckWinner(self:CheckAlivePlayers())
+    local winningSide = sideIndex == 1 and 0 or (sideIndex == 2 and 1 or nil)
+    if ChudCoinRewards then ChudCoinRewards.TeamWin(self, winningSide, true) end
     RemoveVoteTimers()
     timer.Simple(2,function()
         net.Start("riot_roundend")

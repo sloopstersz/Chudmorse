@@ -749,7 +749,7 @@ function CheckAndShowCommanderHint()
         if not COMMANDER_HINT.shownThisRound then
             ShowCommanderHint()
             COMMANDER_HINT.shownThisRound = true
-            --print("[DEFENSE] Showing commander hint")
+            
         end
     end
 end
@@ -771,7 +771,7 @@ local function ShowCommanderHint()
     COMMANDER_HINT.endTime = nil
 
     surface.PlaySound("buttons/button24.wav")
-    --print("[DEFENSE] Commander hint activated")
+    
 end
 
 
@@ -939,12 +939,12 @@ hook.Add("OnLocalPlayerRoleChanged", "CheckCommanderRoleChange", function(oldRol
     if newRole == "Commander" and not COMMANDER_HINT.shownThisRound then
         ShowCommanderHint()
         COMMANDER_HINT.shownThisRound = true
-        --print("[DEFENSE] Commander hint triggered by role change")
+        
     end
 end)
 
 
 concommand.Add("defense_show_hint", function()
     ShowCommanderHint()
-    --print("[DEFENSE] Commander hint triggered by console command")
+    
 end)

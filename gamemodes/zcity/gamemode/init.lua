@@ -497,7 +497,7 @@ hook.Add("PostCleanupMap","changelevel_generate",function()
     for ent, pos in pairs(maps) do
 		if ent.map == game.GetMap() then continue end
         local dist2 = pos:Distance(player_pos)
-        --print(dist,dist2,ent.map,pos,player_pos)
+        
         if dist2 > dist then
             dist = dist2
             map = ent

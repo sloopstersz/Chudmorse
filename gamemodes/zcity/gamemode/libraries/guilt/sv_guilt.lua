@@ -1,3 +1,27 @@
+-- Resolve allegiance from the player, including the starting infected and ragdolls.
+local function ZombieCombatPlayer(ent)
+    if not IsValid(ent) then return nil end
+    if ent:IsPlayer() then return ent end
+    local owner = hg.RagdollOwner(ent)
+    if IsValid(owner) and owner:IsPlayer() then return owner end
+    if IsValid(ent.ply) and ent.ply:IsPlayer() then return ent.ply end
+    owner = ent:GetNWEntity("ply")
+    if IsValid(owner) and owner:IsPlayer() then return owner end
+end
+local function ZombieCombatAllegiance(ply)
+    return (ZZIsZombie and ZZIsZombie(ply)) == true
+        or ply:GetNWBool("ZZFirstInfected", false)
+        or ply.ZZNativeZombie == true
+        or ply.PlayerClassName == "headcrabzombie"
+end
+local function ZombieCombatExempt(attacker, victim)
+    local mode = CurrentRound()
+    if not mode or mode.name ~= "zzombies" then return false end
+    attacker, victim = ZombieCombatPlayer(attacker), ZombieCombatPlayer(victim)
+    if not attacker or not victim then return false end
+    return ZombieCombatAllegiance(attacker) ~= ZombieCombatAllegiance(victim)
+end
+
 -- СДЕЛАЙТЕ СИНХРУ С СКУЭЛЬ УЖЕ // ЛАДНО Я САМ СДЕЛАЮ
 zb = zb or {}
 
@@ -169,8 +193,8 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
     local amt = harm / maxharm
     
     if amt > 0.2 or newharm / maxharm > 0.8 then
-        --print("Player "..Attacker:Name().." harmed player "..(Victim:IsPlayer() and Victim:Name() or (tostring(Victim))).." with "..harm.." points.")
-        --print("They contributed a total of "..math.Round(newharm / maxharm * 100, 0).."% of "..(Victim:IsPlayer() and Victim:Name() or (tostring(Victim))).."'s death")
+        
+        
     end
 
     if zb and zb.hostage and Victim == zb.hostage then
@@ -202,6 +226,8 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
         //Attacker:AddFrags(1) -- better make it a system that counts kills and gives frags at the end of the round
     end
 
+    if ZombieCombatExempt(Attacker, Victim) then return end
+
     Victim = hg.GetCurrentCharacter(Victim) or Victim
     Victim = hg.RagdollOwner(Victim) or Victim
 
@@ -210,6 +236,7 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
     if rnd.GuiltDisabled or GetConVar("zb_dev"):GetBool() then return end
 
     if Attacker == Victim then return end
+    if ZombieCombatExempt(Attacker, Victim) then return end
 
     -- Do not penalize damage needed to kill a stage 2+ infected survivor.
     if rnd.name == "zzombies" and ZZInfection and ZZInfection.InfectedSurvivorStage
@@ -464,13 +491,13 @@ net.Receive("forgive_player", function(len, ply)
     local harm = zb.HarmDoneKarma[ply][ent]
     if not harm or harm <= 0 then return end
 
-    hook.Run("ChudAchievementForgive", ply, ent)
     ent.Karma = math.Clamp(ent.Karma + harm, 0, zb.MaxKarma)
     ent:SetNetVar("Karma",ent.Karma)
     if ply.GiveExp then ply:GiveExp(math.Round(harm)) end
 
     zb.HarmDone[ply][ent] = 0
     zb.HarmDoneKarma[ply][ent] = 0
+    hook.Run("ChudAchievementForgive", ply, ent)
     net.Start("open_guilt_menu")
     net.WriteTable(zb.HarmDoneKarma[ply])
     net.Send(ply)
@@ -488,6 +515,7 @@ hook.Add("ZC_SomeoneGetFallBy","IdiotsMustBeKilled",function(Attacker,Victim)
     if rnd.GuiltDisabled or GetConVar("zb_dev"):GetBool() then return end
    
     if Attacker == Victim then return end
+    if ZombieCombatExempt(Attacker, Victim) then return end
 
     if Victim.isTraitor and !Attacker.isTraitor and (rnd.name == "hmcd" or rnd.name == "framed") and !zb.IsForce(Attacker) then return end
     if Attacker.isTraitor and !Victim.isTraitor and (rnd.name == "hmcd" or rnd.name == "framed") then return end

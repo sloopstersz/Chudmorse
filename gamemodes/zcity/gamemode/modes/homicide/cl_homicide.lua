@@ -475,7 +475,11 @@ function MODE:HUDPaint()
 
 	if(lply.SubRole and lply.SubRole != "")then
 		cur_y = cur_y + ScreenScale(20)
-		add(((MODE.SubRoles[lply.SubRole] and MODE.SubRoles[lply.SubRole].Name or lply.SubRole) or lply.SubRole), "ZB_HomicideMediumLarge", ColorRole, sw * 0.5, cur_y, "right", stack_delay, 1.05)
+        local roleName = MODE.SubRoles[lply.SubRole] and MODE.SubRoles[lply.SubRole].Name or lply.SubRole
+        if lply.SubRole == "traitor_martialartist" then
+            roleName = lply:GetNWBool("ChudDragonStyle", false) and "DRAGON STYLE" or "MARTIAL ARTIST"
+        end
+        add(roleName, "ZB_HomicideMediumLarge", ColorRole, sw * 0.5, cur_y, "right", stack_delay, 1.05)
 		stack_delay = stack_delay + 0.15
 	end
 

@@ -268,7 +268,7 @@ hook.Add("CreateMove", "HMCD_RolePanelClick", function(cmd)
 	end
 
 	if(input.WasMousePressed(MOUSE_LEFT))then
-			-- print("Left mouse button was pressed")
+			
 		local hovered_panel = vgui.GetHoveredPanel()
 		
 		if(IsValid(hovered_panel) and IsValid(hovered_panel.ZRolePanel))then

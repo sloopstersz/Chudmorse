@@ -74,7 +74,7 @@ end)
 --
 -- No loose items and no crates are spawned during the phases. Loot only comes out of
 -- the searchable containers that are already on the map (plus the supply boxes dropped
--- during cooldowns, see below), and it is drawn from LOOT_POOL. Weapons are the rarest finds.
+-- during cooldowns, see below), using separate map and supply pools. Firearms are rarer than melee weapons.
 --------------------------------------------------------------------------------
 
 MODE.LootSpawn = false -- turns off the periodic loot/crate spawner
@@ -89,105 +89,86 @@ MODE.Lootables = setmetatable({}, {
 	end
 })
 
--- {weight, class}. Higher weight = found more often.
--- ent_att_supressor4 is left out on purpose: the loot system in this version files a literal
--- attachment entity as a weapon. Add it back once sv_lootspawn.lua handles "ent_att_" names.
-local LOOT_POOL = {
-    {0.1, "weapon_xdebarricade"}, -- Very rare outside the three starting builders.
-    {2, "weapon_zz_antidote"},
-    {2, "weapon_zz_recovery_pills"},
-	-- melee
-	{5,   "weapon_bat"},
-	{2.5, "weapon_metalbat"},
-	{5,   "weapon_hammer"},
-	{3,   "weapon_hatchet"},
-	{2,   "weapon_hg_axe"},
-	{3,   "weapon_combatknife"},
-	{3,   "weapon_buck200knife"},
-	{1.2, "weapon_hg_spear_pro"},
-	{2.5, "hg_brassknuckles"},
-
-	-- pistols and revolvers
-	{1.8, "weapon_m9beretta"},
-	{1.8, "weapon_cz75"},
-	{1.2, "weapon_glock26"},
-	{1.2, "weapon_revolver2"},
-	{0.9, "weapon_revolver357"},
-
-	-- SMGs and rifles
-	{0.9, "weapon_skorpion"},
-	{0.6, "weapon_draco"},
-	{0.6, "weapon_mp5"},
-	{0.5, "weapon_nlar15"},
-	{0.5, "weapon_mosin"},
-
-	-- armor and gear
-	{1.2, "ent_armor_vest1"},
-    {1.2, "ent_armor_mask2"},
-	{0.6, "ent_armor_helmet6"},
-	{1.2, "ent_armor_mask3"},
-	{1.2, "ent_armor_helmet2"},
-	{0.5, "weapon_ballistic_shield"},
-	{1.2, "weapon_ammocrate"},
-	{0.6, "weapon_hg_jam"},
-
-	-- medical and utility
-	{7,   "weapon_bandage_sh"},
-	{3.5, "weapon_bigbandage_sh"},
-	{4,   "weapon_tourniquet"},
-	{5,   "weapon_ducttape"},
-	{2,   "weapon_needle"},
-	{1.2, "weapon_medkit_sh"},
-	{1.2, "weapon_morphine"},
-	{1,   "weapon_adrenaline"},
-	{1,   "weapon_naloxone"},
-	{0.6, "weapon_mannitol"},
-	{0.4, "weapon_fentanyl"}
+-- Separate map and supply-crate weapon pools. Group weights keep firearms rare
+-- even when the firearm list contains more entries than the melee list.
+local MAP_MELEE = {"weapon_pocketknife", "weapon_hg_shovel", "weapon_hg_sledgehammer", "weapon_hg_tonfa", "weapon_hg_machete", "weapon_pan", "weapon_hg_spear", "weapon_hammer", "weapon_hg_axe", "weapon_hg_extinguisher", "weapon_hg_crowbar", "weapon_buck200knife", "weapon_brick", "weapon_bat", "weapon_metalbat"}
+local MAP_GUNS = {"weapon_px4beretta", "weapon_browninghp", "weapon_cz75", "weapon_p22", "weapon_makarov", "weapon_pm9", "weapon_revolver2", "weapon_tokarev", "weapon_dracovska", "weapon_doublebarrel", "weapon_remington870_long", "weapon_doublebarrel_short", "weapon_remington870_sawed_off", "weapon_kar98", "weapon_mosin", "weapon_skorpion", "weapon_mac11", "weapon_uzi", "weapon_mini14", "weapon_ruger", "weapon_hg_crossbow", "weapon_hg_bow", "weapon_sks", "weapon_akmwreked"}
+local CRATE_MELEE = {"weapon_combatknife", "weapon_sogknife"}
+local CRATE_GUNS = {"weapon_sr25", "weapon_xm1014", "weapon_fn45", "weapon_m45", "weapon_m249", "weapon_mp5", "weapon_p90", "weapon_vector", "weapon_mp7", "weapon_ar15", "weapon_ak200", "weapon_hk416"}
+local SUPPLIES = {
+    {0.1, "weapon_xdebarricade"},
+    {1, "weapon_zz_antidote"}, {2, "weapon_zz_recovery_pills"},
+    {1.2, "ent_armor_vest1"}, {1.2, "ent_armor_mask2"},
+    {0.6, "ent_armor_helmet6"}, {1.2, "ent_armor_mask3"}, {1.2, "ent_armor_helmet2"},
+    {7, "weapon_bandage_sh"}, {3.5, "weapon_bigbandage_sh"},
+    {4, "weapon_tourniquet"}, {5, "weapon_ducttape"}, {2, "weapon_needle"},
+    {1.2, "weapon_medkit_sh"}, {1.2, "weapon_morphine"},
+    {1, "weapon_adrenaline"}, {1, "weapon_naloxone"},
+    {0.6, "weapon_mannitol"}, {0.4, "weapon_fentanyl"}
 }
-
--- Map containers retain the original loot weights and 20% empty-search chance.
-local MAP_LOOT_POOL = {}
-do
-    local total = 0
-    for _, entry in ipairs(LOOT_POOL) do
-        MAP_LOOT_POOL[#MAP_LOOT_POOL + 1] = {entry[1], entry[2]}
-        total = total + entry[1]
+local function Registered(class)
+    return weapons.GetStored(class) or scripted_ents.GetStored(class)
+end
+local function AddGroup(pool, classes, weight)
+    local available = {}
+    for _, class in ipairs(classes) do
+        if Registered(class) then available[#available + 1] = class end
     end
-    MAP_LOOT_POOL[#MAP_LOOT_POOL + 1] = {total * 0.25, false}
+    for _, class in ipairs(available) do
+        pool[#pool + 1] = {weight / #available, class}
+    end
 end
-
-function MODE:GetLootTable()
-    return MAP_LOOT_POOL
+local function MatchingAmmo()
+    local result, seen = {}, {}
+    -- Include ammo for both pools so crate weapons can be resupplied around the map.
+    for _, group in ipairs({MAP_MELEE, MAP_GUNS, CRATE_GUNS}) do
+        for _, class in ipairs(group) do
+            local weapon = weapons.Get(class)
+            if weapon then
+                local ammo = weapon.Primary and weapon.Primary.Ammo
+                if not ammo or ammo == "none" then ammo = weapon.Ammo end -- bow uses Arrow
+                local data = hg.ammotypeshuy and hg.ammotypeshuy[ammo]
+                local key = data and data.name
+                if not key and isstring(ammo) then key = string.lower(string.Replace(ammo, " ", "")) end
+                local entity = key and ("ent_ammo_" .. key)
+                if entity and scripted_ents.GetStored(entity) and not seen[entity] then
+                    seen[entity] = true
+                    result[#result + 1] = entity
+                end
+            end
+        end
+    end
+    return result
 end
-
--- Only downtime supply crates improve with the upcoming phase.
-local LOOT_TIERS = {
-    weapon_zz_antidote = "medical", weapon_zz_recovery_pills = "medical",
-    weapon_m9beretta = "pistol", weapon_cz75 = "pistol", weapon_glock26 = "pistol",
-    weapon_revolver2 = "pistol", weapon_revolver357 = "pistol",
-    weapon_skorpion = "primary", weapon_draco = "primary", weapon_mp5 = "primary",
-    weapon_nlar15 = "primary", weapon_mosin = "primary",
-    ent_armor_mask2 = "gear", ent_armor_vest1 = "gear", ent_armor_helmet6 = "gear", ent_armor_mask3 = "gear",
-    ent_armor_helmet2 = "gear", weapon_ballistic_shield = "gear",
-    weapon_ammocrate = "ammo",
-    weapon_medkit_sh = "medical", weapon_bigbandage_sh = "medical",
-    weapon_morphine = "medical", weapon_adrenaline = "medical"
-}
-local PHASE_LOOT_WEIGHTS = {
-    {basic = 1, pistol = 0.7, primary = 0.25, gear = 0.5, ammo = 0.75, medical = 0.75},
-    {basic = 0.8, pistol = 1.8, primary = 2, gear = 1.8, ammo = 2, medical = 2},
-    {basic = 0.5, pistol = 2, primary = 7, gear = 4, ammo = 5, medical = 4}
-}
-
-local function GetSupplyLootTable(mode)
-    local phase = math.Clamp(tonumber(mode.Phase) or 1, 1, 3)
-    local weights = PHASE_LOOT_WEIGHTS[phase]
+local function BuildLootPool(supply, phase)
+    phase = math.Clamp(tonumber(phase) or 1, 1, 3)
     local pool = {}
-    for _, entry in ipairs(LOOT_POOL) do
-        local weight = entry[1] * weights[LOOT_TIERS[entry[2]] or "basic"]
-        pool[#pool + 1] = {weight, entry[2]}
+    AddGroup(pool, supply and CRATE_MELEE or MAP_MELEE, 36)
+    AddGroup(pool, supply and CRATE_GUNS or MAP_GUNS, supply and ({6, 8, 12})[phase] or 6)
+    AddGroup(pool, MatchingAmmo(), supply and ({20, 24, 28})[phase] or 24)
+    for _, entry in ipairs(SUPPLIES) do
+        if Registered(entry[2]) then
+            local weight = entry[1]
+            if supply and phase > 1 then
+                if entry[2] == "weapon_medkit_sh" or string.StartWith(entry[2], "ent_armor_") then
+                    weight = weight * phase
+                end
+            end
+            pool[#pool + 1] = {weight, entry[2]}
+        end
+    end
+    if not supply then
+        local total = 0
+        for _, entry in ipairs(pool) do total = total + entry[1] end
+        pool[#pool + 1] = {total * 0.25, false} -- Keep the existing 20% empty-roll chance.
     end
     return pool
+end
+function MODE:GetLootTable()
+    return BuildLootPool(false, 1)
+end
+local function GetSupplyLootTable(mode)
+    return BuildLootPool(true, mode.Phase)
 end
 
 --------------------------------------------------------------------------------
@@ -264,18 +245,8 @@ local function DropSupplyBox()
             pool[#pool + 1] = {total, class}
         end
     end
-    local count = math.Clamp(#AliveSurvivors() * 4, 12, 40)
-    -- Later supply crates guarantee useful upgrades before filling the remaining slots.
-    local phase = math.Clamp(tonumber(MODE.Phase) or 1, 1, 3)
-    local guaranteed = phase >= 3 and {"weapon_mp5", "weapon_ammocrate", "weapon_medkit_sh"}
-        or phase >= 2 and {"weapon_m9beretta", "weapon_medkit_sh"} or {}
-    guaranteed[#guaranteed + 1] = "weapon_zz_antidote"
-    guaranteed[#guaranteed + 1] = "weapon_zz_recovery_pills"
-    for _, class in ipairs(guaranteed) do
-        if weapons.GetStored(class) or scripted_ents.GetStored(class) then
-            box.Loot[#box.Loot + 1] = {class = class}
-        end
-    end
+    -- Exactly ten random items; antidote and recovery pills are not guaranteed.
+    local count = 10
     for i = #box.Loot + 1, count do
         local roll = math.Rand(0, total)
         for _, entry in ipairs(pool) do
@@ -687,8 +658,26 @@ function MODE:CheckAlivePlayers()
 	return {AliveSurvivors()}
 end
 
+-- Hot reloads or switching modes mid-round can leave runtime fields unset.
+-- Restore the phase from replicated state without restarting an existing deadline.
+local function EnsurePhaseState(mode)
+    local function Positive(value, fallback)
+        value = tonumber(value)
+        if not value or value ~= value or value <= 0 or value == math.huge then return fallback end
+        return value
+    end
+    mode.PhaseCount = math.max(1, math.floor(Positive(mode.PhaseCount, 3)))
+    mode.PhaseDuration = Positive(mode.PhaseDuration, 300)
+    mode.PhaseCooldown = Positive(mode.PhaseCooldown, 60)
+    mode.GuardIntroDuration = Positive(mode.GuardIntroDuration, 10)
+    mode.ExtractionWindow = Positive(mode.ExtractionWindow, 120)
+    mode.Phase = math.Clamp(math.floor(Positive(mode.Phase,
+        Positive(GetGlobalInt("ZZ_Phase", 1), 1))), 1, mode.PhaseCount)
+end
+
 -- A phase is now running.
 local function StartPhaseTimer(mode)
+    EnsurePhaseState(mode)
 	local now = CurTime()
 
 	mode.PhaseActive = true
@@ -733,6 +722,7 @@ end
 -- round Think timer. Both callers use the same deadlines, so a transition can
 -- happen only once even if they run on the same frame.
 local function AdvancePhaseClock(mode)
+    EnsurePhaseState(mode)
     local now = CurTime()
     local cooldownEnd = GetGlobalFloat("ZZ_CooldownEnd", 0)
     if cooldownEnd > 0 then
@@ -740,6 +730,10 @@ local function AdvancePhaseClock(mode)
         return true
     end
     local phaseEnd = GetGlobalFloat("ZZ_PhaseEnd", 0)
+    if phaseEnd <= 0 then
+        StartPhaseTimer(mode)
+        phaseEnd = GetGlobalFloat("ZZ_PhaseEnd", 0)
+    end
     if mode.Phase < mode.PhaseCount then
         if mode.SkipPhase or (phaseEnd > 0 and now >= phaseEnd) then
             mode.SkipPhase = false
@@ -756,7 +750,7 @@ hook.Add("Think", "ZZombiesPhaseClock", function()
     nextPhaseCheck = CurTime() + 0.1
     if not ModeActive() or zb.ROUND_STATE ~= 1 then return end
     local mode = CurrentRound()
-    if not mode or mode.name ~= "zzombies" or not mode.Phase then return end
+    if not mode or mode.name ~= "zzombies" then return end
     AdvancePhaseClock(mode)
 end)
 
@@ -783,6 +777,7 @@ local function WarnMissingPoints()
 end
 
 function MODE:Intermission()
+    EnsurePhaseState(self)
     self.GroundExtraction = #GetPoints("zzombiesgroundextraction") > 0
     SetGlobalBool("ZZ_GroundExtraction", self.GroundExtraction)
     if IsValid(self.ExfilHelicopter) then self.ExfilHelicopter:Remove() end
@@ -812,7 +807,7 @@ function MODE:Intermission()
 	end
 
 	-- Three five-minute phases and two one-minute preparation periods.
-	self.ROUND_TIME = self.PhaseCount * MODE.PhaseDuration + (self.PhaseCount - 1) * self.PhaseCooldown
+	self.ROUND_TIME = self.PhaseCount * self.PhaseDuration + (self.PhaseCount - 1) * self.PhaseCooldown
 
 	zb.START_TIME = CurTime() + FIRST_PREROUND
 	hg.UpdateRoundTime(self.ROUND_TIME, CurTime(), zb.START_TIME)

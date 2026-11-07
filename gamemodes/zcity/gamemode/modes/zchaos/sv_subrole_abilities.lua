@@ -125,6 +125,8 @@ hook.Add("PlayerPostThink", "CHAOS_SubRoles_Abilities", function(ply)
 				end
 			end
 			
+            -- Martial Artist input is handled once by ChudMartialArtistInput.
+
 			if(ply.SubRole == "traitor_zombie")then
 				if(ply:KeyDown(IN_WALK))then
 					

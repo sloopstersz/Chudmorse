@@ -490,51 +490,56 @@ if CLIENT then
     local adminStatsRows = {}
 
     local pendingAdminStats
-
-    net.Receive("ZB_AdminStatsSend", function()
-        -- Match SendAdminStatsRows: three UInt16 headers, then a JSON batch.
-        local total = net.ReadUInt(16)
-        local chunks = net.ReadUInt(16)
-        local index = net.ReadUInt(16)
-        local part = util.JSONToTable(net.ReadString())
-
-        if chunks < 1 or index < 1 or index > chunks or not istable(part) then
-            pendingAdminStats = nil
-            return
-        end
-
-        if index == 1 then
-            pendingAdminStats = {total = total, chunks = chunks, nextIndex = 1, rows = {}}
-        end
-
-        local pending = pendingAdminStats
-        if not pending or pending.total ~= total or pending.chunks ~= chunks or pending.nextIndex ~= index then
-            pendingAdminStats = nil
-            return
-        end
-
-        for _, row in ipairs(part) do
-            if not istable(row) or not isstring(row.steamid) then
-                pendingAdminStats = nil
-                return
-            end
-            pending.rows[#pending.rows + 1] = row
-        end
-        pending.nextIndex = index + 1
-
-        if #pending.rows > total then
-            pendingAdminStats = nil
-            return
-        end
-        if index ~= chunks then return end
-
+    local statsStatus = "Loading..."
+    local statsLastActivity = 0
+    local function StatsStatus(text)
+        statsStatus = text
+        statsLastActivity = RealTime()
+        if IsValid(statsPanelInstance) then statsPanelInstance:SetTitle("Player SQL Stats - " .. text) end
+    end
+    local function StatsFailed(text)
         pendingAdminStats = nil
-        if #pending.rows ~= total then return end
-        adminStatsRows = pending.rows
-
-        if IsValid(statsPanelInstance) and statsPanelInstance.RefreshRows then
-            statsPanelInstance:RefreshRows()
+        StatsStatus(text .. " - press Refresh")
+    end
+    timer.Create("ChudSQLClientTimeout", 2, 0, function()
+        if IsValid(statsPanelInstance) and statsLastActivity > 0 and RealTime() - statsLastActivity > 35
+            and (pendingAdminStats or statsStatus == "Loading...") then
+            StatsFailed("No data received; check that both SQL menu files are installed on the server")
         end
+    end)
+
+    net.Receive("ZB_AdminStatsChunkV2", function()
+        local id = net.ReadUInt(32)
+        local count, index, size = net.ReadUInt(16), net.ReadUInt(16), net.ReadUInt(16)
+        if count < 1 or count > 2048 or index < 1 or index > count or size < 1 or size > 4096 then
+            StatsFailed("Invalid data chunk") return
+        end
+        local bytes = net.ReadData(size)
+        if not bytes or #bytes ~= size then StatsFailed("Invalid data chunk") return end
+        if index == 1 then pendingAdminStats = {id = id, count = count, nextIndex = 1, parts = {}} end
+        local pending = pendingAdminStats
+        if not pending or pending.id ~= id or pending.count ~= count or pending.nextIndex ~= index then StatsFailed("Transfer interrupted") return end
+        StatsStatus("Receiving " .. index .. "/" .. count)
+        pending.parts[index] = bytes
+        pending.nextIndex = index + 1
+        net.Start("ZB_AdminStatsAckV2")
+            net.WriteUInt(id, 32)
+            net.WriteUInt(index, 16)
+        net.SendToServer()
+        if index ~= count then return end
+        pendingAdminStats = nil
+        local json = util.Decompress(table.concat(pending.parts))
+        if not json or #json > 32 * 1024 * 1024 then StatsFailed("Could not decompress SQL data") return end
+        -- The server-generated snapshot has a strict byte limit but can legitimately
+        -- exceed the default 15,000 JSON keys with per-player achievements.
+        local rows = util.JSONToTable(json, true)
+        if not istable(rows) then StatsFailed("Could not decode SQL data") return end
+        for _, row in ipairs(rows) do
+            if not istable(row) or not isstring(row.steamid) then StatsFailed("Invalid SQL row") return end
+        end
+        adminStatsRows = rows
+        StatsStatus(tostring(#rows) .. " players loaded")
+        if IsValid(statsPanelInstance) and statsPanelInstance.RefreshRows then statsPanelInstance:RefreshRows() end
     end)
 
     net.Receive("ZB_AdminStatsSaveResult", function()
@@ -552,7 +557,7 @@ if CLIENT then
         statsPanelInstance = frame
         frame:SetSize(900, 560)
         frame:Center()
-        frame:SetTitle("Player SQL Stats")
+        frame:SetTitle("Player SQL Stats - " .. statsStatus)
         frame:MakePopup()
 
         local topPanel = vgui.Create("DPanel", frame)
@@ -711,6 +716,7 @@ if CLIENT then
         end
 
         refreshBtn.DoClick = function()
+            StatsStatus("Loading...")
             net.Start("ZB_AdminStatsRequest")
             net.SendToServer()
         end
@@ -719,6 +725,8 @@ if CLIENT then
             statsPanelInstance = nil
         end
 
+        frame:RefreshRows()
+        StatsStatus("Loading...")
         net.Start("ZB_AdminStatsRequest")
         net.SendToServer()
     end

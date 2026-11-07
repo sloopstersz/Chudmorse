@@ -1,4 +1,7 @@
 local function IncluderFunc(fileName)
+    -- Windows duplicate/backup names must never execute or be sent to clients.
+    local basename = fileName:match("([^/]+)$") or ""
+    if not basename:match("^[%w_%-]+%.lua$") then return end
 	if (fileName:find("sv_")) then
 		include(fileName)
 	elseif (fileName:find("shared.lua") or fileName:find("sh_")) then

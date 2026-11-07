@@ -115,11 +115,11 @@ if SERVER then
 	function ENT:PhysicsCollide(data, physobj)
 		if data.DeltaTime > .2 and data.Speed > 200 and !self.Hit then
             local dir = data.HitPos - (data.HitPos + self:GetAngles():Forward() * -5)
-            --print(dir:GetNormalized())
+            
             local hitNormal = data.HitNormal
             local ApproachAngle = math.deg(math.asin(hitNormal:DotProduct(dir:GetNormalized())))
 	        local MaxRicAngle = 10
-            --print(ApproachAngle)
+            
 
             --if ApproachAngle < MaxRicAngle * 1 then 
             --        --[[local effectpoint = self:GetPos()
@@ -203,7 +203,7 @@ if SERVER then
         DmgInfo:SetInflictor(self)
         DmgInfo:SetAttacker(self)
         ent:TakeDamageInfo(DmgInfo)
-        --print(mat)
+        
         self:EmitSound( fleshmats[mat] and self.FleshHit or self.HitSound)
         util.Decal( fleshmats[mat] and "Impact.Flesh" or "Impact.Concrete", SelfPos + self:GetAngles():Forward() * -5, SelfPos + self:GetAngles():Forward() * 500, self )
         self:Remove()

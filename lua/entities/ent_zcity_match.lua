@@ -51,7 +51,7 @@ function ENT:Initialize()
             if ent1:GetFireLeft() <= 0 then return end
             local pos = ent1:GetPos()
             local ent = data.HitEntity
-            --print(IsValid(ent), ignitable[ent:GetModel()], ent:GetModel())
+            
             if IsValid(ent) and ignitable[ent:GetModel()] then
                 ent:Ignite()
             end
@@ -97,7 +97,7 @@ function ENT:Draw()
     if not IsValid(self.effectAttachment) then
         self.effectAttachment = ClientsideModel("models/hunter/plates/plate.mdl")
         self.effectAttachment:SetNoDraw(true)
-        --print("WHY")
+        
         self:CallOnRemove("RemoveEffect",function(ent)
             if IsValid(ent.effectAttachment) then
                 ent.effectAttachment:Remove()
