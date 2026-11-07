@@ -1,0 +1,2 @@
+-- Superseded by the full-body pack adapters in dragon_packs.lua.
+-- Keep this file empty so older installations do not register the old moves.

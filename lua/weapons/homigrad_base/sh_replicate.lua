@@ -1,0 +1,26 @@
+AddCSLuaFile()
+if CLIENT then
+	net.Receive("hgwep shoot", function()
+		local self = net.ReadEntity()
+		local shoot = net.ReadBool()
+		local broadcastAnyways = net.ReadBool()
+		local shootID = net.ReadUInt(16)
+		
+		if not IsValid(self) then return end
+		if !broadcastAnyways and self:GetOwner() == LocalPlayer() and !game.SinglePlayer() then return end
+		if shootID ~= 0 and self.hgLastShootID == shootID then return end
+		self.hgLastShootID = shootID
+		
+		if self.Shoot then
+			self:Shoot(shoot)
+		end
+	end)
+end
+
+function SWEP:IsClient()
+	return CLIENT and self:GetOwner() == LocalPlayer()
+end
+
+function SWEP:KeyDown(key)
+	return hg.KeyDown(self:GetOwner(),key)
+end
