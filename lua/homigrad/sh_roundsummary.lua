@@ -1,12 +1,19 @@
 local SUMMARY_MAX = 3
 local SUMMARY_CLEAR_DELAY = 4
 local SUMMARY_LIFETIME = 16
-local SUMMARY_POST_ROUND = SUMMARY_CLEAR_DELAY + 10.75
+-- Long enough for the whole 3-card screen and the ~15s round summary song to play out.
+local SUMMARY_POST_ROUND = SUMMARY_CLEAR_DELAY + SUMMARY_LIFETIME - 1
+-- How long either summary screen is up (old and new), from opening until the next round starts.
+local SUMMARY_SHOW_TIME = SUMMARY_POST_ROUND - SUMMARY_CLEAR_DELAY
 local SUMMARY_MEDAL_XP = 10
 local SUMMARY_MVP_XP_MULT = 5
+local SUMMARY_SONG = "rem_roundsummary.mp3"
+-- 1 = the song's own mastered level (same way rem_newroundcommence.mp3 is played). Lower it if you want it quieter.
+local SUMMARY_SONG_VOLUME = 1
 
 if SERVER then
 	util.AddNetworkString("rem_roundsummary")
+	resource.AddFile("sound/rem_roundsummary.mp3")
 
 	local function SyncHeadshots(ply)
 		if not IsValid(ply) or not ply:IsPlayer() then return end
@@ -731,7 +738,7 @@ if SERVER then
         if ChudCoinRewards then ChudCoinRewards.Finish() end
 		local featured, NameOf, RoleFor = ComputeFeatured()
 		if #featured == 0 then return end
-		local first = { featured[1] }
+		local first = featured
 		ApplyMedalXP(first)
 		for _, award in ipairs(first) do
 			if award.key == "mvp" or award.key == "dm_winner" then hook.Run("ChudAchievementMVP", award.ply) end
@@ -803,6 +810,7 @@ surface.CreateFont("Rem_Sum_XPBig", { font = "ITC Avant Garde Gothic", size = Sc
 surface.CreateFont("Rem_Sum_XP", { font = "ITC Avant Garde Gothic", size = ScreenScale(14), weight = 600, antialias = true, extended = true })
 surface.CreateFont("Rem_Sum_Stat", { font = "ITC Avant Garde Gothic", size = ScreenScale(21), weight = 800, antialias = true, extended = true })
 surface.CreateFont("Rem_Sum_Countdown", { font = "ITC Avant Garde Gothic", size = ScreenScale(23), weight = 800, antialias = true, extended = true })
+surface.CreateFont("Rem_Sum_Winner", { font = "ITC Avant Garde Gothic", size = ScreenScale(11), weight = 800, antialias = true, extended = true })
 
 local AWARD_INFO = {
 	mvp          = { title = "MVP OF THE ROUND", color = Color(232, 190, 70),  desc = function(v) return "Best player around" end },
@@ -860,6 +868,15 @@ local RS_Sound
 local function StopSummarySound()
 	if IsValid(RS_Sound) then RS_Sound:Stop() end
 	RS_Sound = nil
+end
+
+local function PlaySummarySong()
+	StopSummarySound()
+	local lp = LocalPlayer()
+	if not IsValid(lp) then return end
+	RS_Sound = CreateSound(lp, SUMMARY_SONG)
+	if not RS_Sound then return end
+	RS_Sound:PlayEx(SUMMARY_SONG_VOLUME, 100)
 end
 
 local function ApplyAppearance(ent, ply)
@@ -1323,7 +1340,7 @@ local function IsRTVActive()
 	return zb and zb.IsRTVActive and zb.IsRTVActive()
 end
 
-local function ShowSummary(featured, winnerTeam)
+local function ShowStatsSummary(featured, winnerTeam)
 	if IsRTVActive() then return end
 
 	if IsValid(RS_Container) then RS_Container:Remove() end
@@ -1464,7 +1481,7 @@ local function ShowSummary(featured, winnerTeam)
 		cam.PopModelMatrix()
 	end
 
-	timer.Simple(4, function()
+	timer.Simple(SUMMARY_SHOW_TIME - 6.75, function()
 		if not IsValid(container) then return end
 		container.CountdownStart = CurTime()
 		container.CountPunch = 1
@@ -1512,7 +1529,7 @@ local function ShowSummary(featured, winnerTeam)
 		surface.SetDrawColor(0, 0, 0, self:GetAlpha())
 		surface.DrawRect(0, 0, w, h)
 	end
-	timer.Simple(10, function()
+	timer.Simple(SUMMARY_SHOW_TIME - 0.75, function()
 		if IsValid(endFade) then 
 			endFade:AlphaTo(255, 0.75, 0, function()
 				if IsValid(statPanel) then statPanel:Remove() end
@@ -1527,6 +1544,155 @@ local function ShowSummary(featured, winnerTeam)
 			CloseSummary()
 		end
 	end)
+end
+
+-- The classic Remorse end-of-round screen: three award cards (MVP big in the
+-- middle, the next two awards on either side), with the round summary song.
+local RS_Classic = CreateClientConVar("rem_summary_classic", "1", true, false, "1 = classic 3-card MVP round summary with music, 0 = single MVP with personal stats", 0, 1)
+
+-- seconds after the screen opens that each card walks in (slot 1 = MVP)
+local CLASSIC_CARD_DELAY = { [2] = 0.5, [3] = 1.0, [1] = 1.7 }
+
+local function ShowClassicSummary(featured, winnerTeam)
+	if IsRTVActive() then return end
+	if not featured[1] then return end
+
+	if IsValid(RS_Container) then RS_Container:Remove() end
+
+	local sw, sh = ScrW(), ScrH()
+
+	local container = vgui.Create("DPanel")
+	container:SetSize(sw, sh)
+	container:SetPos(0, 0)
+	container:SetPaintBackground(false)
+	container:SetMouseInputEnabled(false)
+	container:SetKeyboardInputEnabled(false)
+	container.Cards = {}
+	container.OnRemove = function() gui.EnableScreenClicker(false) end
+	RS_Container = container
+	container:MakePopup()
+	container.StartTime = CurTime()
+
+	local bg = vgui.Create("DPanel", container)
+	bg:SetSize(sw, sh)
+	bg:SetPos(0, 0)
+	bg:SetMouseInputEnabled(false)
+	bg.Paint = function(self, w, h)
+		surface.SetDrawColor(RS_BGColor)
+		surface.DrawRect(0, 0, w, h)
+		surface.SetTexture(RS_GradR)
+		surface.SetDrawColor(RS_BGRight)
+		surface.DrawTexturedRect(0, 0, w, h)
+		surface.SetTexture(RS_GradDTex)
+		surface.SetDrawColor(RS_BGTop)
+		surface.DrawTexturedRect(0, 0, w, h)
+	end
+	bg:SetAlpha(0)
+	bg:AlphaTo(255, 0.8, 0)
+	container.BG = bg
+
+	PlaySummarySong()
+
+	-- left = featured[2], middle = featured[1] (MVP), right = featured[3]
+	local built, totalW = {}, 0
+	for _, slot in ipairs({ 2, 1, 3 }) do
+		local data = featured[slot]
+		if data then
+			local card, w, h = BuildCard(container, data, slot)
+			built[#built + 1] = { card = card, w = w, h = h, slot = slot }
+			totalW = totalW + w
+		end
+	end
+
+	local gap = math.max(14, math.floor(math.min(sw, 1920) * 0.016))
+	totalW = totalW + gap * (#built - 1)
+	local x = math.floor((sw - totalW) / 2)
+
+	for _, b in ipairs(built) do
+		local card, w, h, slot = b.card, b.w, b.h, b.slot
+		local fx, fy = x, math.floor((sh - h) / 2)
+		x = x + w + gap
+
+		-- off-screen start; CloseSummary slides the card back out to this spot
+		local ox, oy = fx, sh + 40
+		if slot == 2 then ox, oy = -w - 40, fy end
+		if slot == 3 then ox, oy = sw + 40, fy end
+		card.OffX, card.OffY = ox, oy
+		card:SetPos(ox, oy)
+		container.Cards[#container.Cards + 1] = card
+
+		local t0 = CLASSIC_CARD_DELAY[slot] or 0.5
+
+		timer.Simple(t0, function()
+			if not IsValid(card) then return end
+			card.RSWalkStart = CurTime()
+			card.RSWalkTime = 1.1
+			card.RSWalkDistance = 130
+			card:AlphaTo(255, 0.35, 0)
+			card:MoveTo(fx, fy, 0.75, 0, 0.35)
+		end)
+
+		-- model stops walking, award title fades in
+		timer.Simple(t0 + 1.25, function()
+			if not IsValid(card) then return end
+			card.RSSettled = true
+			if IsValid(card.RSTitle) then card.RSTitle:AlphaTo(255, 0.45, 0) end
+		end)
+
+		-- name / xp panel rises from the bottom of the card
+		timer.Simple(t0 + 2.1, function()
+			if not IsValid(card) then return end
+			card.RSReveal = true
+			if IsValid(card.RSInfoWrap) then card.RSInfoWrap:AlphaTo(255, 0.45, 0) end
+		end)
+	end
+
+	if winnerTeam and winnerTeam ~= "" then
+		timer.Simple(3.4, function()
+			if not IsValid(container) then return end
+			container.RSWinnerStart = CurTime()
+			surface.PlaySound("rem_newroundreveal.wav")
+		end)
+
+		local winnerPanel = vgui.Create("DPanel", container)
+		winnerPanel:SetSize(sw, math.floor(sh * 0.05))
+		winnerPanel:SetPos(0, 0)
+		winnerPanel:SetPaintBackground(false)
+		winnerPanel.Paint = function(self, w2, h2)
+			if not container.RSWinnerStart then return end
+			local t = CurTime() - container.RSWinnerStart
+			local p = math.Clamp(t / 0.5, 0, 1)
+			local ease = p * p * (3 - 2 * p)
+			local a = 255 * ease
+			local col = Color(255, 240, 90, a)
+			if RealishTeams then
+				for _, info in pairs(RealishTeams) do
+					if string.upper(info.name or "") == string.upper(winnerTeam) and info.color then
+						col = Color(info.color.r, info.color.g, info.color.b, a)
+						break
+					end
+				end
+			end
+			draw.SimpleTextOutlined("TEAM WON: " .. string.upper(winnerTeam), "Rem_Sum_Winner", w2 / 2, h2 / 2, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0, math.min(230, a)))
+		end
+		timer.Simple(SUMMARY_LIFETIME - 1, function()
+			if IsValid(winnerPanel) then winnerPanel:Remove() end
+		end)
+	end
+
+	timer.Create("rem_roundsummary_close", SUMMARY_LIFETIME, 1, function()
+		if IsValid(RS_Container) and RS_Container == container then
+			CloseSummary()
+		end
+	end)
+end
+
+local function ShowSummary(featured, winnerTeam)
+	if RS_Classic:GetBool() then
+		ShowClassicSummary(featured, winnerTeam)
+	else
+		ShowStatsSummary(featured, winnerTeam)
+	end
 end
 
 net.Receive("rem_roundsummary", function()
