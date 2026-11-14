@@ -161,13 +161,13 @@ MODE.LootTable = {
 
 		{6,"weapon_deagle"},
 		{6,"weapon_colt9mm"},
+		{5,"weapon_tungsten"},
 
 		{5,"weapon_doublebarrel_short"},
 		{5,"weapon_doublebarrel"},
 		{4, "weapon_flintlock"},
 	}},
 	{4,{
-		{3,"weapon_tungsten"},
 		{5,"ent_armor_vest3"},
 		{5,"ent_armor_helmet1"},
 		{2,"ent_armor_vest4"},
