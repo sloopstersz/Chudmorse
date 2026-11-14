@@ -1183,13 +1183,16 @@ function PANEL:CreateCoinShopArrow()
         local text = string.Comma(coins)
         surface.SetFont("ZCity_Menu_Small")
         local textW = surface.GetTextSize(text)
+        surface.SetFont("ZCity_Menu_Tiny")
+        local labelW = surface.GetTextSize("COIN")
         local gap = MenuUnit(10)
-        local x = (w - h - gap - textW) * 0.5
+        -- Icon, amount, then the COIN label beside it, right-aligned so nothing overlaps.
+        local x = w - (h + gap + textW + gap + labelW)
         surface.SetMaterial(coinIcon)
         surface.SetDrawColor(255, 255, 255)
         surface.DrawTexturedRectUV(x, 0, h, h, 0, 0, 108 / 184, 108 / 111)
-        draw.SimpleText(text, "ZCity_Menu_Small", x + h + gap, h * 0.6, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-        draw.SimpleText("COIN", "ZCity_Menu_Tiny", x + h + gap, h * 0.12, Color(160, 160, 160), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        draw.SimpleText(text, "ZCity_Menu_Small", x + h + gap, h * 0.5, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        draw.SimpleText("COIN", "ZCity_Menu_Tiny", x + h + gap + textW + gap, h * 0.5, Color(160, 160, 160), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
     end
 
     local arrow = vgui.Create("DButton", self)
@@ -1264,6 +1267,63 @@ local function ShopSilhouette(kind, x, y, w, h, tint)
     surface.DrawTexturedRect(x+(w-dw)*0.5,y+(h-dh)*0.5,dw,dh)
 end
 
+-- COIN store item page: item list on the left, a spotlit showcase on the right.
+-- Each item's accent colour (sh_chud_skins.lua) runs through its card and showcase.
+-- Soft round spotlight. Additive, so it only ever brightens the dark backdrop.
+local shopGlow = CreateMaterial("ChudShopSpotGlow", "UnlitGeneric", {
+    ["$basetexture"] = "sprites/glow04", ["$additive"] = "1", ["$vertexcolor"] = "1", ["$vertexalpha"] = "1",
+})
+local shopFadeUp = surface.GetTextureID("vgui/gradient-d")
+-- Used to hide arm/hand meshes on first-person models in the preview.
+local shopHidden = CreateMaterial("ChudShopHiddenMesh", "UnlitGeneric", {["$basetexture"] = "color/white", ["$nodraw"] = "1", ["$alpha"] = "0"})
+local shopFadeRight = surface.GetTextureID("vgui/gradient-r")
+local SHOP_NEUTRAL = Color(225,225,225)
+local SHOP_MUTED = Color(150,150,160)
+local SHOP_DIM = Color(95,95,105)
+
+local function ShopAccent(item)
+    return item and item.accent or SHOP_NEUTRAL
+end
+
+local function ShopFont(name,size,weight)
+    local scale = math.min(ScrW(),ScrH()) / 1000
+    surface.CreateFont(name,{font="Verily Serif Mono",size=math.max(12,math.floor(size*scale)),weight=weight or 300,antialias=true})
+end
+
+-- Four corner ticks around a box.
+local function ShopBrackets(x,y,w,h,len,thick,col)
+    surface.SetDrawColor(col)
+    surface.DrawRect(x,y,len,thick)               surface.DrawRect(x,y,thick,len)
+    surface.DrawRect(x+w-len,y,len,thick)         surface.DrawRect(x+w-thick,y,thick,len)
+    surface.DrawRect(x,y+h-thick,len,thick)       surface.DrawRect(x,y+h-len,thick,len)
+    surface.DrawRect(x+w-len,y+h-thick,len,thick) surface.DrawRect(x+w-thick,y+h-len,thick,len)
+end
+
+-- Small rounded tag, returns its width so tags can be laid out in a row.
+local function ShopTag(text,font,x,y,fg,bg,alignRight)
+    surface.SetFont(font)
+    local tw,th = surface.GetTextSize(text)
+    local padX,padY = MenuUnit(8),MenuUnit(3)
+    local w,h = tw+padX*2,th+padY*2
+    if alignRight then x = x-w end
+    draw.RoundedBox(MenuUnit(3),x,y,w,h,bg)
+    draw.SimpleText(text,font,x+padX,y+padY,fg)
+    return w,h
+end
+
+local function ShopCoinPrice(price,font,x,y,col,alignRight)
+    local text = string.Comma(price)
+    surface.SetFont(font)
+    local tw,th = surface.GetTextSize(text)
+    local icon = th*1.05
+    local gap = MenuUnit(6)
+    if alignRight then x = x-(icon+gap+tw) end
+    surface.SetMaterial(coinIcon)
+    surface.SetDrawColor(255,255,255)
+    surface.DrawTexturedRectUV(x,y+(th-icon)*0.5,icon,icon,0,0,108/184,108/111)
+    draw.SimpleText(text,font,x+icon+gap,y,col)
+end
+
 function PANEL:OpenCoinCategory(category)
     if self.CoinShopMoving or IsValid(self.CoinCategoryPage) then return end
     local detail = vgui.Create("DPanel", self)
@@ -1276,129 +1336,495 @@ function PANEL:OpenCoinCategory(category)
     self.CoinShopPage:SetVisible(false)
     if IsValid(self.previewHolder) then self.previewHolder:SetVisible(false) end
     local title = category == "MELEE SKINS" and "KNIVES" or category
-    local artwork = category == "MELEE SKINS" and "knife" or category == "COSMETICS" and "hat" or "pistol"
-    local scale = math.min(ScrW(),ScrH()) / 1000
-    for key,size in pairs({Title=34,Medium=26,Small=20,Tiny=16}) do
-        surface.CreateFont("ChudShopPage" .. key,{font="Verily Serif Mono",size=math.max(12,math.floor(size*scale)),weight=300})
+    ShopFont("ChudShopPageTitle",34) ShopFont("ChudShopPageMedium",26) ShopFont("ChudShopPageSmall",20) ShopFont("ChudShopPageTiny",16)
+    ShopFont("ChudShopHero",64,400) ShopFont("ChudShopHeroSub",24) ShopFont("ChudShopKicker",15,500) ShopFont("ChudShopCardName",24,400)
+
+    -- Real shop items (sh_chud_skins.lua). Bought skins leave the shop and live in INVENTORY.
+    local isInventory = category == "INVENTORY"
+    local selected
+    local function ItemList()
+        if not ChudSkins then return {} end
+        local list = {}
+        if isInventory then
+            for _,item in pairs(ChudSkins.Items) do
+                if ChudSkins.Owns(item.id) then list[#list+1] = item end
+            end
+            table.SortByMember(list,"order",true)
+        else
+            for _,item in ipairs(ChudSkins.ItemsInCategory(category)) do
+                if not ChudSkins.Owns(item.id) then list[#list+1] = item end
+            end
+        end
+        return list
     end
-    local heading = category == "INVENTORY" and "INVENTORY" or category
+    local itemCount = 0
+
     local left = vgui.Create("DPanel",detail)
     local right = vgui.Create("DPanel",detail)
-    local function cardPaint(pnl,w,h)
-        surface.SetDrawColor(20,20,30,120)
-        surface.DrawRect(0,0,w,h)
-        surface.SetDrawColor(15,15,20,120)
-        surface.DrawRect(0,0,w,MenuUnit(60))
-        surface.SetDrawColor(255,255,255,80)
-        surface.DrawRect(0,MenuUnit(60),w,1)
-        surface.DrawRect(0,h-1,w,1)
-    end
+    local headerH = MenuUnit(56)
     left.Paint = function(pnl,w,h)
-        cardPaint(pnl,w,h)
-        draw.SimpleText(heading,"ChudShopPageSmall",MenuUnit(14),MenuUnit(10),color_white)
-        draw.SimpleText("Select an item","ChudShopPageTiny",MenuUnit(14),MenuUnit(34),Color(160,160,160))
+        surface.SetDrawColor(12,12,18,200)
+        surface.DrawRect(0,0,w,h)
+        draw.SimpleText(isInventory and "OWNED" or "FOR SALE","ChudShopKicker",MenuUnit(16),MenuUnit(12),SHOP_MUTED)
+        draw.SimpleText(itemCount .. (itemCount == 1 and " ITEM" or " ITEMS"),"ChudShopKicker",w-MenuUnit(16),MenuUnit(12),SHOP_DIM,TEXT_ALIGN_RIGHT)
+        surface.SetDrawColor(255,255,255,30)
+        surface.DrawRect(MenuUnit(16),headerH-1,w-MenuUnit(32),1)
     end
+
+    local list = vgui.Create("DScrollPanel",left)
+    local bar = list:GetVBar()
+    bar:SetWide(MenuUnit(4))
+    bar.Paint = function() end
+    bar.btnUp.Paint = function() end
+    bar.btnDown.Paint = function() end
+    bar.btnGrip.Paint = function(_,w,h) draw.RoundedBox(2,0,0,w,h,Color(255,255,255,40)) end
+    list.Paint = function(pnl,w,h)
+        if #list:GetCanvas():GetChildren() > 0 then return end
+        draw.SimpleText(isInventory and "NOTHING HERE YET" or (ChudSkins and #ChudSkins.ItemsInCategory(category) > 0 and "YOU OWN EVERYTHING HERE" or "COMING SOON"),
+            "ChudShopPageSmall",w*0.5,h*0.4,SHOP_MUTED,TEXT_ALIGN_CENTER,TEXT_ALIGN_CENTER)
+        draw.SimpleText(isInventory and "Skins you buy show up here." or "Check back later for new drops.",
+            "ChudShopPageTiny",w*0.5,h*0.4+MenuUnit(26),SHOP_DIM,TEXT_ALIGN_CENTER,TEXT_ALIGN_CENTER)
+    end
+
+    -- Showcase: spotlight, accent glow, corner brackets, then the name block and action button.
+    local infoH = MenuUnit(200)
     right.Paint = function(pnl,w,h)
-        cardPaint(pnl,w,h)
-        draw.SimpleText("DETAILS","ChudShopPageSmall",MenuUnit(14),MenuUnit(10),color_white)
-        draw.SimpleText("Selected item preview","ChudShopPageTiny",MenuUnit(14),MenuUnit(34),Color(160,160,160))
-        if category ~= "INVENTORY" then
-            local dividerY = math.floor(h * 0.64)
-            surface.SetDrawColor(255,255,255,110)
-            surface.DrawRect(MenuUnit(4),dividerY,w-MenuUnit(8),math.max(1,MenuUnit(2)))
-            local fontSize = math.max(18,math.min(MenuUnit(62),math.floor((w-MenuUnit(40))/(14*0.65))))
-            local skinFont = "ChudShopSkinName" .. fontSize
-            if pnl.SkinFont ~= skinFont then
-                surface.CreateFont(skinFont,{font="Verily Serif Mono",size=fontSize,weight=300})
-                pnl.SkinFont = skinFont
-            end
-            draw.SimpleText("<PLACE HOLDER>",skinFont,w*0.5,dividerY+MenuUnit(22),color_white,TEXT_ALIGN_CENTER,TEXT_ALIGN_TOP)
-            local weaponName = category == "MELEE SKINS" and "COMBAT KNIFE" or "M1911"
-            draw.SimpleText(weaponName,"ChudShopPageTitle",w*0.5,dividerY+MenuUnit(30)+fontSize,color_white,TEXT_ALIGN_CENTER,TEXT_ALIGN_TOP)
+        surface.SetDrawColor(9,9,14,215)
+        surface.DrawRect(0,0,w,h)
+        local accent = ShopAccent(selected)
+        local stageH = h-infoH
+        if selected then
+            pnl.GlowLerp = Lerp(FrameTime()*6,pnl.GlowLerp or 0,1)
+            local cx,cy = w*0.5,stageH*0.5
+            surface.SetMaterial(shopGlow)
+            surface.SetDrawColor(accent.r,accent.g,accent.b,120*pnl.GlowLerp)
+            surface.DrawTexturedRect(cx-w*0.42,cy-stageH*0.62,w*0.84,stageH*1.24)
+            surface.SetDrawColor(255,255,255,22*pnl.GlowLerp)
+            surface.DrawTexturedRect(cx-w*0.22,cy-stageH*0.36,w*0.44,stageH*0.72)
+            -- floor line the gun "sits" over
+            surface.SetTexture(shopFadeRight)
+            surface.SetDrawColor(accent.r,accent.g,accent.b,90)
+            surface.DrawTexturedRect(w*0.5,stageH-MenuUnit(30),w*0.35,1)
+            surface.SetTexture(shopFadeRight)
+            surface.DrawTexturedRectRotated(w*0.325,stageH-MenuUnit(30)+0.5,w*0.35,1,180)
+        end
+        local inset = MenuUnit(18)
+        ShopBrackets(inset,inset,w-inset*2,stageH-inset*2,MenuUnit(18),math.max(1,MenuUnit(2)),Color(255,255,255,selected and 70 or 25))
+        draw.SimpleText(isInventory and "INVENTORY" or "PREVIEW","ChudShopKicker",inset+MenuUnit(12),inset+MenuUnit(10),SHOP_DIM)
+        if selected and ChudSkins.IsEquipped(selected.id) then
+            ShopTag("EQUIPPED","ChudShopKicker",w-inset-MenuUnit(12),inset+MenuUnit(8),color_black,accent,true)
+        end
+        -- info block
+        surface.SetDrawColor(255,255,255,22)
+        surface.DrawRect(inset,stageH,w-inset*2,1)
+        if not selected then
+            draw.SimpleText("SELECT AN ITEM","ChudShopPageSmall",w*0.5,stageH*0.5,SHOP_DIM,TEXT_ALIGN_CENTER,TEXT_ALIGN_CENTER)
+            return
+        end
+        surface.SetDrawColor(accent)
+        surface.DrawRect(inset,stageH+MenuUnit(24),MenuUnit(4),MenuUnit(120))
+        local tx = inset+MenuUnit(20)
+        draw.SimpleText(ChudSkins.WeaponName(selected.weapon),"ChudShopKicker",tx,stageH+MenuUnit(24),accent)
+        draw.SimpleText(selected.name,"ChudShopHero",tx,stageH+MenuUnit(42),color_white)
+        surface.SetFont("ChudShopHero")
+        local _,heroH = surface.GetTextSize("W")
+        local tagY = stageH+MenuUnit(50)+heroH
+        local tagX = tx
+        tagX = tagX + ShopTag(selected.category or "SKIN","ChudShopKicker",tagX,tagY,SHOP_MUTED,Color(255,255,255,14)) + MenuUnit(8)
+        if selected.credit then
+            ShopTag("BY " .. selected.credit,"ChudShopKicker",tagX,tagY,accent,Color(accent.r,accent.g,accent.b,28))
         end
     end
-    local list = vgui.Create("DScrollPanel",left)
-    local row = vgui.Create("DButton",list)
-    row:SetText("")
-    row:Dock(TOP)
-    row:DockMargin(MenuUnit(6),MenuUnit(8),MenuUnit(6),0)
-    row:SetTall(MenuUnit(84))
-    row.CoinRevealStart=CurTime()
-    row.Paint = function(btn,w,h)
-        surface.SetDrawColor(20,20,30,btn:IsHovered() and 210 or 150)
-        surface.DrawRect(0,0,w,h)
-        surface.SetDrawColor(225,225,225,200)
-        surface.DrawRect(0,0,2,h)
-        surface.SetDrawColor(255,255,255,80)
-        surface.DrawRect(0,h-1,w,1)
-        draw.SimpleText(CoinShopReveal(btn,"<PLACE HOLDER>","name"),"ChudShopPageSmall",MenuUnit(12),MenuUnit(12),color_white)
-        local coinSize = MenuUnit(26)
-        surface.SetMaterial(coinIcon)
-        surface.SetDrawColor(255,255,255)
-        surface.DrawTexturedRectUV(MenuUnit(12),MenuUnit(42),coinSize,coinSize,0,0,108/184,108/111)
-        draw.SimpleText("99999 COIN","ChudShopPageSmall",MenuUnit(20)+coinSize,MenuUnit(44),Color(180,180,180))
-    end
-    row.OnCursorEntered=function() surface.PlaySound(SOUND_MENU_HOVER) end
-    row.DoClick=function() surface.PlaySound(SOUND_MENU_SELECT) end
+
     local preview = vgui.Create("DModelPanel",right)
-    local weaponClass = category == "MELEE SKINS" and "weapon_combatknife" or "weapon_m1911"
-    local weaponData = weapons.GetStored(weaponClass)
-    local model = weaponData and (weaponData.WorldModelFake or weaponData.WorldModel)
-    if not model or not util.IsValidModel(model) then model="models/weapons/w_pistol.mdl" end
-    preview:SetModel(model)
     preview:SetFOV(40)
     preview:SetMouseInputEnabled(false)
-    if IsValid(preview.Entity) then
-        local mins,maxs=preview.Entity:GetRenderBounds()
-        local center=(mins+maxs)*0.5
-        local size=math.max((maxs-mins):Length(),8)
-        preview:SetLookAt(center)
-        preview:SetCamPos(center+Vector(size*1.4,size*1.4,size*0.55))
+    preview.LayoutEntity=function() end -- still, side-on, no spin
+    -- Frame the gun itself: measure the gun's mesh in the pose it is drawn in
+    -- (arm meshes skipped), then fit that box into the panel, centred.
+    local function IsArmMaterial(path)
+        path = string.lower(path or "")
+        for _,word in ipairs({"hand","arm","glove","sleeve"}) do
+            if string.find(path,word,1,true) then return true end
+        end
+        return false
     end
-    preview.LayoutEntity=function(_,ent) ent:SetAngles(Angle(0,RealTime()*12%360,0)) end
+    -- Measures the gun's mesh in its drawn pose. Parts that float apart from the
+    -- main body (spare reload magazines) come back in `loose` so they can be hidden.
+    local function MeshBounds(ent)
+        local ok,meshes,binds = pcall(util.GetModelMeshes,ent:GetModel(),0,0)
+        if not ok or not istable(meshes) or not istable(binds) then return end
+        local cache = {}
+        local boxes = {}
+        for _,part in ipairs(meshes) do
+            if not IsArmMaterial(part.material) then
+                for _,vert in ipairs(part.triangles or {}) do
+                    local pos = Vector(0,0,0)
+                    local total,top,topW = 0,nil,-1
+                    for _,w in ipairs(vert.weights or {}) do
+                        local m = cache[w.bone]
+                        if m == nil then
+                            local bone = ent:GetBoneMatrix(w.bone)
+                            m = (bone and binds[w.bone]) and (bone * binds[w.bone].matrix) or false
+                            cache[w.bone] = m
+                        end
+                        if m then
+                            pos = pos + (m * vert.pos) * w.weight
+                            total = total + w.weight
+                            if w.weight > topW then top,topW = w.bone,w.weight end
+                        end
+                    end
+                    if total > 0 and top then
+                        pos = pos / total
+                        local box = boxes[top]
+                        if box then
+                            box.mins.x,box.mins.y,box.mins.z = math.min(box.mins.x,pos.x),math.min(box.mins.y,pos.y),math.min(box.mins.z,pos.z)
+                            box.maxs.x,box.maxs.y,box.maxs.z = math.max(box.maxs.x,pos.x),math.max(box.maxs.y,pos.y),math.max(box.maxs.z,pos.z)
+                            box.count = box.count + 1
+                            box.verts[#box.verts+1] = pos
+                        else
+                            boxes[top] = {mins = Vector(pos), maxs = Vector(pos), count = 1, verts = {pos}}
+                        end
+                    end
+                end
+            end
+        end
+        -- Group bones whose boxes touch; the biggest group is the gun.
+        local ids = table.GetKeys(boxes)
+        local parent = {}
+        for _,id in ipairs(ids) do parent[id] = id end
+        local function root(id) while parent[id] ~= id do id = parent[id] end return id end
+        local pad = 0.75
+        for i = 1,#ids do
+            for j = i+1,#ids do
+                local A,B = boxes[ids[i]],boxes[ids[j]]
+                if A.mins.x-pad <= B.maxs.x and B.mins.x-pad <= A.maxs.x and A.mins.y-pad <= B.maxs.y and B.mins.y-pad <= A.maxs.y
+                    and A.mins.z-pad <= B.maxs.z and B.mins.z-pad <= A.maxs.z then
+                    parent[root(ids[i])] = root(ids[j])
+                end
+            end
+        end
+        local groups = {}
+        for _,id in ipairs(ids) do
+            local r = root(id)
+            groups[r] = groups[r] or {bones = {}, count = 0}
+            table.insert(groups[r].bones,id)
+            groups[r].count = groups[r].count + boxes[id].count
+        end
+        local main
+        for _,g in pairs(groups) do if not main or g.count > main.count then main = g end end
+        if not main then return end
+        local mins,maxs
+        local keep = {}
+        for _,id in ipairs(main.bones) do
+            keep[id] = true
+            local box = boxes[id]
+            mins = mins and Vector(math.min(mins.x,box.mins.x),math.min(mins.y,box.mins.y),math.min(mins.z,box.mins.z)) or Vector(box.mins)
+            maxs = maxs and Vector(math.max(maxs.x,box.maxs.x),math.max(maxs.y,box.maxs.y),math.max(maxs.z,box.maxs.z)) or Vector(box.maxs)
+        end
+        local loose = {}
+        for _,id in ipairs(ids) do if not keep[id] then loose[#loose+1] = id end end
+        local verts = {}
+        for _,id in ipairs(main.bones) do
+            for _,v in ipairs(boxes[id].verts) do verts[#verts+1] = v end
+        end
+        return mins,maxs,loose,keep,verts
+    end
+    -- Eigenvectors of a symmetric 3x3 matrix (Jacobi), largest eigenvalue first.
+    local function Eigen3(m)
+        local a = {{m[1][1],m[1][2],m[1][3]},{m[2][1],m[2][2],m[2][3]},{m[3][1],m[3][2],m[3][3]}}
+        local v = {{1,0,0},{0,1,0},{0,0,1}}
+        for _ = 1,40 do
+            local p,q,big = 1,2,math.abs(a[1][2])
+            if math.abs(a[1][3]) > big then p,q,big = 1,3,math.abs(a[1][3]) end
+            if math.abs(a[2][3]) > big then p,q,big = 2,3,math.abs(a[2][3]) end
+            if big < 1e-9 then break end
+            local theta = (a[q][q]-a[p][p])/(2*a[p][q])
+            local t = (theta >= 0 and 1 or -1)/(math.abs(theta)+math.sqrt(theta*theta+1))
+            local c = 1/math.sqrt(t*t+1)
+            local sn = t*c
+            for k = 1,3 do
+                local akp,akq = a[k][p],a[k][q]
+                a[k][p],a[k][q] = c*akp-sn*akq, sn*akp+c*akq
+            end
+            for k = 1,3 do
+                local apk,aqk = a[p][k],a[q][k]
+                a[p][k],a[q][k] = c*apk-sn*aqk, sn*apk+c*aqk
+            end
+            for k = 1,3 do
+                local vkp,vkq = v[k][p],v[k][q]
+                v[k][p],v[k][q] = c*vkp-sn*vkq, sn*vkp+c*vkq
+            end
+        end
+        local list = {}
+        for i = 1,3 do list[i] = {val = a[i][i], vec = Vector(v[1][i],v[2][i],v[3][i])} end
+        table.sort(list,function(x,y) return x.val > y.val end)
+        return list[1].vec,list[2].vec,list[3].vec
+    end
+    -- Camera basis from the gun's own shape: long axis runs left-right,
+    -- the thin axis faces the camera, so we always see the flat side.
+    local function ShapeBasis(verts)
+        if #verts < 8 then return end
+        local mean = Vector(0,0,0)
+        for _,v in ipairs(verts) do mean = mean + v end
+        mean = mean / #verts
+        local c = {{0,0,0},{0,0,0},{0,0,0}}
+        for _,v in ipairs(verts) do
+            local d = {v.x-mean.x, v.y-mean.y, v.z-mean.z}
+            for i = 1,3 do for j = 1,3 do c[i][j] = c[i][j] + d[i]*d[j] end end
+        end
+        local long,mid = Eigen3(c)
+        long:Normalize() mid:Normalize()
+        -- Keep the old orientation habit: long axis points towards +X/+Y, "up" points up.
+        if (math.abs(long.x) >= math.abs(long.y) and long.x or long.y) < 0 then long = -long end
+        if mid.z < 0 or (math.abs(mid.z) < 0.2 and mid:Dot(Vector(0,0,1)) < 0) then mid = -mid end
+        local right,up = long,mid
+        local forward = up:Cross(right)
+        forward:Normalize()
+        up = right:Cross(forward)
+        local lo = Vector(math.huge,math.huge,math.huge)
+        local hi = Vector(-math.huge,-math.huge,-math.huge)
+        for _,v in ipairs(verts) do
+            local d = v - mean
+            local x,y,z = d:Dot(right),d:Dot(up),d:Dot(forward)
+            lo.x,lo.y,lo.z = math.min(lo.x,x),math.min(lo.y,y),math.min(lo.z,z)
+            hi.x,hi.y,hi.z = math.max(hi.x,x),math.max(hi.y,y),math.max(hi.z,z)
+        end
+        local mid3 = (lo+hi)*0.5
+        local center = mean + right*mid3.x + up*mid3.y + forward*mid3.z
+        return {right = right, up = up, forward = forward, center = center, size = hi-lo}
+    end
+    -- Hide loose parts, but never a bone the gun itself hangs from.
+    local function HideLoose(ent,loose,keep)
+        local ancestor = {}
+        for id in pairs(keep or {}) do
+            local p = ent:GetBoneParent(id)
+            while p and p >= 0 and not ancestor[p] do ancestor[p] = true p = ent:GetBoneParent(p) end
+        end
+        for _,id in ipairs(loose or {}) do
+            if not ancestor[id] then ent:ManipulateBoneScale(id,vector_origin) end
+        end
+    end
+    local function FramePreview()
+        local ent = preview.Entity
+        if not IsValid(ent) then return end
+        ent:SetPos(vector_origin)
+        ent:SetAngles(angle_zero)
+        ent:InvalidateBoneCache()
+        ent:SetupBones()
+        local mins,maxs,loose,keep,verts = MeshBounds(ent)
+        preview.MeshFramed = mins ~= nil and (maxs-mins):Length() >= 1
+        if preview.MeshFramed then HideLoose(ent,loose,keep) end
+        preview.GunBasis = preview.MeshFramed and ShapeBasis(verts) or nil
+        if not preview.MeshFramed then mins,maxs = ent:GetRenderBounds() end
+        preview.GunMins,preview.GunMaxs = mins,maxs
+        preview.FramedSize = nil
+    end
+    -- Bones are only guaranteed once the model has drawn, so measure again then.
+    preview.PostDrawModel = function(pnl)
+        if pnl.MeshFramed or (pnl.FrameTries or 0) >= 3 then return end
+        pnl.FrameTries = (pnl.FrameTries or 0) + 1
+        FramePreview()
+    end
+    -- Re-fit whenever the panel changes size (the cards slide and resize).
+    preview.Think = function(pnl)
+        local w,h = pnl:GetSize()
+        if not pnl.GunMins or w < 2 or h < 2 then return end
+        local key = w .. "x" .. h
+        if pnl.FramedSize == key then return end
+        pnl.FramedSize = key
+        local tanH = math.tan(math.rad(pnl:GetFOV()*0.5))
+        local tanV = tanH*h/w
+        local b = pnl.GunBasis
+        if b then
+            local dist = math.max(b.size.x*0.5/tanH, b.size.y*0.5/tanV)*1.3 + b.size.z*0.5
+            pnl:SetCamPos(b.center - b.forward*dist)
+            pnl:SetLookAng(b.forward:AngleEx(b.up))
+            return
+        end
+        pnl.aLookAngle = nil
+        local mins,maxs = pnl.GunMins,pnl.GunMaxs
+        local center = (mins+maxs)*0.5
+        local extent = maxs-mins
+        -- Look across the gun so the barrel runs left to right.
+        local alongY = extent.y > extent.x
+        local across = alongY and extent.y or extent.x
+        local depth = alongY and extent.x or extent.y
+        local tanH = math.tan(math.rad(pnl:GetFOV()*0.5))
+        local tanV = tanH*h/w
+        local margin = 1.3
+        local dist = math.max(across*0.5/tanH, extent.z*0.5/tanV)*margin + depth*0.5
+        pnl:SetLookAt(center)
+        pnl:SetCamPos(center + (alongY and Vector(dist,0,0) or Vector(0,-dist,0)))
+    end
+    local function ShowPreview(item)
+        local weaponData = weapons.GetStored(item.weapon)
+        -- Melee weapons keep their real model in DroppedWorldModel / WorldModelReal.
+        local model
+        for _,key in ipairs({"WorldModelFake","DroppedWorldModel","WorldModelReal","WorldModel"}) do
+            local path = weaponData and weaponData[key]
+            if isstring(path) and path ~= "" and file.Exists(path,"GAME") then model = path break end
+        end
+        preview:SetModel(model or "models/weapons/w_pistol.mdl")
+        local ent = preview.Entity
+        if not IsValid(ent) then return end
+        -- Pose the gun in its idle animation so loose parts (mags, slides) sit in place.
+        local idle = weaponData and weaponData.AnimList and weaponData.AnimList.idle
+        for _,name in ipairs({idle or "", "idle", "base_idle", "draw"}) do
+            local seq = name ~= "" and ent:LookupSequence(name) or -1
+            if seq and seq >= 0 then ent:ResetSequence(seq) ent:SetCycle(0) ent:SetPlaybackRate(0) break end
+        end
+        ChudSkins.ApplyToModel(ent,item.id)
+        -- First-person models can carry arms; keep only the weapon on show.
+        for i,path in ipairs(ent:GetMaterials()) do
+            if IsArmMaterial(path) then ent:SetSubMaterial(i-1,"!ChudShopHiddenMesh") end
+        end
+        preview.FrameTries = 0
+        FramePreview()
+        preview:SetAlpha(0)
+        preview:AlphaTo(255,0.25,0)
+    end
+
     local buy=vgui.Create("DButton",right)
     buy:SetText("")
-    buy:SetEnabled(false)
-    buy.Paint=function(_,w,h)
-        surface.SetDrawColor(15,15,20,220)
-        surface.DrawRect(0,0,w,h)
-        surface.SetDrawColor(255,255,255,65)
-        surface.DrawOutlinedRect(0,0,w,h)
-        draw.SimpleText("BUY","ChudShopPageSmall",w*0.5,h*0.5,Color(125,125,125),TEXT_ALIGN_CENTER,TEXT_ALIGN_CENTER)
+    local function BuyState()
+        if not selected then return end
+        if ChudSkins.IsEquipped(selected.id) then return "UNEQUIP","unequip","outline" end
+        if ChudSkins.Owns(selected.id) then return "EQUIP","equip","solid" end
+        local coins = IsValid(LocalPlayer()) and LocalPlayer():GetNWInt("ChudCoin",0) or 0
+        if coins < selected.price then return "NEED " .. string.Comma(selected.price - coins) .. " MORE COIN",nil,"locked" end
+        return "BUY","buy","solid"
     end
-    if category == "INVENTORY" then
-        row:SetVisible(false)
-        preview:SetVisible(false)
-        buy:SetVisible(false)
-        list.Paint=function() draw.SimpleText("YOUR INVENTORY IS EMPTY","ChudShopPageTiny",MenuUnit(14),MenuUnit(18),Color(160,160,160)) end
+    buy.Paint=function(btn,w,h)
+        local label,action,style = BuyState()
+        if not label then return end
+        local waiting = (btn.WaitUntil or 0) > CurTime()
+        local accent = ShopAccent(selected)
+        local hover = action and btn:IsHovered() and not waiting
+        btn.HoverLerp = Lerp(FrameTime()*10,btn.HoverLerp or 0,hover and 1 or 0)
+        local radius = MenuUnit(4)
+        if style == "solid" then
+            local boost = 1+0.18*btn.HoverLerp
+            draw.RoundedBox(radius,0,0,w,h,Color(math.min(255,accent.r*boost),math.min(255,accent.g*boost),math.min(255,accent.b*boost),waiting and 120 or 235))
+        elseif style == "outline" then
+            draw.RoundedBox(radius,0,0,w,h,Color(255,255,255,8+20*btn.HoverLerp))
+            surface.SetDrawColor(accent.r,accent.g,accent.b,170)
+            surface.DrawOutlinedRect(0,0,w,h,math.max(1,MenuUnit(2)))
+        else
+            draw.RoundedBox(radius,0,0,w,h,Color(255,255,255,8))
+        end
+        local dark = style == "solid" and (accent.r*0.3+accent.g*0.59+accent.b*0.11) > 150
+        local fg = style == "locked" and SHOP_DIM or (dark and Color(15,15,15) or color_white)
+        if waiting then label = "..." end
+        if action == "buy" and not waiting then
+            draw.SimpleText(label,"ChudShopPageMedium",MenuUnit(20),h*0.5,fg,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+            surface.SetFont("ChudShopPageMedium")
+            local _,th = surface.GetTextSize("0")
+            ShopCoinPrice(selected.price,"ChudShopPageMedium",w-MenuUnit(20),h*0.5-th*0.5,fg,true)
+        else
+            draw.SimpleText(label,"ChudShopPageMedium",w*0.5,h*0.5,fg,TEXT_ALIGN_CENTER,TEXT_ALIGN_CENTER)
+        end
     end
+    buy.OnCursorEntered=function() surface.PlaySound(SOUND_MENU_HOVER) end
+    buy.DoClick=function(btn)
+        local _,action = BuyState()
+        if not action or (btn.WaitUntil or 0) > CurTime() then return end
+        surface.PlaySound(SOUND_MENU_SELECT)
+        btn.WaitUntil = CurTime() + 2
+        ChudSkins.Request(action,selected.id)
+    end
+
+    local function Select(item)
+        local changed = selected ~= item
+        selected = item
+        preview:SetVisible(item ~= nil)
+        buy:SetVisible(item ~= nil)
+        if item and changed then right.GlowLerp = 0 ShowPreview(item) end
+    end
+    -- Item cards: accent bar, name, weapon, price tag or status tag.
+    local function BuildRows()
+        list:Clear()
+        local items = ItemList()
+        itemCount = #items
+        if selected and not table.HasValue(items,selected) then selected = nil end
+        for i,item in ipairs(items) do
+            local row = list:Add("DButton")
+            row:SetText("")
+            row:Dock(TOP)
+            row:DockMargin(MenuUnit(12),i == 1 and MenuUnit(12) or MenuUnit(8),MenuUnit(12),0)
+            row:SetTall(MenuUnit(78))
+            row.CoinRevealStart=CurTime()
+            row.Paint = function(btn,w,h)
+                local active = selected == item
+                local accent = ShopAccent(item)
+                btn.ActiveLerp = Lerp(FrameTime()*10,btn.ActiveLerp or 0,active and 1 or 0)
+                btn.HoverLerp = Lerp(FrameTime()*10,btn.HoverLerp or 0,btn:IsHovered() and 1 or 0)
+                local a,hv = btn.ActiveLerp,btn.HoverLerp
+                draw.RoundedBox(MenuUnit(4),0,0,w,h,Color(255,255,255,6+8*hv))
+                if a > 0.01 then
+                    surface.SetTexture(shopFadeRight)
+                    surface.SetDrawColor(accent.r,accent.g,accent.b,45*a)
+                    surface.DrawTexturedRectRotated(w*0.5,h*0.5,w,h,180)
+                end
+                surface.SetDrawColor(accent.r,accent.g,accent.b,120+135*a)
+                surface.DrawRect(0,MenuUnit(10)*(1-a),MenuUnit(3)+MenuUnit(2)*a,h-MenuUnit(20)*(1-a))
+                local x = MenuUnit(18)+MenuUnit(4)*a
+                draw.SimpleText(CoinShopReveal(btn,item.name,"name"),"ChudShopCardName",x,MenuUnit(12),color_white)
+                draw.SimpleText(ChudSkins.WeaponName(item.weapon),"ChudShopKicker",x,MenuUnit(46),SHOP_MUTED)
+                if ChudSkins.IsEquipped(item.id) then
+                    ShopTag("EQUIPPED","ChudShopKicker",w-MenuUnit(14),h*0.5-MenuUnit(11),color_black,accent,true)
+                elseif ChudSkins.Owns(item.id) then
+                    ShopTag("OWNED","ChudShopKicker",w-MenuUnit(14),h*0.5-MenuUnit(11),SHOP_MUTED,Color(255,255,255,14),true)
+                else
+                    surface.SetFont("ChudShopPageSmall")
+                    local _,th = surface.GetTextSize("0")
+                    ShopCoinPrice(item.price,"ChudShopPageSmall",w-MenuUnit(16),h*0.5-th*0.5,color_white,true)
+                end
+            end
+            row.OnCursorEntered=function() surface.PlaySound(SOUND_MENU_HOVER) end
+            row.DoClick=function() if selected ~= item then surface.PlaySound(SOUND_MENU_SELECT) Select(item) end end
+        end
+        Select(selected or items[1])
+    end
+    BuildRows()
+    hook.Add("ChudSkinsUpdated",detail,function()
+        buy.WaitUntil = nil
+        BuildRows()
+    end)
+    if ChudSkins then ChudSkins.Request("sync") end
+
+    -- Page background and header band.
     detail.Paint = function(pnl,w,h)
         if hg.DrawBlur then hg.DrawBlur(pnl,5) end
-        surface.SetDrawColor(10,10,19,235)
+        surface.SetDrawColor(7,7,11,240)
         surface.DrawRect(0,0,w,h)
-        surface.SetDrawColor(100,100,100,35)
-        surface.SetTexture(gradient_d)
-        surface.DrawTexturedRect(0,0,w,h)
+        local accent = ShopAccent(selected)
+        surface.SetTexture(shopFadeUp)
+        surface.SetDrawColor(accent.r,accent.g,accent.b,18)
+        surface.DrawTexturedRect(0,h*0.55,w,h*0.45)
         local top=MenuUnit(menu_news.top+menu_news.height+8)
-        surface.SetDrawColor(15,15,20,120)
-        surface.DrawRect(0,top,w,MenuUnit(70))
-        surface.SetDrawColor(255,255,255,140)
-        surface.DrawRect(0,top+MenuUnit(70),w,1)
-        draw.SimpleText(CoinShopReveal(pnl,title,"header"),"ChudShopPageTitle",MenuUnit(25),top+MenuUnit(18),color_white)
+        draw.SimpleText("CHUDMORSE  /  COIN STORE","ChudShopKicker",MenuUnit(26),top+MenuUnit(10),SHOP_MUTED)
+        draw.SimpleText(CoinShopReveal(pnl,title,"header"),"ChudShopPageTitle",MenuUnit(25),top+MenuUnit(28),color_white)
+        surface.SetDrawColor(255,255,255,30)
+        surface.DrawRect(MenuUnit(26),top+MenuUnit(76),w-MenuUnit(52),1)
+        surface.SetDrawColor(accent)
+        surface.DrawRect(MenuUnit(26),top+MenuUnit(75),MenuUnit(60),math.max(2,MenuUnit(3)))
     end
     detail.Think = function(pnl)
         local mx,my=self:GetLiveOffset(MenuUnit(menu_live.profile_drift_x),MenuUnit(menu_live.profile_drift_y))
         local sx,sy=self:GetLiveShake(1.7,2.3,MenuUnit(menu_live.shake_x),MenuUnit(menu_live.shake_y))
-        local pad,gap=MenuUnit(22),MenuUnit(22)
+        local pad,gap=MenuUnit(26),MenuUnit(18)
         local top=MenuUnit(menu_news.top+menu_news.height+100)
-        local cw=(pnl:GetWide()-pad*2-gap)*0.5
-        local ch=math.max(MenuUnit(240),pnl:GetTall()-top-MenuUnit(72))
-        left:SetSize(cw,ch)
-        right:SetSize(cw,ch)
+        local usable = pnl:GetWide()-pad*2-gap
+        local lw = math.floor(usable*0.36)
+        local rw = usable-lw
+        local ch=math.max(MenuUnit(240),pnl:GetTall()-top-MenuUnit(80))
+        left:SetSize(lw,ch)
+        right:SetSize(rw,ch)
         local leftTarget = pad+mx+sx
-        local rightTarget = pad+cw+gap+mx+sx
+        local rightTarget = pad+lw+gap+mx+sx
         local targetY = top+my+sy
-        local exitLeft,exitRight = -cw-MenuUnit(180),pnl:GetWide()+MenuUnit(180)
+        local exitLeft,exitRight = -lw-MenuUnit(180),pnl:GetWide()+MenuUnit(180)
         if not pnl.CardsSlideStarted then
             pnl.CardsSlideStarted = true
             left:SetPos(exitLeft,targetY)
@@ -1415,11 +1841,14 @@ function PANEL:OpenCoinCategory(category)
         end
         slide(left,leftTarget)
         slide(right,rightTarget)
-        list:SetPos(0,MenuUnit(61));list:SetSize(cw,ch-MenuUnit(61))
-        local dividerY = math.floor(ch*0.64)
-        preview:SetPos(MenuUnit(16),MenuUnit(76))
-        preview:SetSize(cw-MenuUnit(32),math.max(20,dividerY-MenuUnit(92)))
-        buy:SetPos(MenuUnit(18),ch-MenuUnit(72));buy:SetSize(cw-MenuUnit(36),MenuUnit(48))
+        list:SetPos(0,headerH);list:SetSize(lw,ch-headerH-MenuUnit(8))
+        local inset = MenuUnit(18)
+        local stageH = ch-infoH
+        preview:SetPos(inset*2,inset*2)
+        preview:SetSize(rw-inset*4,math.max(20,stageH-inset*4))
+        local bw = math.floor(rw*0.36)
+        buy:SetSize(bw,MenuUnit(58))
+        buy:SetPos(rw-inset-bw,ch-inset-MenuUnit(58))
         if IsValid(self.CoinWallet) then self.CoinWallet:Think() end
     end
     detail:Think()
@@ -1433,7 +1862,7 @@ function PANEL:OpenCoinCategory(category)
         local tw,th = surface.GetTextSize("#######")
         local bw,bh = surface.GetTextSize("<  BACK")
         btn:SetSize(math.max(tw,bw)+MenuUnit(32),math.max(th,bh)+MenuUnit(24))
-        btn:SetPos(MenuUnit(12),detail:GetTall()-btn:GetTall()-MenuUnit(12))
+        btn:SetPos(MenuUnit(14),detail:GetTall()-btn:GetTall()-MenuUnit(10))
     end
     back.Paint = function(btn,w,h)
         local shade = btn:IsHovered() and (0.5+0.5*math.sin(CurTime()*10))*255 or 225
@@ -1448,18 +1877,18 @@ function PANEL:OpenCoinCategory(category)
         detail:Stop()
         detail:AlphaTo(0,0.2,0,function()
             if not IsValid(self) or not IsValid(detail) then return end
-        detail:Remove()
-        self.CoinCategoryPage = nil
-        if IsValid(self.CoinShopPage) then
-            self.CoinShopPage:SetVisible(true)
-            self.CoinShopPage:MoveToFront()
-            for _,tile in ipairs(self.CoinShopPage.Tiles) do
-                tile.CoinRevealStart=CurTime()
-                tile.CoinRevealCounts={}
+            detail:Remove()
+            self.CoinCategoryPage = nil
+            if IsValid(self.CoinShopPage) then
+                self.CoinShopPage:SetVisible(true)
+                self.CoinShopPage:MoveToFront()
+                for _,tile in ipairs(self.CoinShopPage.Tiles) do
+                    tile.CoinRevealStart=CurTime()
+                    tile.CoinRevealCounts={}
+                end
             end
-        end
-        if IsValid(self.previewHolder) then self.previewHolder:SetVisible(true) end
-        if IsValid(self.CoinWallet) then self.CoinWallet:MoveToFront();self.CoinWallet:Think() end
+            if IsValid(self.previewHolder) then self.previewHolder:SetVisible(true) end
+            if IsValid(self.CoinWallet) then self.CoinWallet:MoveToFront();self.CoinWallet:Think() end
         end)
     end
     detail:MoveToFront()

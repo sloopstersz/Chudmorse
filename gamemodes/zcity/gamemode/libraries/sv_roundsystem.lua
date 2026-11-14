@@ -666,7 +666,14 @@ function zb.SendRoundListToClient(ply)
 	net.Start("ZB_SendRoundList")
 		net.WriteTable(zb.RoundList)
 		net.WriteString(zb.nextround or "")
+		net.WriteString(forcemodeconvar:GetString() or "random") -- F6 menu: lets admins see/lock the forced mode
 	net.Send(ply)
+end
+
+function zb.SyncForceModeToAdmins()
+	for _, admin in ipairs(zb.GetAllAdmins()) do
+		zb.SendRoundListToClient(admin)
+	end
 end
 
 
@@ -953,6 +960,19 @@ if SERVER then
 		local modeKey = ZB_NormalizeModeKey(net.ReadString())
 		local addToQueue = net.ReadBool() or false
 		if command ~= "setmode" and command ~= "setforcemode" then return end
+
+		-- F6 menu force toggle: "random" turns force mode off.
+		if command == "setforcemode" and modeKey == "random" then
+			forcemodeconvar:SetString("random")
+			forcemode = "random"
+			ply:ChatPrint("Force mode disabled")
+			net.Start("ZB_NotifyRoundListChange")
+				net.WriteString(ply:Nick())
+			net.Send(zb.GetAllAdmins())
+			zb.SyncForceModeToAdmins()
+			return
+		end
+
 		if not isstring(modeKey) or not zb.modes[modeKey] then ply:ChatPrint("Invalid game mode") return end
 
 		if !(ply:IsSuperAdmin() or ply:IsAdmin()) and not zb.modes[modeKey]:CanLaunch() then
@@ -971,9 +991,12 @@ if SERVER then
 				zb.SyncQueueToAdmins()
 			end
 		elseif command == "setforcemode" then
+			-- Store in the convar too, otherwise RoundStart resets force mode after one round.
+			forcemodeconvar:SetString(modeKey)
 			forcemode = modeKey
                         NextRound(forcemode, true)
 			ply:ChatPrint("Force mode set to: " .. modeKey)
+			zb.SyncForceModeToAdmins()
 
 			if addToQueue and #zb.QueuedModes < 12 then
 				table.insert(zb.QueuedModes, modeKey)

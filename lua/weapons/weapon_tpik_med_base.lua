@@ -1,0 +1,932 @@
+if SERVER then AddCSLuaFile() end
+SWEP.PrintName = "TPIK Medical Base"
+SWEP.Instructions = "Tpik Base"
+SWEP.Category = "ZCity Anims items"
+SWEP.Instructions = ":3 если вы скриптхукнули знайте вы для нас вонючка."
+SWEP.Spawnable = false
+SWEP.AdminOnly = true
+SWEP.Slot = 1
+
+SWEP.Weight = 0
+SWEP.AutoSwitchTo = false
+SWEP.AutoSwitchFrom = false
+
+SWEP.Primary.ClipSize = -1
+SWEP.Primary.DefaultClip = -1
+SWEP.Primary.Ammo = "none"
+
+SWEP.Secondary.ClipSize = -1
+SWEP.Secondary.DefaultClip = -1
+SWEP.Secondary.Ammo = "none"
+
+SWEP.WorldModel = "models/weapons/zcity/chands_gestures.mdl"
+SWEP.WorldModelReal = "models/weapons/zcity/chands_gestures.mdl"
+SWEP.WorldModelExchange = false
+SWEP.ViewModel = ""
+SWEP.HoldType = "slam"
+
+function SWEP:CanPrimaryAttack()
+	return true
+end
+
+function SWEP:CanSecondaryAttack()
+	return true
+end
+
+SWEP.supportTPIK = true
+
+SWEP.weaponPos = Vector(0,0,0)
+SWEP.weaponAng = Angle(0,0,0)
+
+SWEP.animtime = 0
+SWEP.animspeed = 0
+SWEP.cycling = false
+SWEP.reverseanim = false
+
+SWEP.AnimList = {
+    -- self:PlayAnim( anim,time,cycling,callback,reverse,sendtoclient )
+    -- ["AnimName"] = { "animrealname", number iTime, boolean bCycle, function fCallback, boolean bReverse }
+}
+
+if CLIENT then
+	--SWEP.WepSelectIcon = Material("vgui/hud/tfa_iw7_tactical_knife")
+	--SWEP.IconOverride = "vgui/hud/tfa_iw7_tactical_knife.png"
+	SWEP.BounceWeaponIcon = false
+end
+
+SWEP.setlh = false
+SWEP.setrh = true
+
+SWEP.sprint_ang = Angle(20,0,0)
+SWEP.sprint_pos = Vector(0,0,0)
+
+SWEP.HoldPos = Vector(0,0,0)
+SWEP.HoldAng = Angle(0,0,0)
+
+SWEP.basebone = 1
+
+SWEP.WorkWithFake = true
+SWEP.visualweight = 1.2
+
+function SWEP:SetHold(value)
+    self:SetWeaponHoldType(value)
+    self:SetHoldType(value)
+    self.holdtype = value
+end
+
+SWEP.modelscale = 1
+SWEP.modelscale2 = 1
+
+-- Medical TPIK base (ported from judge). Kept separate from weapon_tpik_base so
+-- grenades / slam / handcuffs etc. keep using Chudmorse's original base.
+hg.GetTPIKCharacter = hg.GetTPIKCharacter or function(owner)
+	if not IsValid(owner) then return end
+
+	local ragdoll = owner:GetNWEntity("FakeRagdoll")
+	return IsValid(ragdoll) and ragdoll or owner
+end
+
+if CLIENT then
+
+    local vecPochtiZero = Vector(0.0001, 0.0001, 0.0001)
+
+    function PrintBones( entity )
+        for i = 0, entity:GetBoneCount() - 1 do
+            print( i, entity:GetBoneName( i ) )
+        end
+    end
+
+	function SWEP:GetWM()
+		if not IsValid(self.worldModel) then self.worldModel = ClientsideModel(self.WorldModel) end
+		if not IsValid(self.worldModel) then return end
+        self.worldModel:SetNoDraw(true)
+		return self.worldModel
+	end
+
+    function SWEP:DrawWorldModel()
+        if not IsValid(self:GetOwner()) then
+            self:DrawWorldModel2()
+        end
+    end
+
+	function SWEP:DrawWorldModel2(prepareOnly)
+		local owner = self:GetOwner()
+
+        if not IsValid(self.worldModel) then
+            self.worldModel = ClientsideModel(self.WorldModel)
+			if not IsValid(self.worldModel) then return end
+            local model = self.worldModel
+            self.worldModel:SetSkin(self.WMSkin or 0)
+            self:CallOnRemove("remove_worldmodel1",function()
+                if IsValid(model) then
+                    model:Remove()
+                    model = nil
+                end
+            end)
+        end
+
+        self.worldModel:SetNoDraw(true)
+        if IsValid(owner) and (not owner.shouldTransmit or owner.NotSeen) then return end
+        if not IsValid(owner) and (not self.shouldTransmit or self.NotSeen) then return end
+
+		local WorldModel = self.worldModel
+		local desiredSkin = IsValid(owner) and (self.WMSkinV or self.WMSkin or 0) or (self.WMSkin or 0)
+		if WorldModel:GetSkin() ~= desiredSkin then
+			WorldModel:SetSkin(desiredSkin)
+		end
+
+		self.worldModel:SetModelScale(self.modelscale2)
+
+		local ent = hg.GetTPIKCharacter(owner)
+
+        if (IsValid(owner)) and (ent == owner or hg.KeyDown(owner,IN_USE) or (owner:GetNetVar("lastFake",0) > CurTime())) then
+            local timing = 0
+            if not self.cycling then
+				local animtime = self.animtime or CurTime()
+				local animspeed = math.max(self.animspeed or 1, 0.001)
+                timing = (1 - math.Clamp((animtime - CurTime()) / animspeed,0,1))
+				local startCycle = isnumber(self.animStartCycle) and self.animStartCycle or (self.reverseanim and 1 or 0)
+				local endCycle = isnumber(self.animEndCycle) and self.animEndCycle or (self.reverseanim and 0 or 1)
+				timing = Lerp(timing, startCycle, endCycle)
+                timing = self.CustomTiming and self:CustomTiming() or timing
+                WorldModel:SetCycle(timing)
+                
+                if self.callback and timing == ((not self.reverseanim) and 1 or 0) then
+                    self.callback(self)
+                    self.callback = nil
+                end
+            else
+				local animspeed = math.max(self.animspeed or 1, 0.001)
+				local animtime = self.animtime or (CurTime() + animspeed)
+                timing = ((CurTime() - (animtime - animspeed)) % animspeed) / animspeed
+                WorldModel:SetCycle(timing)
+            end
+
+            self.sprintanim = qerp(0.02 * FrameTime() / engine.TickInterval(),self.sprintanim or 0,(owner.IsSprinting and owner:IsSprinting()) and 1 or 0)
+            
+			local tr = hg.eyeTrace(owner,60,ent)
+			local ang = owner:EyeAngles()
+            if not tr then return end
+
+            if WorldModel:GetModel() ~= self.WorldModelReal then WorldModel:SetModel(self.WorldModelReal); WorldModel:SetSkin(self.WMSkinV or self.WMSkin or 0) end
+
+			local holdPos = self.HoldPos
+			if self.GetTPIKHoldPos then holdPos = self:GetTPIKHoldPos(holdPos) or holdPos end
+			local pos = tr.StartPos + ang:Forward() * (holdPos[1] - 4) + ang:Right() * holdPos[2] + ang:Up() * holdPos[3]
+			--pos = pos + ang:Forward() * self.AttackPos[1] * self.attackanim + ang:Right() * self.AttackPos[2] * self.attackanim + ang:Up() * self.AttackPos[3] * self.attackanim
+			local ang = owner:EyeAngles()
+            local _,ang = LocalToWorld(vector_origin,(self.HoldAng or angle_zero),vector_origin,ang)
+			
+			local pos, ang = LocalToWorld(self.sprint_pos * self.sprintanim,self.sprint_ang * self.sprintanim,pos,ang)
+
+			if self.HoldClampMax ~= nil and self.HoldClampMin ~= nil then
+				local headAng = owner:EyeAngles()
+				ang.x = math.max(math.min(headAng.x,self.HoldClampMax),self.HoldClampMin)
+			end
+
+			WorldModel:SetRenderOrigin(pos)
+			WorldModel:SetRenderAngles(ang)
+        else
+            if WorldModel:GetModel() ~= self.WorldModel then WorldModel:SetModel(self.WorldModel); WorldModel:SetSkin(self.WMSkin or 0) end
+			
+            WorldModel:SetRenderOrigin(self:GetPos())
+			WorldModel:SetRenderAngles(self:GetAngles())
+		end
+
+        if IsValid(owner) and not (ent == owner or hg.KeyDown(owner,IN_USE) or (owner:GetNetVar("lastFake",0) > CurTime())) then
+            local bon = ent:LookupBone("ValveBiped.Bip01_R_Hand")
+            if not bon then return end
+            local mat = ent:GetBoneMatrix(bon)
+            if not mat then return end
+            local pos,ang = LocalToWorld(self.lpos or vector_origin,self.lang or angle_zero,mat:GetTranslation(),mat:GetAngles())
+            WorldModel:SetRenderOrigin(pos)
+			WorldModel:SetRenderAngles(ang)
+        end
+
+        WorldModel:SetupBones()
+
+		if prepareOnly then return end
+        
+        if IsValid(self.worldModel2) then
+            self.worldModel2:SetNoDraw(true)
+        end
+
+        local hideMeshBones = self.GetHideMeshBones and self:GetHideMeshBones() or self.HideMeshBones
+		local meshBlendFraction
+		local meshBlendFrom = self.animBlendHiddenFrom
+		local meshBlendTo = self.animBlendHiddenTo
+		if self.animBlendStart and self.animBlendEnd and self.animBlendEnd > self.animBlendStart and meshBlendFrom and meshBlendTo then
+			meshBlendFraction = math.Clamp((CurTime() - self.animBlendStart) / (self.animBlendEnd - self.animBlendStart), 0, 1)
+			meshBlendFraction = meshBlendFraction * meshBlendFraction * (3 - 2 * meshBlendFraction)
+			local blendBones = {}
+			hideMeshBones = {}
+			for bone in pairs(meshBlendFrom) do blendBones[bone] = true end
+			for bone in pairs(meshBlendTo) do blendBones[bone] = true end
+			for bone in pairs(blendBones) do hideMeshBones[#hideMeshBones + 1] = bone end
+		end
+        if not self.WorldModelExchange or hideMeshBones then
+            if hideMeshBones then
+				local collapseBone = self.GetHideMeshCollapseBone and self:GetHideMeshCollapseBone()
+				local collapseIndex = isnumber(collapseBone) and collapseBone
+					or collapseBone and WorldModel:LookupBone(collapseBone)
+				local collapseMatrix = collapseIndex and WorldModel:GetBoneMatrix(collapseIndex)
+				local collapsePos = collapseMatrix and collapseMatrix:GetTranslation()
+				local collapseAng = collapseMatrix and collapseMatrix:GetAngles()
+
+                for k,v in ipairs(hideMeshBones) do
+					local boneIndex = isnumber(v) and v or WorldModel:LookupBone(v)
+					if not boneIndex or boneIndex < 0 or boneIndex >= WorldModel:GetBoneCount() then continue end
+                    --print(v)
+                    --WorldModel:ManipulateBoneScale(WorldModel:LookupBone(v),vecPochtiZero)
+					local matrix = WorldModel:GetBoneMatrix(boneIndex)
+					if not matrix then continue end
+					local hiddenFraction = 1
+					if meshBlendFraction then
+						local wasHidden = meshBlendFrom[v] and 1 or 0
+						local isHidden = meshBlendTo[v] and 1 or 0
+						hiddenFraction = Lerp(meshBlendFraction, wasHidden, isHidden)
+					end
+					if hiddenFraction < 1 then
+						matrix:SetScale(LerpVector(hiddenFraction, matrix:GetScale(), vecPochtiZero))
+						WorldModel:SetBoneMatrix(boneIndex,matrix)
+						continue
+					end
+					if collapsePos then
+						matrix:SetTranslation(collapsePos)
+						matrix:SetAngles(collapseAng)
+						matrix:SetScale(vecPochtiZero)
+                    elseif self.HideMeshOnlyScale and self.HideMeshOnlyScale[v] then
+                        matrix:SetScale(vecPochtiZero)
+                    else
+                        matrix:Zero()
+                    end
+                    WorldModel:SetBoneMatrix(boneIndex,matrix)
+                end
+            end
+
+            WorldModel:DrawModel()
+        end
+
+        if IsValid(self.worldModel) and self.WorldModelExchange then
+            if not IsValid(self.worldModel2) then
+                self.worldModel2 = ClientsideModel(self.WorldModelExchange)
+				if not IsValid(self.worldModel2) then return end
+                local model = self.worldModel2
+                self:CallOnRemove("remove_worldmodel2",function()
+                    if IsValid(model) then
+                        model:Remove()
+                        model = nil
+                    end
+                end)
+            end
+
+			local pos,ang = self.worldModel:GetPos(),self.worldModel:GetAngles()
+			local huy = self.worldModel:GetModel() == self.WorldModelReal
+            
+			if IsValid(self:GetOwner()) or self.DontChangeDropped then
+				local baseMatrix = huy and self.worldModel:GetBoneMatrix(self.basebone or 1)
+				local basePos = baseMatrix and baseMatrix:GetTranslation() or self.worldModel:GetPos()
+				local baseAng = baseMatrix and baseMatrix:GetAngles() or self.worldModel:GetAngles()
+				pos,ang = LocalToWorld(self.weaponPos,self.weaponAng,basePos,baseAng)
+			end
+            self.worldModel2:SetModelScale(self.modelscale)
+            self.worldModel2:SetRenderOrigin(pos)
+            self.worldModel2:SetRenderAngles(ang)
+            self.worldModel2:SetupBones()
+            --print(self.worldModel:GetManipulateBoneScale(self.basebone or 1))
+            if self.worldModel:GetManipulateBoneScale(self.basebone or 1) != vector_origin then
+                self.worldModel2:DrawModel()
+            end
+        end
+
+        if self:IsLocal() and self.isTPIKBase then
+            local camBone = WorldModel:LookupBone(self.ViewBobCamBone or "Camera_animated") or WorldModel:LookupBone("ValveBiped.Bip01_R_Hand")
+            if camBone then
+                local camMat = WorldModel:GetBoneMatrix(camBone)
+                local camBase = WorldModel:LookupBone(self.ViewBobCamBase or "") or 0
+                local baseMat = camBase and WorldModel:GetBoneMatrix(camBase)
+                if camMat and baseMat then
+                    local gAngles = camMat:GetAngles()
+                    local _,gAngles = WorldToLocal(vector_origin,gAngles, WorldModel:GetPos(), baseMat:GetAngles())
+                    self.OldAngPunch = self.OldAngPunch or gAngles
+                    local viewPunchDiv = self.ViewPunchDiv or 100
+                    if self.anim == "deploy" and self.DeployViewPunchDiv then
+                        viewPunchDiv = self.DeployViewPunchDiv
+                    elseif (self.anim == "attack" or self.anim == "attack2") and self.ThrowViewPunchDiv then
+                        viewPunchDiv = self.ThrowViewPunchDiv
+                    end
+                    ViewPunch((self.OldAngPunch - gAngles) / viewPunchDiv)
+                    self.OldAngPunch = gAngles
+                end
+            end
+        end
+		
+		if(self.DrawPostWorldModel)then
+			self:DrawPostWorldModel()
+		end
+	end
+end
+SWEP.isTPIKBase = true
+
+
+local host_timescale = game.GetTimeScale
+
+function SWEP:Camera(eyePos, eyeAng, view, vellen)
+	self:DrawWorldModel2(true)
+    self:SetHandPos()
+
+    local owner = self:GetOwner()
+	local isPlayer = IsValid(owner) and owner:IsPlayer()
+	local character = IsValid(owner) and hg.GetCurrentCharacter(owner) or nil
+	local speedSqr = IsValid(character) and character:GetVelocity():LengthSqr() or 0
+
+	self.walkinglerp = Lerp(hg.lerpFrameTime2(0.1), self.walkinglerp or 0, ((self.DisableWalkBob or (isPlayer and owner:InVehicle())) and 0) or speedSqr)
+	self.huytime = self.huytime or 0
+	local walk = math.Clamp(self.walkinglerp / 10000,0,1)
+	
+	self.huytime = self.huytime + walk * FrameTime() * 8 * host_timescale()
+	if isPlayer and owner:IsSprinting() then
+		--walk = walk * 2
+	end
+
+	local huy = self.huytime
+	
+	local x,y = math.cos(huy) * math.sin(huy) * walk * 1,math.sin(huy) * walk * 1
+	eyePos = eyePos - eyeAng:Up() * walk
+	eyePos = eyePos - eyeAng:Up() * x * 0.5
+	eyePos = eyePos - eyeAng:Right() * y * 0.5
+
+	view.origin = (eyePos - (angle_difference_localvec * 150) - (position_difference * 0.5))
+    
+    return view
+end
+
+function SWEP:CanPrimaryAttack()
+    return self:GetOwner():IsSprinting()
+end
+
+function SWEP:SetHandPos(noset)
+	local ply = self:GetOwner()
+
+    self.rhandik = false
+	self.lhandik = false
+    
+    if not IsValid(ply) or not IsValid(self.worldModel) then return end
+    if not ply.shouldTransmit or ply.NotSeen then return end
+
+	local ent = hg.GetTPIKCharacter(ply)
+	if not IsValid(ent) then return end
+
+	local bones = hg.TPIKBonesLH or {}
+
+    local ply_spine_index = ent:LookupBone("ValveBiped.Bip01_Spine4")
+    if !ply_spine_index then return end
+    local ply_spine_matrix = ent:GetBoneMatrix(ply_spine_index)
+    if !ply_spine_matrix then return end
+    local wmpos = ply_spine_matrix:GetTranslation()
+
+	local wm = self:GetWM()
+	if !IsValid(wm) then return end
+	local blendFraction = 1
+	if self.animBlendStart and self.animBlendEnd and self.animBlendEnd > self.animBlendStart then
+		blendFraction = math.Clamp((CurTime() - self.animBlendStart) / (self.animBlendEnd - self.animBlendStart), 0, 1)
+		blendFraction = blendFraction * blendFraction * (3 - 2 * blendFraction)
+	end
+	local blendPose = self.animBlendPose
+	-- ent:SetupBones()
+
+	self.rhandik = self.setrh
+	self.lhandik = self.setlh and ((ply:GetTable().ChatGestureWeight or 0) < 0.1)
+
+	local rhIndex = ent:LookupBone("ValveBiped.Bip01_R_Hand")
+	local lhIndex = ent:LookupBone("ValveBiped.Bip01_L_Hand")
+	local rhmat = rhIndex and ent:GetBoneMatrix(rhIndex)
+	local lhmat = lhIndex and ent:GetBoneMatrix(lhIndex)
+
+	ply.rhold = rhmat
+	ply.lhold = lhmat
+
+	if self.lhandik and (ent == ply or hg.KeyDown(ply,IN_USE) or (ply:GetNetVar("lastFake",0) > CurTime())) and hg.CanUseLeftHand(ply) then
+		for _, bone in ipairs(bones) do
+			local wm_boneindex = wm:LookupBone(bone)
+			if !wm_boneindex then continue end
+			local wm_bonematrix = wm:GetBoneMatrix(wm_boneindex)
+			if !wm_bonematrix then continue end
+			
+			local ply_boneindex = ent:LookupBone(bone)
+			if !ply_boneindex then continue end
+			local ply_bonematrix = ent:GetBoneMatrix(ply_boneindex)
+			if !ply_bonematrix then continue end
+
+			local bonepos = wm_bonematrix:GetTranslation()
+			local boneang = wm_bonematrix:GetAngles()
+			local oldPose = blendPose and blendPose[bone]
+			if oldPose and blendFraction < 1 then
+				bonepos = LerpVector(blendFraction, oldPose[1], bonepos)
+				boneang = LerpAngle(blendFraction, oldPose[2], boneang)
+			end
+
+			bonepos.x = math.Clamp(bonepos.x, wmpos.x - 38, wmpos.x + 38)
+			bonepos.y = math.Clamp(bonepos.y, wmpos.y - 38, wmpos.y + 38)
+			bonepos.z = math.Clamp(bonepos.z, wmpos.z - 38, wmpos.z + 38)
+
+			ply_bonematrix:SetTranslation(bonepos)
+			ply_bonematrix:SetAngles(boneang)
+			
+            --if bone == "ValveBiped.Bip01_L_Hand" then lhmat = ply_bonematrix end
+			ent:SetBoneMatrix(ply_boneindex, ply_bonematrix)
+			--ent:SetBonePosition(ply_boneindex, bonepos, boneang)
+		end
+	end
+
+	local bones = hg.TPIKBonesRH or {}
+
+	if self.rhandik and (ent == ply or hg.KeyDown(ply,IN_USE) or (ply:GetNetVar("lastFake",0) > CurTime())) then
+		for _, bone in ipairs(bones) do
+			local wm_boneindex = wm:LookupBone(bone)
+			if !wm_boneindex then continue end
+			local wm_bonematrix = wm:GetBoneMatrix(wm_boneindex)
+			if !wm_bonematrix then continue end
+			
+			local ply_boneindex = ent:LookupBone(bone)
+			if !ply_boneindex then continue end
+			local ply_bonematrix = ent:GetBoneMatrix(ply_boneindex)
+			if !ply_bonematrix then continue end
+
+			local bonepos = wm_bonematrix:GetTranslation()
+			local boneang = wm_bonematrix:GetAngles()
+			local oldPose = blendPose and blendPose[bone]
+			if oldPose and blendFraction < 1 then
+				bonepos = LerpVector(blendFraction, oldPose[1], bonepos)
+				boneang = LerpAngle(blendFraction, oldPose[2], boneang)
+			end
+
+			bonepos.x = math.Clamp(bonepos.x, wmpos.x - 38, wmpos.x + 38)
+			bonepos.y = math.Clamp(bonepos.y, wmpos.y - 38, wmpos.y + 38)
+			bonepos.z = math.Clamp(bonepos.z, wmpos.z - 38, wmpos.z + 38)
+
+			ply_bonematrix:SetTranslation(bonepos)
+			ply_bonematrix:SetAngles(boneang)
+
+            --if bone == "ValveBiped.Bip01_R_Hand" then rhmat = ply_bonematrix end
+            ent:SetBoneMatrix(ply_boneindex, ply_bonematrix)
+			--ent:SetBonePosition(ply_boneindex, bonepos, boneang)
+		end
+	end
+
+    if self.PostSetHandPos then
+        self:PostSetHandPos()
+    end
+	if blendFraction >= 1 then
+		self.animBlendPose = nil
+		self.animBlendMeshPose = nil
+		self.animBlendHiddenFrom = nil
+		self.animBlendHiddenTo = nil
+		self.animBlendStart = nil
+		self.animBlendEnd = nil
+	end
+
+    --return rhmat,lhmat
+end
+
+function SWEP:SetupDataTables()
+end
+
+function SWEP:OwnerChanged()
+    if IsValid(self:GetOwner()) and self:GetOwner():IsPlayer() then
+        self:PlayAnim("deploy")
+        self:SetHold(self.HoldType)
+		timer.Simple(0,function() if IsValid(self) then self.picked = true end end)
+    else
+		timer.Simple(0,function() if IsValid(self) then self.picked = nil end end)
+    end
+end
+
+function SWEP:OnRemove()
+	hook.Remove("Think", "AnimCallback" .. self:EntIndex())
+    if IsValid(self.worldModel) then
+        self.worldModel:Remove()
+    end
+end
+SWEP.Initialzed = false
+function SWEP:Deploy()
+	local owner = self:GetOwner()
+	if SERVER and self.Initialzed and IsValid(owner) and not owner.noSound then owner:EmitSound(self.DeploySnd,65) end
+    self.Initialzed = true
+    self:PlayAnim("deploy")
+    self:SetHold(self.HoldType)
+	
+	return true
+end
+
+function SWEP:Holster(wep)
+    --self:SetInAttack(false)
+    return true
+end
+
+function SWEP:IsEntSoft(ent)
+	return ent:IsNPC() or ent:IsPlayer() or hg.RagdollOwner(ent) or ent:IsRagdoll()
+end
+
+function SWEP:ThinkAdd()
+end
+
+function SWEP:Think()
+    if not IsFirstTimePredicted() then return end
+    local owner = self:GetOwner()
+
+    self:SetHold(self.HoldType)
+
+    self:ThinkAdd()
+end
+
+function SWEP:PrimaryAttackAdd(ent)
+end
+
+function SWEP:SecondaryAttackAdd(ent)
+end
+
+function SWEP:PrimaryAttack()
+end
+
+function SWEP:SecondaryAttack()
+end
+
+function SWEP:InitAdd()
+end
+
+function SWEP:Initialize()
+
+    if self.modelscale then
+        self:SetModelScale(self.modelscale)
+        self:Activate()
+    end
+	if SERVER then
+		self:SetSkin(self.WMSkin or 0)
+	end
+    self:SetHold(self.HoldType)
+
+    self:InitAdd()
+end
+
+function SWEP:IsLocal()
+	if SERVER then return end
+	return not ((self:GetOwner() ~= LocalPlayer()) or (LocalPlayer() ~= GetViewEntity()))
+end
+SWEP.tries = 10
+
+if SERVER then
+    util.AddNetworkString("hg_tpik_med_anim")
+elseif CLIENT then
+	local function PlayNetworkedAnim(owner, class, tbl, tries)
+		if not IsValid(owner) or CurTime() >= (tbl.endTime or 0) then return end
+
+		local ent = owner:GetActiveWeapon()
+		if not IsValid(ent) or ent:GetClass() ~= class then
+			ent = owner:GetWeapon(class)
+		end
+		if not IsValid(ent) or not isfunction(ent.PlayAnim) then
+			tries = (tries or 0) + 1
+			if tries < 20 then
+				timer.Simple(0.05, function()
+					PlayNetworkedAnim(owner, class, tbl, tries)
+				end)
+			end
+			return
+		end
+
+		local remaining = tbl.endTime and math.max(tbl.endTime - CurTime(), 0.001) or tbl.time
+		ent:PlayAnim(tbl.anim,remaining,tbl.cycling,tbl.callback,tbl.reverse,nil,tbl.startCycle,tbl.endCycle,tbl.endTime)
+	end
+
+    net.Receive("hg_tpik_med_anim",function()
+        local tbl = net.ReadTable()
+		local owner = net.ReadEntity()
+		local class = net.ReadString()
+		PlayNetworkedAnim(owner, class, tbl)
+    end)
+end
+
+function SWEP:PlayAnim(anim,time,cycling,callbackFuncName,reverse,sendtoclient,startCycle,endCycle,endTime)
+    if SERVER then
+		endTime = endTime or (CurTime() + (time or (self.AnimList[anim] and self.AnimList[anim][2]) or 1))
+        sendtoclient = true
+        net.Start("hg_tpik_med_anim")
+            local netTbl = {
+                anim = anim,
+                time = time,
+                cycling = cycling,
+                callback = callbackFuncName,
+				reverse = reverse,
+				startCycle = startCycle,
+				endCycle = endCycle,
+				endTime = endTime
+            }
+            net.WriteTable(netTbl) 
+		local owner = self:GetOwner()
+		net.WriteEntity(owner)
+		net.WriteString(self:GetClass())
+		net.SendPVS(IsValid(owner) and owner:GetPos() or self:GetPos())
+
+        local tAnim = self.AnimList[anim] or {}
+        --self:GetWM():SetSequence(tAnim[1] or anim)
+        self.seq = tAnim and tAnim[1] or anim
+        self.anim = anim
+        self.animspeed = time or tAnim[2] or 1
+		self.animtime = endTime
+		if cycling ~= nil then
+			self.cycling = cycling
+		else
+			self.cycling = tAnim[3] ~= nil and tAnim[3]
+		end
+		if reverse ~= nil then
+			self.reverseanim = reverse
+		else
+			self.reverseanim = tAnim[4] ~= nil and tAnim[4]
+		end
+		self.animStartCycle = startCycle
+		self.animEndCycle = endCycle
+
+		if not reverse and (self[callbackFuncName] or tAnim[5]) then
+            local timerAnim = self.animspeed - (tAnim[6] or self.CallbackTimeAdjust or 0)
+            self.CallbackTime = CurTime() + timerAnim
+            self.callback = self[callbackFuncName] or tAnim[5]
+            
+			local callbackHookName = "AnimCallback" .. self:EntIndex()
+			hook.Add("Think", callbackHookName, function()
+				if not IsValid(self) or not IsValid(self:GetOwner()) then
+					hook.Remove("Think", callbackHookName)
+					return
+				end
+				if self.CallbackTime >= CurTime() then return end
+
+				local callback = self.callback
+				hook.Remove("Think", callbackHookName)
+				self.callback = nil
+				if isfunction(callback) then callback(self) end
+            end)
+        end
+
+    return end
+    if not IsValid(self:GetWM()) or not IsValid(self:GetOwner()) or self:GetOwner():GetActiveWeapon() ~= self then
+		self.tries = (self.tries or 10) - 1
+		if self.tries > 0 then
+			timer.Simple(0.01,function()
+                if not IsValid(self) then return end
+				self:PlayAnim(anim,time,cycling,callbackFuncName,reverse,sendtoclient,startCycle,endCycle,endTime)
+			end)
+		end
+		return
+	end
+    self.tries = 10
+
+    local mdl = self:GetWM()
+	local previousHiddenBones
+	if self.anim ~= anim and (self.AnimBlendTime or 0) > 0 then
+		local hiddenBones = self.GetHideMeshBones and self:GetHideMeshBones() or self.HideMeshBones
+		if self.AnimBlendMeshes ~= false then
+			previousHiddenBones = {}
+			for _, bone in ipairs(hiddenBones or {}) do previousHiddenBones[bone] = true end
+		end
+		mdl:SetupBones()
+		if self.AnimBlendHands ~= false then
+			self.animBlendPose = {}
+			local blendBones = {}
+			for _, bone in ipairs(hg.TPIKBonesLH or {}) do blendBones[bone] = true end
+			for _, bone in ipairs(hg.TPIKBonesRH or {}) do blendBones[bone] = true end
+			for bone in pairs(blendBones) do
+				local index = mdl:LookupBone(bone)
+				local matrix = index and mdl:GetBoneMatrix(index)
+				if matrix then
+					self.animBlendPose[bone] = {matrix:GetTranslation(), matrix:GetAngles()}
+				end
+			end
+		end
+		self.animBlendStart = CurTime()
+		self.animBlendEnd = self.animBlendStart + self.AnimBlendTime
+	end
+    if mdl:GetModel() ~= self.WorldModelReal then mdl:SetModel(self.WorldModelReal) end
+    local tAnim = self.AnimList[anim] or {}
+    self.seq = tAnim and tAnim[1] or anim
+    self.anim = anim
+	if previousHiddenBones then
+		self.animBlendHiddenFrom = previousHiddenBones
+		self.animBlendHiddenTo = {}
+		local hiddenBones = self.GetHideMeshBones and self:GetHideMeshBones() or self.HideMeshBones
+		for _, bone in ipairs(hiddenBones or {}) do self.animBlendHiddenTo[bone] = true end
+	end
+    mdl:SetSequence(tAnim[1] or anim)
+    self.animtime = endTime or (CurTime() + (time or tAnim[2] or 1))
+    self.animspeed = time or tAnim[2] or 1
+	if cycling ~= nil then
+		self.cycling = cycling
+	else
+		self.cycling = tAnim[3] ~= nil and tAnim[3]
+	end
+	if reverse ~= nil then
+		self.reverseanim = reverse
+	else
+		self.reverseanim = tAnim[4] ~= nil and tAnim[4]
+	end
+	self.animStartCycle = startCycle
+	self.animEndCycle = endCycle
+	if not reverse and (self[callbackFuncName] or tAnim[5]) then
+        self.callback = self[callbackFuncName] or tAnim[5]
+    end
+
+    if self.AnimsEvents and self.AnimsEvents[self.seq] then
+		local Time = self.animspeed
+		for k,v in pairs(self.AnimsEvents[self.seq]) do
+			self.VM_TimerEvents = self.VM_TimerEvents or {}
+
+			local TimerName = "VM_Events_ZC-Base" .. self:EntIndex() .. self.seq .. k
+			local TimerID = #self.VM_TimerEvents + 1
+			local seq = self.seq
+
+			timer.Create(TimerName, Time * k, 1, function()
+				if not IsValid(self) then return end
+				if seq != self.seq then self:VM_RemoveAllEvents() end
+				v(self, mdl)
+				self.VM_TimerEvents[TimerID] = nil
+			end)
+
+			self.VM_TimerEvents[TimerID] = TimerName
+		end
+	end
+end
+
+function SWEP:GetCurrentAnimCycle(curTime)
+	curTime = curTime or CurTime()
+	if not self.animtime or not self.animspeed or self.animspeed <= 0 then return 0 end
+
+	if self.cycling then
+		return ((curTime - (self.animtime - self.animspeed)) % self.animspeed) / self.animspeed
+	end
+
+	local timing = 1 - math.Clamp((self.animtime - curTime) / self.animspeed, 0, 1)
+	local startCycle = isnumber(self.animStartCycle) and self.animStartCycle or (self.reverseanim and 1 or 0)
+	local endCycle = isnumber(self.animEndCycle) and self.animEndCycle or (self.reverseanim and 0 or 1)
+	return Lerp(timing, startCycle, endCycle)
+end
+
+function SWEP:ReverseAnimToIdle(anim, minimumCycle)
+	self.callback = nil
+	hook.Remove("Think", "AnimCallback" .. self:EntIndex())
+	if not SERVER then return end
+
+	local cycle = self:GetCurrentAnimCycle()
+	minimumCycle = minimumCycle or 0
+	if cycle <= minimumCycle + 0.001 then
+		self._reverseToIdle = nil
+		self:PlayAnim("idle")
+		return
+	end
+
+	local fullDuration = self.animspeed > 0 and self.animspeed or 1
+	self._reverseToIdle = true
+	self:PlayAnim(anim or self.anim or "use", math.max((cycle - minimumCycle) * fullDuration, 0.01), false, nil, true, nil, cycle, minimumCycle)
+end
+
+function SWEP:ThinkReverseAnimToIdle(curTime)
+	if not self._reverseToIdle then return end
+	if self.animtime and self.animtime > (curTime or CurTime()) then return end
+
+	self._reverseToIdle = nil
+	self.reverseanim = false
+	self.animStartCycle = nil
+	self.animEndCycle = nil
+	if SERVER then self:PlayAnim("idle") end
+end
+
+if CLIENT then
+    function SWEP:VM_RemoveAllEvents()
+		for k,v in ipairs(self.VM_TimerEvents) do
+			timer.Remove(v)
+		end
+		table.Empty(self.VM_TimerEvents)
+	end
+end
+
+function SWEP:SetFakeGun(ent)
+	self:SetNWEntity("fakeGun", ent)
+	self.fakeGun = ent
+end
+
+function SWEP:RemoveFake()
+	if not IsValid(self.fakeGun) then return end
+	self.fakeGun:Remove()
+	self:SetFakeGun()
+end
+
+local function GetPhysBoneNum(ent,string)
+	if not IsValid(ent) then return end
+	local bone = ent:LookupBone(string)
+	if not bone then return end
+	local physBone = ent:TranslateBoneToPhysBone(bone)
+	return physBone and physBone >= 0 and physBone or nil
+end
+
+function SWEP:CreateFake(ragdoll)
+	if IsValid(self:GetNWEntity("fakeGun")) then return end
+	if not IsValid(ragdoll) then return end
+	local physbonerh = GetPhysBoneNum(ragdoll,"ValveBiped.Bip01_R_Hand")
+	if not physbonerh then return end
+	local rh = ragdoll:GetPhysicsObjectNum(physbonerh)
+	if not IsValid(rh) then return end
+
+	local ent = ents.Create("prop_physics")
+	if not IsValid(ent) then return end
+	ent.notprop = true
+
+	ent:SetPos(rh:GetPos())
+	ent:SetModel(self.WorldModel)
+	ent:Spawn()
+	ent:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
+	ent:SetMoveType(MOVETYPE_NONE)
+	local phys = ent:GetPhysicsObject()
+	if IsValid(phys) then phys:SetMass(0) end
+    ent:SetNoDraw(true)
+    ent.dontPickup = true
+	ent.fakeOwner = self
+	ragdoll:DeleteOnRemove(ent)
+	ragdoll.fakeGun = ent
+	if IsValid(ragdoll.ConsRH) then ragdoll.ConsRH:Remove() end
+	self:SetFakeGun(ent)
+	ent:CallOnRemove("homigrad-swep", self.RemoveFake, self)
+
+	ent:SetNoDraw(true)
+end
+
+local function PhysCallback(ent, data)
+	if data.DeltaTime < 0.2 then return end
+	ent:EmitSound(Sound(ent.FallSnd))
+end
+
+function SWEP:SpawnGarbage(mdl_custom, skin_custom, snd_custom, clr_custom, bgs_custom)
+	if CLIENT then return end
+
+	local owner = self:GetOwner()
+	if not IsValid(owner) then return end
+
+	local boneid
+	local character = owner
+	if owner:IsPlayer() then
+		character = hg.GetCurrentCharacter(owner)
+		if not IsValid(character) then return end
+		boneid = character:LookupBone(((owner.organism and owner.organism.rarmamputated) or (owner.zmanipstart ~= nil and owner.zmanipseq == "interact" and not ( owner.organism and owner.organism.larmamputated ))) and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
+	else
+		boneid = owner:LookupBone("ValveBiped.Bip01_R_Hand") or 1
+	end
+
+	if not boneid then return end
+	local matrix = character:GetBoneMatrix(boneid)
+	if not matrix then return end
+
+	local ent = ents.Create("prop_physics")
+	if not IsValid(ent) then return end
+	ent:SetModel(Model((mdl_custom and mdl_custom ~= "" and mdl_custom ~= nil and isstring(mdl_custom)) and mdl_custom or self.WorldModel))
+
+	if skin_custom and skin_custom ~= nil and isnumber(skin_custom) then
+		ent:SetSkin(skin_custom or 0)
+	end
+
+	ent:SetPos(matrix:GetTranslation())
+	ent:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
+	ent:SetAngles(AngleRand(-180, 180))
+	ent:Activate()
+	ent:Spawn()
+	ent:SetOwner(owner)
+	ent.FallSnd = Sound((snd_custom and snd_custom ~= nil) and snd_custom or self.FallSnd or "")
+
+	if clr_custom and clr_custom ~= nil and IsColor(clr_custom) then
+		ent:SetColor(clr_custom)
+	else
+		ent:SetColor(Color(200, 200, 200))
+	end
+
+	if bgs_custom and bgs_custom ~= nil and isstring(bgs_custom) then
+		ent:SetBodyGroups(bgs_custom)
+	end
+
+	local phys = ent:GetPhysicsObject()
+	if IsValid(phys) then
+		phys:SetVelocity(self:GetVelocity() + (owner:GetAimVector() * 200) + VectorRand(-50, 50))
+		phys:AddAngleVelocity(VectorRand(-100, 100))
+	end
+
+	ent:AddCallback("PhysicsCollide", PhysCallback)
+
+	SafeRemoveEntityDelayed(ent, 60)
+end
+
+-- Chudmorse: NPC support used by the medical items (was provided by weapon_bandage_sh)
+function SWEP:NPCHeal(npc, mul, snd)
+	if not npc then npc = self:GetOwner() end
+	if not IsValid(npc) or not npc:IsNPC() then return end
+
+	mul = mul or 0.3
+	npc:SetHealth(math.Clamp(npc:Health() + npc:GetMaxHealth() * mul, 0, npc:GetMaxHealth() * math.Clamp(2 * mul, 2, 100)))
+	npc:EmitSound(snd or "snd_jack_hmcd_bandage.wav", 75, math.random(95, 105))
+
+	if SERVER then self:Remove() end
+end

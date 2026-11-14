@@ -114,7 +114,9 @@ local IsValid, math_Clamp = IsValid, math.Clamp
 			--ent:ManipulateBoneScale(lkp, wawanted)
 			local mat = ent:GetBoneMatrix(lkp)
 			if !(Glide and Glide.Camera and !Glide.Camera.isInFirstPerson and lply == ply and lply:InVehicle() and hg_no_camera_in_cars:GetBool()) then
-				if (!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent) then
+				-- An external camera (e.g. the Jason SWEP's third person / kill camera) shows the head.
+				local externalView = hg.ExternalViewActive and ply == lply
+				if not externalView and ((!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent)) then
 					mat:SetScale(wawanted)
 				end
 			end

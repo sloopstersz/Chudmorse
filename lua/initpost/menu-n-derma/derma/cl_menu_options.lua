@@ -348,13 +348,15 @@ local info_sections = {
 }
 
 local info_credit_people = {
-    {fallbackName = "sloopsters", role = "Co-Owner", steamID64 = "76561198370899886", group = "lead"},
-    {fallbackName = "Kazoo", role = "Creator", steamID64 = "76561199404982388", group = "lead"},
-    {fallbackName = "Koi", role = "Owner", steamID64 = "76561198840745229", group = "lead"},
+    {fallbackName = "sloopsters", role = "Owner", steamID64 = "76561198370899886", group = "lead"},
+    {fallbackName = "Kazoo", role = "Creator", steamID64 = "76561199404982388", group = "lead", featured = true},
+    {fallbackName = "Koi", role = "Co-Owner", steamID64 = "76561198840745229", group = "lead"},
     {fallbackName = "Rojok", role = "Helper", steamID64 = "76561197993188046", group = "helper"},
     {fallbackName = "CAT", role = "Helper", steamID64 = "76561199401339884", group = "helper", featured = true},
-    {fallbackName = "Fizzy", role = "Helper", steamID64 = "76561199121849332", group = "helper"},
-    {fallbackName = "zYNEX-_-", role = "Project Hemogen Creator", steamID64 = "76561199406449809", group = "Contributor"},
+    {fallbackName = "Fizzy", role = "Helper", steamID64 = "76561199121849332", group = "helper", featured = true},
+    {fallbackName = "Farten1_", role = "Helper", steamID64 = "76561198359745242", group = "helper", featured = true},
+    {fallbackName = "Def_m.", role = "Helper", steamID64 = "76561199486562077", group = "helper"},
+    {fallbackName = "Griggs", role = "Map Creator", steamID64 = "76561198105993696", group = "Contributor"},
     {fallbackName = "Wileyasik", role = "jUDGE Creator", steamID64 = "76561199162536724", group = "Contributor", featured = true},
   {fallbackName = "Barry", role = "Fuckass Music Pack Creator", steamID64 = "76561199043924494", group = "Contributor"}
 }

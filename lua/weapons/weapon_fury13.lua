@@ -1,5 +1,6 @@
 if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_bandage_sh"
+SWEP.BandageTPIK = false -- keep the old (non-TPIK) bandage behaviour
 SWEP.PrintName = "Fury-13"
 SWEP.Instructions = "Fury-13 (Not to be confused with \"Furry-13\", an unrelated pathowogen virus strain) is an incredibly potent stimulator drug. Instead of \"modifying\" how your organism works, this drug aims to provide additional resources instead, making you stronger than ever before. Side effects may include permanent brain damage. Do not use on infected person."
 SWEP.Category = "ZCity Medicine"

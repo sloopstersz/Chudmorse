@@ -660,6 +660,8 @@ local vec_dist = Vector(500,500,500)
 hook.Add("Boxes Think", "SpawnBoxes", function()
 	local round = CurrentRound()
 	if zb.ROUND_STATE ~= 1 or not round.LootSpawn then return end
+	-- Modes with ManualBoxWaves (event mode) spawn on their own schedule
+	if round.ManualBoxWaves and not round.InManualWave then return end
 	//local spawnPos = table.Random(spawns) + vec
 
 	//local spawnPos = zb:FurthestFromEveryone(spawns) + vec

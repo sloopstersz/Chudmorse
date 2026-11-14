@@ -74,6 +74,32 @@ hook.Add("Camera", "Weapon", function(ply, eyePos, eyeAng, view, ...)
 	return result
 end)
 
+-- External camera views (third person / cinematic cameras from SWEPs and addons).
+-- A SWEP takes over the camera by defining SWEP:HGView(ply, origin, angles, fov) and
+-- returning a view table {origin, angles, fov, drawviewer, znear}. Anything else (for
+-- example a victim's kill camera) can return the same table from hook "HG_OverrideView".
+-- The view is rendered as-is, skipping Homigrad's first-person camera code.
+local function validView(view)
+	return istable(view) and isvector(view.origin) and isangle(view.angles) and view or nil
+end
+
+local lastExternalError
+function hg.ExternalView(ply, origin, angles, fov)
+	if not IsValid(ply) or not ply:Alive() then return end
+	local wep = ply:GetActiveWeapon()
+	if IsValid(wep) and isfunction(wep.HGView) then
+		local ok, view = pcall(wep.HGView, wep, ply, origin, angles, fov)
+		if ok then
+			view = validView(view)
+			if view then return view end
+		elseif lastExternalError ~= view then
+			lastExternalError = view
+			ErrorNoHalt("[HG camera] " .. tostring(wep:GetClass()) .. ":HGView: " .. tostring(view) .. "\n")
+		end
+	end
+	return validView(hook_Run("HG_OverrideView", ply, origin, angles, fov))
+end
+
 hook.Add("MotionBlur", "Weapon", function(x,y,w,z)
 	wep = lply:GetActiveWeapon()
 	if wep.Blur then return wep:Blur(x,y,w,z) end
@@ -336,6 +362,9 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 	}
 
 	if drive.CalcView(ply, view) then return view end
+
+	local externalView = hg.ExternalView(ply, origin, angles, fov)
+	if externalView then return externalView end
 
 	local rlEnt = hg.GetCurrentCharacter(ply)
 	lerpfovadd = LerpFT(0.01, lerpfovadd, (ply:IsSprinting() and rlEnt == ply and rlEnt:GetVelocity():LengthSqr() > 1500 and 10 or 0) - ( ply.organism and (ply.organism and (((ply.organism.immobilization or 0) / 4) - (ply.organism.adrenaline or 0) * 5 - (ply.organism.noradrenaline or 0) * 15)) or 0) / 2 - (ply.suiciding and (ply:GetNetVar("suicide_time",CurTime()) < CurTime()) and (1 - math.max(ply:GetNetVar("suicide_time",CurTime()) + 8 - CurTime(),0) / 8) * 20 or 0))
@@ -760,7 +789,10 @@ local function renderscene(pos, angle, fov)
 	
 	pos = eyepos(lply)
 	angle = eyeangles(lply)
-	local view = CalcView(lply, pos, angle, fov)
+	local external = GetViewEntity() == lply and hg.ExternalView(lply, pos, angle, fov) or nil
+	-- Read by DrawPlayerRagdoll so the local head is not hidden while seen from outside.
+	hg.ExternalViewActive = external ~= nil and external.drawviewer ~= false
+	local view = external or CalcView(lply, pos, angle, fov)
 	viewOverride = view
 	
 	local invert = invertCam:GetBool()
@@ -776,9 +808,12 @@ local function renderscene(pos, angle, fov)
 
 	renderView.w = scrw
 	renderView.h = scrh
-	renderView.fov = fov
+	renderView.fov = external and external.fov or fov
 	renderView.origin = view.origin
 	renderView.angles = view.angles
+	-- render.RenderView only draws the local player's body when told to.
+	renderView.drawviewer = external and external.drawviewer ~= false or nil
+	renderView.znear = external and external.znear or nil
 	if mapswithfog[map] then
 		renderView.zfar = zfar
 	end
@@ -815,6 +850,7 @@ end
 end, "huynuck")]]
 
 hook.Add("RenderScene", "jopa", renderscene)
+hg.OverrideViewHook = true
 
 local vector_zero = Vector(0,0,0)
 net.Receive("LookAway",function()

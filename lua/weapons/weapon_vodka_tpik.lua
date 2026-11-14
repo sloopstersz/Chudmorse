@@ -5,7 +5,7 @@ if SERVER then AddCSLuaFile() end
 SWEP.Base           = "weapon_tpik_base"
 SWEP.PrintName      = "Vodka"
 SWEP.Instructions   = "Drink to clear current pain and depression. Causes intoxication; injuries can bring symptoms back."
-SWEP.Category       = "Chudmorse Items"
+SWEP.Category       = "ZCity Other"
 SWEP.Spawnable      = true
 SWEP.AdminOnly      = false
 
@@ -19,7 +19,7 @@ SWEP.WorldModelReal = "models/weapons/sweps/stalker2/vodka/v_item_vodka.mdl"
 SWEP.WorldModelExchange = false
 
 if CLIENT then
-    SWEP.WepSelectIcon   = Material("entities/weapon_vodka_tpik")
+    SWEP.WepSelectIcon   = Material("entities/weapon_vodka_tpik.png", "smooth mips")
     SWEP.IconOverride    = "entities/weapon_vodka_tpik.png"
     SWEP.BounceWeaponIcon = false
 end

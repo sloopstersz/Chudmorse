@@ -54,7 +54,9 @@ SWEP.FakeReloadEvents = {
 			local ent = hg.CreateMag( self, Vector(0,15,-15) )
 			if not IsValid(ent) then return end
 			ent:SetSubMaterial(1,"models/zcity/skins/walther_p22/classic/walther1")
-			ent:SetSubMaterial(0,"models/zcity/skins/walther_p22/classic/walther2")
+			-- Dropped mag matches the gun's COIN skin, if it has one.
+			local gunBody = IsValid(self:GetWM()) and self:GetWM():GetSubMaterial(0) or ""
+			ent:SetSubMaterial(0,gunBody ~= "" and gunBody or "models/zcity/skins/walther_p22/classic/walther2")
 			for i = 0, ent:GetBoneCount() - 1 do
 				ent:ManipulateBoneScale(i, vector_origin)
 			end
