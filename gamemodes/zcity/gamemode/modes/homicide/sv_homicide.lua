@@ -167,6 +167,7 @@ MODE.LootTable = {
 		{4, "weapon_flintlock"},
 	}},
 	{4,{
+		{3,"weapon_tungsten"},
 		{5,"ent_armor_vest3"},
 		{5,"ent_armor_helmet1"},
 		{2,"ent_armor_vest4"},
