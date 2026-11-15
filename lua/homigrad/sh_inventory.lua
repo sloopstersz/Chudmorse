@@ -36,6 +36,9 @@ if CLIENT then
 	local ammoIcons = {}
 	local buttons = {}
 	local function nameThings(i, thing)
+		local fakeout = ChudSkins and ChudSkins.CrateFakeouts and ChudSkins.CrateFakeouts[i]
+		if fakeout then return fakeout.name end
+
 		local weps = weapons.Get(i)
 		local entss = scripted_ents.Get(i)
 		if weps then return weps.PrintName end
@@ -72,6 +75,17 @@ if CLIENT then
 		end
 		if tab == "Ammo" then
 			return getAmmoIcon(i), true, false, true
+		end
+
+		if tab == "Weapons" then
+			local fakeout = ChudSkins and ChudSkins.CrateFakeouts and ChudSkins.CrateFakeouts[i]
+			if fakeout then
+				if fakeout.icon then return fakeout.icon, true, false, true end
+				return nil, false, false, false
+			end
+
+			local entData = scripted_ents.Get(i)
+			if entData and entData.IconOverride then return entData.IconOverride, true, false, true end
 		end
 
 		if tab == "Weapons" and weapons.Get(i) then
@@ -426,8 +440,15 @@ if CLIENT then
 				realCount = realCount + 1
 				local revealWeight = getLootWeight(tab, i, thing)
 				local sizeWeight = (tab == "Armor" and "armor") or revealWeight
+				local isJackpot = tab == "Weapons" and i == "ent_chud_coin_jackpot"
+				local fakeout = tab == "Weapons" and ChudSkins and ChudSkins.CrateFakeouts and ChudSkins.CrateFakeouts[i]
 				if i == "hg_flashlight" or i == "hg_brassknuckles" then sizeWeight = 1 revealWeight = 1 end
-				local blockW, blockH = getLootSize(sizeWeight)
+				local blockW, blockH
+				if isJackpot or fakeout then
+					blockW, blockH = 3, 3
+				else
+					blockW, blockH = getLootSize(sizeWeight)
+				end
 				local layoutKey = tab .. ":" .. tostring(i)
 				local saved = lootLayout.real[layoutKey]
 				local blockX, blockY
@@ -526,11 +547,23 @@ if CLIENT then
 						button.SoundKD = CurTime() + 0.1
 					end
 
-					surface.SetDrawColor(38 + button.col1 / 8, 38 + button.col1 / 8, 38 + button.col1 / 8, 235)
+					if found and (isJackpot or (fakeout and fakeout.highlight == "gold")) then
+						surface.SetDrawColor(155 + button.col1 / 4, 105 + button.col1 / 3, 25, 245)
+					elseif found and fakeout and fakeout.highlight == "brown" then
+						surface.SetDrawColor(90 + button.col1 / 3, 55 + button.col1 / 4, 25, 245)
+					else
+						surface.SetDrawColor(38 + button.col1 / 8, 38 + button.col1 / 8, 38 + button.col1 / 8, 235)
+					end
 					surface.DrawRect(0, 0, w, h)
 					for yy = 0, blockH - 1 do
 						for xx = 0, blockW - 1 do
-							surface.SetDrawColor(70, 70, 70, 145)
+							if found and (isJackpot or (fakeout and fakeout.highlight == "gold")) then
+								surface.SetDrawColor(255, 215, 105, 190)
+							elseif found and fakeout and fakeout.highlight == "brown" then
+								surface.SetDrawColor(185, 125, 75, 190)
+							else
+								surface.SetDrawColor(70, 70, 70, 145)
+							end
 							surface.DrawOutlinedRect(xx * (cell + gap), yy * (cell + gap), cell, cell, 1)
 						end
 					end
@@ -560,10 +593,23 @@ if CLIENT then
 						surface.DrawTexturedRect(Quad and w / 5 + 5 or 0 - 5, 5, Quad and (w / 2 + 2.5) or (w + 10), Quad and h / 1.3 or h - 10)
 					end
 
-					surface.SetDrawColor(button.col1, button.col1, button.col1, button.col1)
+					if isJackpot or (fakeout and fakeout.highlight == "gold") then
+						surface.SetDrawColor(255, 220, 125, 255)
+					elseif fakeout and fakeout.highlight == "brown" then
+						surface.SetDrawColor(185, 130, 80, 255)
+					else
+						surface.SetDrawColor(button.col1, button.col1, button.col1, button.col1)
+					end
 					surface.DrawOutlinedRect(0, 0, w, h, 1)
 					local Text = (tab == "Ammo" and game.GetAmmoName(name)) or language.GetPhrase(name)
-					drawBouncingText(self, Text, "ZCity_Tiny", w / 2, (HaveIcon and h / 1.3) or h / 3, w - 10, color_white)
+					if isJackpot then
+						draw.SimpleTextOutlined(Text, "ZCity_Menu_Settings_Small", w / 2, h - 5, color_white,
+							TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM, 1, Color(50, 30, 0, 255))
+					else
+						surface.SetFont("ZCity_Tiny")
+						local _, textHeight = surface.GetTextSize(Text)
+						drawBouncingText(self, Text, "ZCity_Tiny", w / 2, h - textHeight - 4, w - 10, color_white)
+					end
 				end
 			end
 		end
