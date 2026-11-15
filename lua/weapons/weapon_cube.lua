@@ -105,7 +105,7 @@ function SWEP:CustomAttack2()
         ent:Spawn()
 
         ent.localshit = Vector(0,0,0)
-        ent.wep = self:GetClass()
+        ent.wep = "weapon_tungsten"
         ent.owner = ply
         ent.damage = 1000
         ent.MaxSpeed = 350
