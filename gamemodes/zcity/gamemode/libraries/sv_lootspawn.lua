@@ -461,6 +461,23 @@ hook.Add("ZB_InventoryChecked", "LootSpawn", function(ply, ent)
 	end
 	
     local hadLoot = false
+    local fakeouts = ChudSkins and ChudSkins.CrateFakeouts
+    if fakeouts then
+        for class, fakeout in pairs(fakeouts) do
+            if math.random(1, ChudSkins.GetCrateFakeoutChance(fakeout)) == 1 then
+                ent.inventory.Weapons = ent.inventory.Weapons or {}
+                ent.inventory.Weapons[class] = true
+            end
+        end
+    end
+
+	local jackpotChance = GetConVar("chud_coin_jackpot_chance")
+	if math.random(1, jackpotChance and jackpotChance:GetInt() or 1000000) == 1 then
+		ent.inventory.Weapons = ent.inventory.Weapons or {}
+		ent.inventory.Weapons["ent_chud_coin_jackpot"] = true
+		hadLoot = true
+	end
+
 	for i = 0,amount-1 do
 		local entName, AmmoCount, Tab = hg.GenerateLoot(ply,ent)
 		if entName then
