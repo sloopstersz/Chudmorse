@@ -2,7 +2,7 @@
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Tungsten Cube"
 SWEP.Instructions = "A Really Heavy Cube made out of Tungsten, Throw it at people.\n\nLMB to attack.\nRMB to block.\nRMB + LMB to throw."
-SWEP.Category = "Weapons - Melee"
+SWEP.Category = "Weapons - Tungsten Cubes"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
 
