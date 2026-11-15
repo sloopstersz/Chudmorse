@@ -15,18 +15,38 @@ for _, vtf in ipairs({"m1911/weapon_m1911_dm", "m1911/weapon_m1911_nm", "m1911/w
 end
 resource.AddFile("materials/chudmorse/skins/didi/sog_held_didi.vmt")
 resource.AddFile("materials/chudmorse/skins/didi/sog_dropped_didi.vmt")
-resource.AddFile("materials/chudmorse/skins/didi/tungsten_didi.vmt")
+resource.AddFile("materials/chudmorse/fakeouts/realshop.vmt")
+resource.AddFile("materials/chud/realshop.vtf")
+resource.AddFile("materials/chud/didicamel.png")
+resource.AddFile("materials/chud/fort.png")
+resource.AddFile("materials/chud/chuddy.png")
+resource.AddFile("sound/rem_chudtoken.mp3")
 
 util.AddNetworkString("ChudSkins.Sync")
 util.AddNetworkString("ChudSkins.Action")
+util.AddNetworkString("ChudSkins.JackpotNotice")
+util.AddNetworkString("ChudSkins.JackpotTimer")
+util.AddNetworkString("ChudSkins.JackpotHuntTimer")
+CreateConVar("chud_coin_jackpot_chance", "1000000", 0,
+    "Denominator for the Coin Shop jackpot crate chance; set to 1 to guarantee it.", 1, 1000000)
+for _, fakeout in pairs(ChudSkins.CrateFakeouts) do
+    CreateConVar(fakeout.convar, tostring(fakeout.chance), 0,
+        "Denominator for the " .. fakeout.name .. " fakeout chance; set to 1 to guarantee it.", 1, 1000000)
+end
+
+function ChudSkins.GetCrateFakeoutChance(fakeout)
+    local convar = GetConVar(fakeout.convar)
+    return math.max(convar and convar:GetInt() or fakeout.chance, 1)
+end
 
 local ready = sql.Query([[CREATE TABLE IF NOT EXISTS chud_skins (
     steamid TEXT NOT NULL, item TEXT NOT NULL, equipped INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (steamid, item))]]) ~= false
+local activeJackpots = setmetatable({}, {__mode = "k"})
 
 local function Load(ply)
     if ply.ChudSkinData then return ply.ChudSkinData end
-    local data = {owned = {}, equipped = {}}
+    local data = {owned = {}, equipped = {}, temporary = {}}
     if ready and not ply:IsBot() then
         local rows = sql.Query("SELECT item, equipped FROM chud_skins WHERE steamid = " .. sql.SQLStr(ply:SteamID64()))
         for _, row in ipairs(istable(rows) and rows or {}) do
@@ -54,7 +74,33 @@ local function Send(ply, message)
     net.Send(ply)
 end
 
+local function SetJackpotTimer(ply, running)
+    net.Start("ChudSkins.JackpotTimer")
+    net.WriteBool(running)
+    if running then net.WriteFloat(30) end
+    net.Send(ply)
+
+    net.Start("ChudSkins.JackpotHuntTimer")
+    net.WriteBool(running)
+    net.WriteString(ply:SteamID64())
+    if running then
+        net.WriteString(ply:Nick())
+        net.WriteFloat(30)
+    end
+    net.Broadcast()
+end
+
 local function SetEquipped(ply, class, id)
+    local data = Load(ply)
+    local current = data.equipped[class]
+    if (id and data.temporary[id]) or (not id and data.temporary[current]) then
+        local jackpot = ply.ChudSkinJackpot
+        if jackpot then jackpot.temporarySlots[class] = true end
+        data.equipped[class] = id
+        return
+    end
+    if ply.ChudSkinJackpot then ply.ChudSkinJackpot.temporarySlots[class] = nil end
+
     local sid = sql.SQLStr(ply:SteamID64())
     local others = {}
     for otherId, item in pairs(ChudSkins.Items) do
@@ -64,7 +110,7 @@ local function SetEquipped(ply, class, id)
     sql.Query("UPDATE chud_skins SET equipped = 0 WHERE steamid = " .. sid .. " AND item IN (" .. table.concat(others, ",") .. ")")
     if id then sql.Query("UPDATE chud_skins SET equipped = 1 WHERE steamid = " .. sid .. " AND item = " .. sql.SQLStr(id)) end
     sql.Commit()
-    Load(ply).equipped[class] = id
+    data.equipped[class] = id
 end
 
 local handlers = {
@@ -98,6 +144,132 @@ local handlers = {
     end,
 }
 
+local function IsRTVStarted()
+    return zb and zb.votestarted == true
+end
+
+local function ClearJackpotWeaponSkins(ply, revert, data, temporary)
+    for _, wep in ipairs(ents.GetAll()) do
+        if wep.ChudSkinJackpotOwner ~= ply then continue end
+
+        if revert then
+            local slot = ChudSkins.ClassSlot[wep:GetClass()]
+            local equipped = slot and data.equipped[slot]
+            local skin = equipped and not temporary[equipped] and equipped or wep.ChudSkinJackpotPreviousSkin or ""
+            wep:SetNWString("ChudSkin", skin)
+        end
+
+        wep.ChudSkinJackpotOwner = nil
+        wep.ChudSkinJackpotPreviousSkin = nil
+    end
+end
+
+local function ClearTemporaryJackpot(ply, message)
+    if not IsValid(ply) then return end
+
+    local data = Load(ply)
+    local temporary = data.temporary or {}
+    local jackpot = ply.ChudSkinJackpot
+    for class in pairs(jackpot and jackpot.temporarySlots or {}) do
+        data.equipped[class] = jackpot.originalEquipped[class]
+    end
+
+    ClearJackpotWeaponSkins(ply, true, data, temporary)
+
+    for id in pairs(temporary) do
+        data.owned[id] = nil
+    end
+    data.temporary = {}
+    ply.ChudSkinJackpot = nil
+    activeJackpots[ply] = nil
+    SetJackpotTimer(ply, false)
+    Send(ply, message or "The temporary Coin Shop jackpot has ended.")
+end
+
+local function MakeJackpotPermanent(ply)
+    if not ready then
+        ErrorNoHalt("[ChudSkins] Could not save the Coin Shop jackpot: skin database is unavailable.\n")
+        return false
+    end
+
+    local data = Load(ply)
+    local jackpot = ply.ChudSkinJackpot
+    local temporaryEquipped = {}
+    for class in pairs(jackpot and jackpot.temporarySlots or {}) do
+        local id = data.equipped[class]
+        if id and data.temporary[id] then temporaryEquipped[class] = id end
+    end
+
+    local sid = sql.SQLStr(ply:SteamID64())
+    sql.Begin()
+    for id in pairs(ChudSkins.Items) do
+        local result = sql.Query("INSERT OR IGNORE INTO chud_skins (steamid, item, equipped) VALUES ("
+            .. sid .. ", " .. sql.SQLStr(id) .. ", 0)")
+        if result == false then
+            sql.Query("ROLLBACK")
+            ErrorNoHalt("[ChudSkins] Could not save every Coin Shop jackpot item for " .. ply:SteamID64() .. ".\n")
+            return false
+        end
+    end
+    sql.Commit()
+
+    for id in pairs(ChudSkins.Items) do
+        data.owned[id] = true
+        data.temporary[id] = nil
+    end
+    data.temporary = {}
+    for class, id in pairs(temporaryEquipped) do
+        SetEquipped(ply, class, id)
+    end
+    ClearJackpotWeaponSkins(ply, false, data, data.temporary)
+    ply.ChudSkinJackpot = nil
+    activeJackpots[ply] = nil
+    SetJackpotTimer(ply, false)
+    return true
+end
+
+function ChudSkins.StartJackpot(ply)
+    if not IsValid(ply) or not ply:IsPlayer() or ply:IsBot() or not ply:Alive() or IsRTVStarted() then return false end
+    if ply.ChudSkinJackpot then return false end
+
+    local data = Load(ply)
+    data.temporary = data.temporary or {}
+    for id in pairs(ChudSkins.Items) do
+        if not data.owned[id] then
+            data.owned[id] = true
+            data.temporary[id] = true
+        end
+    end
+
+    local jackpot = {
+        failed = false,
+        startedAt = CurTime(),
+        originalEquipped = table.Copy(data.equipped),
+        temporarySlots = {},
+    }
+    ply.ChudSkinJackpot = jackpot
+    activeJackpots[ply] = true
+    Send(ply, "Every Coin Shop skin is temporarily yours. Stay alive for 30 seconds before RTV to keep them.")
+    SetJackpotTimer(ply, true)
+
+    net.Start("ChudSkins.JackpotNotice")
+    net.WriteString(ply:Nick())
+    net.WriteString(ply:SteamID64())
+    net.Broadcast()
+
+    local timerName = "ChudSkins.Jackpot." .. ply:UserID()
+    timer.Create(timerName, 30, 1, function()
+        if not IsValid(ply) or ply.ChudSkinJackpot ~= jackpot then return end
+        if jackpot.failed or not ply:Alive() or IsRTVStarted() then return end
+
+        if MakeJackpotPermanent(ply) then
+            Send(ply, "You survived 30 seconds. Every Coin Shop skin is now permanently yours.")
+        end
+    end)
+
+    return true
+end
+
 net.Receive("ChudSkins.Action", function(_, ply)
     if not IsValid(ply) or (ply.ChudSkinNext or 0) > CurTime() then return end
     ply.ChudSkinNext = CurTime() + 0.4
@@ -107,7 +279,37 @@ net.Receive("ChudSkins.Action", function(_, ply)
     handlers[action](ply, item)
 end)
 
-hook.Add("PlayerInitialSpawn", "ChudSkins.Load", function(ply) Load(ply) end)
+hook.Add("PlayerInitialSpawn", "ChudSkins.Load", function(ply)
+    Load(ply)
+    for jackpotPly in pairs(activeJackpots) do
+        if not IsValid(jackpotPly) or not jackpotPly.ChudSkinJackpot then continue end
+
+        net.Start("ChudSkins.JackpotHuntTimer")
+        net.WriteBool(true)
+        net.WriteString(jackpotPly:SteamID64())
+        net.WriteString(jackpotPly:Nick())
+        net.WriteFloat(math.max(30 - (CurTime() - (jackpotPly.ChudSkinJackpot.startedAt or CurTime())), 0))
+        net.Send(ply)
+    end
+end)
+hook.Add("PlayerDeath", "ChudSkins.JackpotDeath", function(victim)
+    local jackpot = IsValid(victim) and victim.ChudSkinJackpot
+    if jackpot then
+        jackpot.failed = true
+        timer.Remove("ChudSkins.Jackpot." .. victim:UserID())
+        ClearTemporaryJackpot(victim, "You died and lost the temporary Coin Shop jackpot.")
+    end
+end)
+hook.Add("PlayerDisconnected", "ChudSkins.JackpotDisconnect", function(ply)
+    timer.Remove("ChudSkins.Jackpot." .. ply:UserID())
+    activeJackpots[ply] = nil
+end)
+hook.Add("ChudSkinsRTVStarted", "ChudSkins.JackpotRTV", function()
+    for ply in pairs(activeJackpots) do
+        timer.Remove("ChudSkins.Jackpot." .. ply:UserID())
+        ClearTemporaryJackpot(ply)
+    end
+end)
 
 -- A gun gets its skin once, from the first player to receive it, and only when it
 -- is new to the world: given on spawn (ply:Give) or taken out of a container.
@@ -118,8 +320,15 @@ hook.Add("WeaponEquip", "ChudSkins.Apply", function(wep, ply)
     wep.ChudSkinDecided = true
     if wep.IsSpawned and wep.init then return end -- loose ground loot / dropped gun
     if not IsValid(ply) or not ply:IsPlayer() then return end
-    local id = Load(ply).equipped[slot]
-    if id and ChudSkins.Covers(ChudSkins.Get(id), wep:GetClass()) then wep:SetNWString("ChudSkin", id) end
+    local data = Load(ply)
+    local id = data.equipped[slot]
+    if id and ChudSkins.Covers(ChudSkins.Get(id), wep:GetClass()) then
+        if data.temporary[id] then
+            wep.ChudSkinJackpotOwner = ply
+            wep.ChudSkinJackpotPreviousSkin = wep:GetNWString("ChudSkin", "")
+        end
+        wep:SetNWString("ChudSkin", id)
+    end
 end)
 
 -- File reload: refresh connected players.
