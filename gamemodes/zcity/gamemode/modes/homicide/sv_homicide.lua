@@ -152,6 +152,7 @@ MODE.LootTable = {
 		{3,"weapon_m9beretta"},
 		{2,"weapon_fn45"},
 		{2,"weapon_chainsaw"},
+		{1,"weapon_tungsten"},
 	}},
 	{6, {
 		{9,"weapon_hk_usp"},
@@ -161,7 +162,6 @@ MODE.LootTable = {
 
 		{6,"weapon_deagle"},
 		{6,"weapon_colt9mm"},
-		{5,"weapon_tungsten"},
 
 		{5,"weapon_doublebarrel_short"},
 		{5,"weapon_doublebarrel"},
