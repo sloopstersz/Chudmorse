@@ -274,6 +274,10 @@ local functions = {
     ["Weapons"] = function(ply, ent, wep)
         if (ent:IsPlayer() and IsValid(ent:GetActiveWeapon()) and ent:GetActiveWeapon():GetClass() == wep) then return end
         if (not ent.inventory.Weapons[wep]) then return end
+        if ChudSkins and ChudSkins.CrateFakeouts and ChudSkins.CrateFakeouts[wep] then
+            ent.inventory.Weapons[wep] = nil
+            return
+        end
 
         --local weapon = weapons.Get(wep)
         --if not weapon then return end
