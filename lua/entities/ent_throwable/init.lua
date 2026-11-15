@@ -130,6 +130,12 @@ function ENT:Use(ply)
 		wep:SetPos(self:GetPos())
 		wep:SetAngles(self:GetAngles())
 		wep.poisoned2 = self.poisoned2
+		-- A thrown skinned weapon keeps its COIN skin when it is picked back up.
+		local skin = self:GetNWString("ChudSkin", "")
+		if skin ~= "" then
+			wep:SetNWString("ChudSkin", skin)
+			wep.ChudSkinDecided = true
+		end
 		self:Remove()
 
 		if constraint.FindConstraint( self, "Weld" ) then

@@ -1,8 +1,13 @@
 include("chud_barry/sh_manifest.lua")
 local kit = ChudBarryMusic
 local enabled = CreateClientConVar("chud_barry_music", "0", true, false, "Toggle all sounds in Barry's sound pack", 0, 1)
+-- An admin can force the kit on for everyone (chud_barry_force / !barry).
+local function Active()
+    return GetGlobalBool("ChudBarryForced", false) or enabled:GetBool()
+end
+kit.IsActive = Active
 function kit.Resolve(path)
-    return enabled:GetBool() and kit.Replacement(path) or path
+    return Active() and kit.Replacement(path) or path
 end
 kit.Original = kit.Original or {}
 local original = kit.Original
@@ -37,3 +42,8 @@ end
 hook.Add("InitPostEntity", "ChudBarryPreference", SendPreference)
 cvars.AddChangeCallback("chud_barry_music", SendPreference, "ChudBarryPreference")
 net.Receive("ChudBarryPreference", SendPreference)
+cvars.AddChangeCallback("chud_barry_music", function(_, _, new)
+    if new == "0" and GetGlobalBool("ChudBarryForced", false) then
+        chat.AddText(Color(255, 200, 0), "[Chudmorse] ", color_white, "Barry's music kit is locked on by an admin right now.")
+    end
+end, "ChudBarryForcedNotice")

@@ -40,7 +40,7 @@ local function Split(filter, pos, level)
     end
     local normal, barry = RecipientFilter(), RecipientFilter()
     for _, ply in ipairs(recipients:GetPlayers()) do
-        if kit.Listeners[ply] then barry:AddPlayer(ply) else normal:AddPlayer(ply) end
+        if kit.Listeners[ply] or GetGlobalBool("ChudBarryForced", false) then barry:AddPlayer(ply) else normal:AddPlayer(ply) end
     end
     return normal, barry
 end

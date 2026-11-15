@@ -15,6 +15,7 @@ for _, vtf in ipairs({"m1911/weapon_m1911_dm", "m1911/weapon_m1911_nm", "m1911/w
 end
 resource.AddFile("materials/chudmorse/skins/didi/sog_held_didi.vmt")
 resource.AddFile("materials/chudmorse/skins/didi/sog_dropped_didi.vmt")
+resource.AddFile("materials/chudmorse/skins/didi/tungsten_didi.vmt")
 
 util.AddNetworkString("ChudSkins.Sync")
 util.AddNetworkString("ChudSkins.Action")

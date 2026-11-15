@@ -15,14 +15,30 @@ local function syncPlayerHeadshotAchievements(ply)
     hg.achievements.SetPlayerAchievement(ply, "gollavo", headshots)
 end
 
+-- Merge loaded rows into whatever is already live, keeping the higher value of
+-- each achievement, so a late or stale database load never erases progress.
+local function mergeAchievements(steamID64, loaded)
+    local all = hg.achievements.achievements_data.player_achievements
+    local live = all[steamID64] or {}
+    for key, entry in pairs(istable(loaded) and loaded or {}) do
+        local newValue = tonumber(istable(entry) and entry.value or entry) or 0
+        local oldValue = tonumber(istable(live[key]) and live[key].value or live[key]) or 0
+        if not istable(live[key]) or oldValue < newValue then
+            live[key] = istable(entry) and table.Copy(entry) or {value = newValue}
+        end
+    end
+    all[steamID64] = live
+end
+
 local function updatePlayer(ply)
     local name = ply:Name()
 	local steamID64 = ply:SteamID64()
 
     if not hg.achievements.SqlActive then
-        hg.achievements.achievements_data.player_achievements[steamID64] = {}
+        mergeAchievements(steamID64, {})
+        syncPlayerHeadshotAchievements(ply)
         return
-    end 
+    end
 
 	local query = mysql:Select("hg_achievements")
 		query:Select("achievements")
@@ -36,8 +52,9 @@ local function updatePlayer(ply)
 					updateQuery:Where("steamid", steamID64)
 				updateQuery:Execute()
 
-                hg.achievements.achievements_data.player_achievements[steamID64] = util.JSONToTable(result[1].achievements) or {}
+                mergeAchievements(steamID64, util.JSONToTable(result[1].achievements) or {})
                 syncPlayerHeadshotAchievements(ply)
+                if hg.achievements.ChudSyncPlayer then hg.achievements.ChudSyncPlayer(ply) end
 
                 
 			else
@@ -47,8 +64,9 @@ local function updatePlayer(ply)
 					insertQuery:Insert("achievements", util.TableToJSON({}))
 				insertQuery:Execute()
 
-				hg.achievements.achievements_data.player_achievements[steamID64] = {}
+				mergeAchievements(steamID64, {})
 				syncPlayerHeadshotAchievements(ply)
+				if hg.achievements.ChudSyncPlayer then hg.achievements.ChudSyncPlayer(ply) end
 			end
 		end)
 	query:Execute()
@@ -181,15 +199,19 @@ function hg.achievements.SetPlayerAchievement(ply, key, val)
     local playerAchievements = hg.achievements.achievements_data.player_achievements[steamID]
     playerAchievements[key] = playerAchievements[key] or {}
 
+    local completed = false
     if isAchievementCompleted(ply, key, val) then
         net.Start("hg_NewAchievement")
             net.WriteString(ach.name)
             net.WriteString(ach.img)
             net.WriteString(ach.category or "general")
         net.Send(ply)
+        completed = true
     end
 
     playerAchievements[key].value = val
+    -- Fired once, the moment an achievement is completed (COIN rewards listen here).
+    if completed then hook.Run("HG_AchievementCompleted", ply, key, ach) end
 end
 
 function hg.achievements.AddPlayerAchievement(ply, key, val)

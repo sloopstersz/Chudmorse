@@ -1,18 +1,32 @@
 --;; ===================================
---;; RTV Modded RTVded :troll:
+--;; Chudmorse map vote (RTV)
+--;; 5 map cards + Extend / None of these / Random, 50%+ wins outright,
+--;; otherwise the top two go head to head. Players can rate the map they
+--;; just played for a one-time karma bonus per vote.
 --;; ===================================
 util.AddNetworkString("ZB_RockTheVote_start")
 util.AddNetworkString("ZB_RockTheVote_vote")
 util.AddNetworkString("ZB_RockTheVote_voteCLreg")
 util.AddNetworkString("ZB_RockTheVote_end")
-zb = zb or {}
-local cooldown = {}
-local votes = {}
-zb.votestarted = false
-local playervote = {}
+util.AddNetworkString("ZB_MapVote_Rate")
+util.AddNetworkString("ZB_MapVote_Rating")
+util.AddNetworkString("RTVMenu")
 
+zb = zb or {}
+zb.votestarted = false
+
+local VOTE_TIME       = 30   -- default first-round length (sv_roundsystem passes 20)
+local RUNOFF_TIME     = 15   -- head to head length
+local EXTEND_ROUNDS   = 8    -- "Extend map" keeps the map for this many rounds
+local MAX_EXTENDS     = 2    -- per map
+local MAP_CHOICES     = 5
+local RATE_KARMA      = 5    -- karma for rating the map (once per vote)
+local RTV_ROUND_LIMIT = 15   -- sv_roundsystem starts a vote when Roundscount > 15
+
+local cooldown = {}
 local mappull = {}
-local playerVoteWeight = {}
+local vote = nil
+local endStarted = false
 
 local function GetMapFamily(map)
     if string.find(string.lower(map), "smalltown") then
@@ -55,58 +69,56 @@ local function GetSafeServerName()
     return hostname
 end
 
-
 local function GetDataPath(fileName)
-    local serverName = GetSafeServerName()
-    return "zbattle/" .. serverName .. "/" .. fileName
+    return "zbattle/" .. GetSafeServerName() .. "/" .. fileName
 end
-
 
 local function EnsureDataDirectory()
     local serverName = GetSafeServerName()
-    if not file.Exists("zbattle", "DATA") then
-        file.CreateDir("zbattle")
-    end
-    if not file.Exists("zbattle/" .. serverName, "DATA") then
-        file.CreateDir("zbattle/" .. serverName)
-    end
+    if not file.Exists("zbattle", "DATA") then file.CreateDir("zbattle") end
+    if not file.Exists("zbattle/" .. serverName, "DATA") then file.CreateDir("zbattle/" .. serverName) end
 end
-
 
 EnsureDataDirectory()
 
-local mapPopularity = {}
 local popularityPath = GetDataPath("MapPopularity.json")
-if file.Exists(popularityPath, "DATA") then
-    local data = file.Read(popularityPath, "DATA")
-    mapPopularity = util.JSONToTable(data) or {}
+local mapPopularity = util.JSONToTable(file.Read(popularityPath, "DATA") or "") or {}
+
+--;; ---------- map ratings ----------
+local ratingsPath = GetDataPath("MapRatings.json")
+local mapRatings = util.JSONToTable(file.Read(ratingsPath, "DATA") or "") or {}
+
+local function SaveRatings()
+    file.Write(ratingsPath, util.TableToJSON(mapRatings))
 end
 
+local function QueueSaveRatings()
+    timer.Create("ZB_MapVote_SaveRatings", 2, 1, SaveRatings)
+end
+
+hook.Add("ShutDown", "ZB_MapVote_SaveRatings", SaveRatings)
+
+local function RatingSummary(map)
+    local sum, n = 0, 0
+    for _, stars in pairs(mapRatings[map] or {}) do
+        stars = tonumber(stars)
+        if stars then sum = sum + stars n = n + 1 end
+    end
+    return {n > 0 and math.Round(sum / n, 1) or 0, n}
+end
+
+local function MyRating(ply, map)
+    local r = mapRatings[map]
+    return r and tonumber(r[ply:SteamID64()]) or 0
+end
+
+--;; ---------- map pool ----------
 local function getmaps()
     table.Empty(mappull)
-
-    local maps = file.Find("maps/*.bsp", "GAME")
-
-    --[[ 
-    if hg and hg.xmas then
-        table.Empty(mappull)
-        mappull = {
-            "cs_office",
-            "cs_drugbust_winter",
-            "gm_zabroshka_winter",
-            "mu_smallotown_v2_snow",
-            "ttt_clue_xmas",
-            "ttt_cosy_winter",
-            "ttt_winterplant_v4"
-        }
-        return 
-    end
-    ]]
-
-    for _, map in ipairs(maps) do
+    for _, map in ipairs(file.Find("maps/*.bsp", "GAME")) do
         map = map:sub(1, -5)
-        local mapstr = map:Split("_")
-        if (allowedPrefix[mapstr[1]] or not string.find(map, "_")) and not blacklist[map] then
+        local prefix = map:Split("_")[1]
+        if (allowedPrefix[prefix] or not string.find(map, "_")) and not blacklist[map] then
             table.insert(mappull, map)
         end
     end
@@ -114,15 +126,11 @@ end
 
 local function getWeightedRandomMapPrefix()
     local totalWeight = 0
-    for prefix, weight in pairs(prefixWeights) do
-        totalWeight = totalWeight + weight
-    end
+    for _, weight in pairs(prefixWeights) do totalWeight = totalWeight + weight end
 
     local randomWeight = math.random() * totalWeight
     for prefix, weight in pairs(prefixWeights) do
-        if randomWeight < weight then
-            return prefix
-        end
+        if randomWeight < weight then return prefix end
         randomWeight = randomWeight - weight
     end
 end
@@ -130,75 +138,143 @@ end
 local function getMapsByPrefix(prefix)
     local prefixMaps = {}
     for _, map in ipairs(mappull) do
-        if map:StartWith(prefix) then
-            table.insert(prefixMaps, map)
-        end
+        if map:StartWith(prefix .. "_") then table.insert(prefixMaps, map) end
     end
     return prefixMaps
 end
 
-hook.Add("InitPostEntity", "zb_GetMaps", function()
-    zb.votestarted = false
-    getmaps()
-end)
+local function getMapWeight(map)
+    local pop = mapPopularity[map] or 0
+    return math.max(1 - (pop / 100), 0.01)
+end
 
-net.Receive("ZB_RockTheVote_vote", function(len, ply)
-    if not zb.votestarted then return end
-    if cooldown[ply:EntIndex()] and cooldown[ply:EntIndex()] > CurTime() then return end
+local function LoadPlayedMaps()
+    local path = GetDataPath("PlayedMaps.json")
+    return util.JSONToTable(file.Read(path, "DATA") or "") or {}
+end
 
-    cooldown[ply:EntIndex()] = CurTime() + 1
+-- Weighted pick that removes the chosen entry from list.
+local function TakeWeighted(list)
+    local total = 0
+    for _, m in ipairs(list) do total = total + getMapWeight(m) end
+    local rnd = math.random() * total
+    for idx, m in ipairs(list) do
+        local w = getMapWeight(m)
+        if rnd < w then return table.remove(list, idx) end
+        rnd = rnd - w
+    end
+    return table.remove(list)
+end
 
-    local playerIdx = ply:EntIndex()
+-- Same idea as the old RTV: 3 weighted prefixes with 4+ fresh maps each,
+-- then weighted fallback. blocked = maps that must not appear.
+local function GeneratePool(blocked)
+    local function free(m) return not blocked[m] end
 
-    if playervote[playerIdx] and votes[playervote[playerIdx]] then
-        votes[playervote[playerIdx]] = votes[playervote[playerIdx]] - (playerVoteWeight[playerIdx] or 1)
+    local chosen, attempts = {}, 0
+    while #chosen < 3 and attempts < 300 do
+        attempts = attempts + 1
+        local prefix = getWeightedRandomMapPrefix()
+        if prefix and not table.HasValue(chosen, prefix) then
+            local count = 0
+            for _, m in ipairs(getMapsByPrefix(prefix)) do
+                if free(m) then count = count + 1 end
+            end
+            if count >= 4 then table.insert(chosen, prefix) end
+        end
     end
 
-    local map = net.ReadString()
-    if not map or map == "" then return end
-    if map ~= "random" and not table.HasValue(mappull, map) then return end
-    playervote[playerIdx] = map
-
-    playerVoteWeight[playerIdx] = 1
-
-    votes[map] = (votes[map] or 0) + playerVoteWeight[playerIdx]
-
-    net.Start("ZB_RockTheVote_voteCLreg")
-        net.WriteTable(votes)
-    net.Broadcast()
-end)
-
-
-local endStarted = false
-
-function zb.EndRTV()
-    if endStarted then return end
-
-    local winmap = table.GetWinningKey(votes)
-    if not winmap then
-		winmap = "random"
-	end
-
-    if winmap == "random" then
-        winmap = mappull[math.random(#mappull)]
+    local pool = {}
+    for _, prefix in ipairs(chosen) do
+        local valid = {}
+        for _, m in ipairs(getMapsByPrefix(prefix)) do
+            if free(m) then table.insert(valid, m) end
+        end
+        for i = 1, 4 do
+            if #valid == 0 then break end
+            table.insert(pool, TakeWeighted(valid))
+        end
     end
 
+    if #pool < 12 then
+        local fallback = {}
+        for _, m in ipairs(mappull) do
+            if free(m) and not table.HasValue(pool, m) then table.insert(fallback, m) end
+        end
+        while #pool < 12 and #fallback > 0 do
+            table.insert(pool, TakeWeighted(fallback))
+        end
+    end
+
+    return pool
+end
+
+-- One map per prefix first so the cards stay varied, then fill up.
+local function PickChoices(pool)
+    local shuffled = table.Copy(pool)
+    table.Shuffle(shuffled)
+
+    local out, used = {}, {}
+    for _, m in ipairs(shuffled) do
+        local prefix = m:match("^([^_]+)_") or m
+        if #out < MAP_CHOICES and not used[prefix] then
+            table.insert(out, m)
+            used[prefix] = true
+        end
+    end
+    for _, m in ipairs(shuffled) do
+        if #out >= MAP_CHOICES then break end
+        if not table.HasValue(out, m) then table.insert(out, m) end
+    end
+    return out
+end
+
+local function BuildChoices(exclude)
+    local cur = game.GetMap()
+    local played = LoadPlayedMaps()
+
+    local blocked = {[cur] = true}
+    for _, m in ipairs(played) do blocked[m] = true end
+    for m in pairs(exclude or {}) do blocked[m] = true end
+
+    local choices = PickChoices(GeneratePool(blocked))
+
+    -- Small map lists: ignore played history before giving up.
+    if #choices < MAP_CHOICES then
+        local relaxed = {[cur] = true}
+        for m in pairs(exclude or {}) do relaxed[m] = true end
+        for _, m in ipairs(choices) do relaxed[m] = true end
+        for _, m in ipairs(PickChoices(GeneratePool(relaxed))) do
+            if #choices >= MAP_CHOICES then break end
+            table.insert(choices, m)
+        end
+    end
+
+    return choices
+end
+
+local function RandomMap()
+    local cur = game.GetMap()
+    local list = {}
+    for _, m in ipairs(mappull) do
+        if m ~= cur then table.insert(list, m) end
+    end
+    return list[math.random(#list)] or cur
+end
+
+-- Popularity + played history, unchanged from the old RTV.
+local function RecordPlayed(winmap)
     local mapFamily = GetMapFamily(winmap)
-    
     mapPopularity[winmap] = math.min((mapPopularity[winmap] or 0) + 5, 100)
-    
-    local PlayedMaps = {}
+
     local playedMapsPath = GetDataPath("PlayedMaps.json")
-    if file.Exists(playedMapsPath, "DATA") then
-        PlayedMaps = util.JSONToTable(file.Read(playedMapsPath, "DATA")) or {}
-    end
-    
+    local PlayedMaps = LoadPlayedMaps()
+
     if not table.HasValue(PlayedMaps, winmap) then
         table.insert(PlayedMaps, 1, winmap)
-        
+
         if mapFamily then
-            local familyMaps = GetFamilyMaps(mapFamily)
-            for _, familyMap in ipairs(familyMaps) do
+            for _, familyMap in ipairs(GetFamilyMaps(mapFamily)) do
                 if familyMap ~= winmap and not table.HasValue(PlayedMaps, familyMap) then
                     table.insert(PlayedMaps, 1, familyMap)
                     mapPopularity[familyMap] = math.min((mapPopularity[familyMap] or 0) + 5, 100)
@@ -209,368 +285,349 @@ function zb.EndRTV()
         if #PlayedMaps > 20 then
             local lastFiveMaps = {}
             for i = math.max(1, #PlayedMaps - 5 + 1), #PlayedMaps do
-                if i > 1 then 
-                    table.insert(lastFiveMaps, PlayedMaps[i])
-                end
+                if i > 1 then table.insert(lastFiveMaps, PlayedMaps[i]) end
             end
-            
             PlayedMaps = {winmap}
-            for _, map in ipairs(lastFiveMaps) do
-                table.insert(PlayedMaps, map)
-            end
+            for _, map in ipairs(lastFiveMaps) do table.insert(PlayedMaps, map) end
         end
-        
+
         file.Write(playedMapsPath, util.TableToJSON(PlayedMaps))
     end
-    
+
     for map, pop in pairs(mapPopularity) do
         if map ~= winmap and not table.HasValue(PlayedMaps, map) then
             mapPopularity[map] = math.max(pop - 2, 0)
         end
     end
-    
+
     file.Write(popularityPath, util.TableToJSON(mapPopularity))
+end
 
-    net.Start("ZB_RockTheVote_end")
-        net.WriteString(winmap)
+hook.Add("InitPostEntity", "zb_GetMaps", function()
+    zb.votestarted = false
+    getmaps()
+end)
+
+--;; ---------- networking ----------
+local function SendTally()
+    if not vote then return end
+    local voters = {}
+    for ply, opt in pairs(vote.ballots) do
+        if IsValid(ply) then
+            voters[opt] = voters[opt] or {}
+            table.insert(voters[opt], ply:EntIndex())
+        end
+    end
+    net.Start("ZB_RockTheVote_voteCLreg")
+        net.WriteTable(voters)
+        net.WriteUInt(math.min(player.GetCount(), 255), 8)
     net.Broadcast()
+end
 
+local function PayloadFor(ply)
+    local cur = game.GetMap()
+    local ratings = {[cur] = RatingSummary(cur)}
+    for _, m in ipairs(vote.maps) do ratings[m] = RatingSummary(m) end
+
+    return {
+        phase = vote.phase,
+        maps = vote.maps,
+        options = vote.options,
+        runoff = vote.runoff,
+        endTime = vote.endTime,
+        duration = vote.duration,
+        current = cur,
+        ratings = ratings,
+        myRating = MyRating(ply, cur),
+        rated = vote.rated[ply:SteamID64()] and true or false,
+        myVote = vote.ballots[ply],
+        extendRounds = EXTEND_ROUNDS,
+        rateKarma = RATE_KARMA,
+    }
+end
+
+local function SendStart(target)
+    if not vote then return end
+    for _, ply in ipairs(target and {target} or player.GetHumans()) do
+        net.Start("ZB_RockTheVote_start")
+            net.WriteTable(PayloadFor(ply))
+        net.Send(ply)
+    end
+end
+
+local function SendRating()
+    local cur = game.GetMap()
+    local summary = RatingSummary(cur)
+    for _, ply in ipairs(player.GetHumans()) do
+        net.Start("ZB_MapVote_Rating")
+            net.WriteFloat(summary[1])
+            net.WriteUInt(summary[2], 16)
+            net.WriteUInt(MyRating(ply, cur), 3)
+            net.WriteBool(vote and vote.rated[ply:SteamID64()] or false)
+        net.Send(ply)
+    end
+end
+
+--;; ---------- vote flow ----------
+local function OpenVote(duration, exclude, canReroll, keepRated)
+    local maps = BuildChoices(exclude)
+
+    local options = {}
+    if (zb.MapVoteExtends or 0) < MAX_EXTENDS then table.insert(options, "extend") end
+    if canReroll then table.insert(options, "reroll") end
+    table.insert(options, "random")
+
+    vote = {
+        phase = 1,
+        maps = maps,
+        options = options,
+        valid = {},
+        ballots = {},
+        rated = keepRated or {},
+        endTime = CurTime() + duration,
+        duration = duration,
+        canReroll = canReroll,
+    }
+    for _, m in ipairs(maps) do vote.valid[m] = true end
+    for _, o in ipairs(options) do vote.valid[o] = true end
+
+    SendStart()
+    SendTally()
+end
+
+local function StartRunoff(a, b)
+    vote.phase = 2
+    vote.runoff = {a, b}
+    vote.valid = {[a] = true, [b] = true}
+    for ply, opt in pairs(vote.ballots) do
+        if not vote.valid[opt] then vote.ballots[ply] = nil end
+    end
+    vote.endTime = CurTime() + RUNOFF_TIME
+    vote.duration = RUNOFF_TIME
+
+    SendStart()
+    SendTally()
+end
+
+local function SendEnd(opt, winmap)
+    net.Start("ZB_RockTheVote_end")
+        net.WriteString(opt)
+        net.WriteString(winmap or "")
+    net.Broadcast()
+end
+
+local function Finish(opt)
+    if opt == "reroll" then
+        local exclude = {}
+        for _, m in ipairs(vote.maps) do exclude[m] = true end
+        OpenVote(VOTE_TIME, exclude, false, vote.rated)
+        return
+    end
+
+    vote.finished = true
+
+    if opt == "extend" then
+        zb.MapVoteExtends = (zb.MapVoteExtends or 0) + 1
+        zb.Roundscount = RTV_ROUND_LIMIT + 1 - EXTEND_ROUNDS
+        if zb.ClearRTVVotes then zb.ClearRTVVotes() end
+        SendEnd("extend", game.GetMap())
+
+        timer.Simple(4, function()
+            vote = nil
+            zb.votestarted = false
+            hook.Remove("Think", "RTVThink")
+        end)
+        return
+    end
+
+    if endStarted then return end
     endStarted = true
 
-    timer.Simple(3, function()
-        --zb.votestarted = false
-        table.Empty(votes)
-        table.Empty(playervote)
-        table.Empty(playerVoteWeight) 
-        RunConsoleCommand("changelevel", winmap) --;; Gavnoooooo
+    local winmap = opt == "random" and RandomMap() or opt
+    RecordPlayed(winmap)
+    SendEnd(opt, winmap)
+    SaveRatings()
+
+    timer.Simple(4, function()
+        RunConsoleCommand("changelevel", winmap)
     end)
 end
 
-local rtvtime = 0
+local function Resolve()
+    local counts, total = {}, 0
+    for ply, opt in pairs(vote.ballots) do
+        if IsValid(ply) and vote.valid[opt] then
+            counts[opt] = (counts[opt] or 0) + 1
+            total = total + 1
+        end
+    end
+
+    if total == 0 then
+        -- Nobody voted: pick one of the offered maps (or the runoff pair).
+        local pool = vote.phase == 2 and vote.runoff or vote.maps
+        Finish(pool[math.random(#pool)] or "random")
+        return
+    end
+
+    local ranked = {}
+    for opt, n in pairs(counts) do table.insert(ranked, {opt = opt, n = n, r = math.random()}) end
+    table.sort(ranked, function(a, b)
+        if a.n ~= b.n then return a.n > b.n end
+        return a.r > b.r -- ties are random
+    end)
+
+    local top, second = ranked[1], ranked[2]
+    if vote.phase == 1 and second then
+        -- 50%+ wins outright, as long as it isn't tied for first.
+        local outright = top.n * 2 >= total and top.n > second.n
+        if not outright then
+            StartRunoff(top.opt, second.opt)
+            return
+        end
+    end
+
+    Finish(top.opt)
+end
+
 function zb.ThinkRTV()
-    if not zb.votestarted then return end
-    if rtvtime < CurTime() then
-        zb.EndRTV()
-    end
-end
-
---;; ===================================
---;; ВЕЛИКАЯ МЕГА СИСТЕМА ГОВНА:
---;; Функция для выбора "уникальных" префиксов
---;; с учётом того, что у них есть >=4 доступных карт
---;; (т. е. не в PlayedMaps)
---;; ===================================
-local function getUniquePrefixes(playedMaps)
-    local chosen = {}
-    local attempts = 0
-
-    while #chosen < 3 do
-        local prefix = getWeightedRandomMapPrefix()
-        if prefix then
-            if not table.HasValue(chosen, prefix) then
-                local prefixMaps = getMapsByPrefix(prefix)
-                local validCount = 0
-                for _, m in ipairs(prefixMaps) do
-                    if not table.HasValue(playedMaps, m) then
-                        validCount = validCount + 1
-                    end
-                end
-
-                if validCount >= 4 then
-                    table.insert(chosen, prefix)
-                end
-            end
-        end
-
-        attempts = attempts + 1
-        if attempts > 300 then
-            break
-        end
-    end
-
-    return chosen
-end
-
-local function getMapWeight(map)
-    local pop = mapPopularity[map] or 0
-    return math.max(1 - (pop / 100), 0.01)
+    if not zb.votestarted or not vote or vote.finished then return end
+    if CurTime() >= vote.endTime then Resolve() end
 end
 
 function zb.StartRTV(time)
     if zb.votestarted then return end
-    
     getmaps()
 
-    rtvtime = CurTime() + (time or 45)
-
-    local PlayedMaps = {}
-    local playedMapsPath = GetDataPath("PlayedMaps.json")
-    if file.Exists(playedMapsPath, "DATA") then
-        PlayedMaps = util.JSONToTable(file.Read(playedMapsPath, "DATA"))
-    end
-    if not PlayedMaps then
-        PlayedMaps = {}
-    end
-
-    --;; Сначала попытаемся выбрать 3 "уникальных" префикса 
-    --;; через взвешенный рандом. В каждом должно быть >=4 карт, 
-    --;; которые НЕ в PlayedMaps.
-    local selectedPrefixes = getUniquePrefixes(PlayedMaps)
-
-    if #selectedPrefixes < 3 then
-        local possible = {}
-        for prefix, weight in pairs(prefixWeights) do
-            if weight > 0 then
-                local prefixMaps = getMapsByPrefix(prefix)
-                local validCount = 0
-                for _, m in ipairs(prefixMaps) do
-                    if not table.HasValue(PlayedMaps, m) then
-                        validCount = validCount + 1
-                    end
-                end
-                if validCount >= 4 then
-                    table.insert(possible, prefix)
-                end
-            end
-        end
-
-        selectedPrefixes = {}
-        table.SortByKey(possible)
-        for i = 1, 3 do
-            if possible[i] then
-                table.insert(selectedPrefixes, possible[i])
-            end
-        end
-    end
-
-    if #selectedPrefixes < 3 then
-        selectedPrefixes = {"gm", "ttt", "cs"}
-    end
-
-    local finalmaps = {}
-    for _, prefix in ipairs(selectedPrefixes) do
-        local prefixMaps = getMapsByPrefix(prefix)
-        local validMaps = {}
-        for _, m in ipairs(prefixMaps) do
-            if not table.HasValue(PlayedMaps, m) then
-                table.insert(validMaps, m)
-            end
-        end
-        for i = 1, 4 do
-            if #validMaps == 0 then break end
-
-            local totalWeight = 0
-            for _, m in ipairs(validMaps) do
-                totalWeight = totalWeight + getMapWeight(m)
-            end
-
-            local rnd = math.random() * totalWeight
-            local selectedIndex = nil
-            for idx, m in ipairs(validMaps) do
-                local weight = getMapWeight(m)
-                if rnd < weight then
-                    selectedIndex = idx
-                    break
-                else
-                    rnd = rnd - weight
-                end
-            end
-
-            if selectedIndex then
-                table.insert(finalmaps, validMaps[selectedIndex])
-                table.remove(validMaps, selectedIndex)
-            end
-        end
-    end
-
-    if #finalmaps < 12 then
-        local filteredFallback = {}
-        for _, m in ipairs(mappull) do
-            if not table.HasValue(PlayedMaps, m) and not table.HasValue(finalmaps, m) then
-                table.insert(filteredFallback, m)
-            end
-        end
-
-        if #filteredFallback == 0 then
-            for _, m in ipairs(mappull) do
-                if not table.HasValue(finalmaps, m) then
-                    table.insert(filteredFallback, m)
-                end
-            end
-        end
-
-        while #finalmaps < 12 and #filteredFallback > 0 do
-            local totalWeight = 0
-            for _, m in ipairs(filteredFallback) do
-                totalWeight = totalWeight + getMapWeight(m)
-            end
-
-            local rnd = math.random() * totalWeight
-            local selectedIndex = nil
-            for idx, m in ipairs(filteredFallback) do
-                local weight = getMapWeight(m)
-                if rnd < weight then
-                    selectedIndex = idx
-                    break
-                else
-                    rnd = rnd - weight
-                end
-            end
-
-            if selectedIndex then
-                table.insert(finalmaps, filteredFallback[selectedIndex])
-                table.remove(filteredFallback, selectedIndex)
-            else
-                break
-            end
-        end
-    end
-
-    if #finalmaps == 0 then
-        local filteredFallback = {}
-        for _, m in ipairs(mappull) do
-            if not table.HasValue(finalmaps, m) then
-                table.insert(filteredFallback, m)
-            end
-        end
-
-        local rndMap = filteredFallback[ math.random(#filteredFallback) ]
-        if rndMap then
-            table.insert(finalmaps, rndMap)
-        end
-    end
-
-    table.insert(finalmaps, "random")
-
-    net.Start("ZB_RockTheVote_start")
-        net.WriteTable(finalmaps)
-        net.WriteFloat(rtvtime)
-    net.Broadcast()
-
     zb.votestarted = true
-
+    endStarted = false
+    OpenVote(time or VOTE_TIME, nil, true)
 
     hook.Add("Think", "RTVThink", zb.ThinkRTV)
 end
 
-util.AddNetworkString("RTVMenu")
+-- Ends the current round of voting right now (kept for compatibility).
+function zb.EndRTV()
+    if vote and not vote.finished then Resolve() end
+end
+
+net.Receive("ZB_RockTheVote_vote", function(len, ply)
+    if not vote or vote.finished then return end
+    if (cooldown[ply] or 0) > CurTime() then return end
+    cooldown[ply] = CurTime() + 0.4
+
+    local opt = net.ReadString()
+    if not vote.valid[opt] or vote.ballots[ply] == opt then return end
+
+    vote.ballots[ply] = opt
+    SendTally()
+end)
+
+net.Receive("ZB_MapVote_Rate", function(len, ply)
+    if not vote or not IsValid(ply) then return end
+    if (ply.ZB_MapRateCD or 0) > CurTime() then return end
+    ply.ZB_MapRateCD = CurTime() + 0.5
+
+    local stars = net.ReadUInt(3)
+    if stars < 1 or stars > 5 then return end
+
+    local cur, sid = game.GetMap(), ply:SteamID64()
+    mapRatings[cur] = mapRatings[cur] or {}
+    mapRatings[cur][sid] = stars
+    QueueSaveRatings()
+
+    if not vote.rated[sid] then
+        vote.rated[sid] = true
+        if isnumber(ply.Karma) then
+            local cap = zb.MaxKarma or 100
+            ply.Karma = math.max(ply.Karma, math.min(ply.Karma + RATE_KARMA, cap))
+            ply:SetNetVar("Karma", ply.Karma)
+        end
+    end
+
+    SendRating()
+end)
+
+hook.Add("PlayerInitialSpawn", "ZB_MapVote_LateJoin", function(ply)
+    timer.Simple(5, function()
+        if IsValid(ply) and vote and not vote.finished then
+            SendStart(ply)
+            SendTally()
+        end
+    end)
+end)
+
+hook.Add("PlayerDisconnected", "ZB_MapVote_Leave", function(ply)
+    cooldown[ply] = nil
+    if vote and vote.ballots[ply] then
+        vote.ballots[ply] = nil
+        timer.Simple(0, SendTally)
+    end
+end)
+
 function zb.RTVMenu(ply)
     net.Start("RTVMenu")
     net.Send(ply)
 end
 
-
 COMMANDS.forcertv = {function(ply, args)
-	if not ply:IsAdmin() then ply:ChatPrint("You don't have access") return end
-		zb.StartRTV(20)
-	end,
-	0
-}
+    if not ply:IsAdmin() then ply:ChatPrint("You don't have access") return end
+    zb.StartRTV(20)
+end, 0}
 
---;; чут чут переписал 
-local rtvVotes = {} -- Dagestani fleas heard lezginka and trampled a cat to death
-local rtvTimeout = nil
-
+--;; ---------- !rtv (vote to start a map vote) ----------
+local rtvVotes = {}
 
 function zb.ClearRTVVotes()
     rtvVotes = {}
-    if rtvTimeout then
-        timer.Remove("RTVTimeout")
-        rtvTimeout = nil
-    end
 end
 
--- ДЕКА КАК ТЫ ТАК СМОГ СДЕЛАТЬ, ЧТО ОНО СРЕТ БЕЗ ОСТНАОВКИ МНЕ ПРИНТОМ, ЧТО РТВ СОСТОИТСЯ, ГДЕ ТЫ НАСРАЛ 
 function zb.CheckRTVVotes(needPrint)
     local votesNeeded = math.ceil(#player.GetAll() / 2)
-    local votes = table.Count(rtvVotes)
-    
-    if votes >= votesNeeded then
+    if table.Count(rtvVotes) >= votesNeeded then
         if needPrint then
             for _, v in player.Iterator() do
                 v:ChatPrint("Enough votes to change the map. RTV will be on next round.")
             end
         end
-        
         return true
     end
-    
     return false
 end
+
 local function rtv(ply, args)
-    
-	if zb.votestarted then
-		zb.RTVMenu(ply)
-		return
-	end
+    if zb.votestarted then
+        zb.RTVMenu(ply)
+        return
+    end
 
     local steamID = ply:SteamID()
-    
     if rtvVotes[steamID] then
         rtvVotes[steamID] = nil
         ply:ChatPrint("You canceled your vote for map change.")
-        
-        local votesNeeded = math.ceil(#player.GetAll() / 2)
-        local votes = table.Count(rtvVotes)
-        local remaining = votesNeeded - votes
-        
-        --for _, v in pairs(player.GetAll()) do
-        --    if v ~= ply then БЕСМЫСЛЕННЫЙ СПАМ
-        --        v:ChatPrint(ply:Nick() .. " canceled their vote for map change. " .. remaining .. " more votes needed.")
-        --    end
-        --end
-        
         return
     end
-    --;; Дебилы
-    --[[if table.Count(rtvVotes) == 0 and not rtvTimeout then
-        rtvTimeout = true
-        timer.Create("RTVTimeout", 1800, 1, function()
-            if table.Count(rtvVotes) > 0 then
-                for _, v in pairs(player.GetAll()) do
-                    v:ChatPrint("Map change votes have been reset due to timeout (30 minutes).")
-                end
-                zb.ClearRTVVotes()
-            end
-        end)
-    end--]]
-	
+
     rtvVotes[steamID] = true
-    
-    local votesNeeded = math.ceil(#player.GetAll() / 2)
-    local votes = table.Count(rtvVotes)
-    local remaining = votesNeeded - votes
-    
-    for _, v in player.Iterator() do
-        if remaining != 0 then
-            v:ChatPrint(
-                ply:Nick() .. " voted for map change. " .. 
-                remaining .. " more votes needed. Type !rtv again to cancel your vote."
-            )
+
+    local remaining = math.ceil(#player.GetAll() / 2) - table.Count(rtvVotes)
+    if remaining > 0 then
+        for _, v in player.Iterator() do
+            v:ChatPrint(ply:Nick() .. " voted for map change. " .. remaining .. " more votes needed. Type !rtv again to cancel your vote.")
         end
     end
 
-    if zb.CheckRTVVotes(true) then
-        return
-    end 
+    zb.CheckRTVVotes(true)
 end
 
 COMMANDS.rtv = {rtv, 0}
 COMMANDS.кем = {rtv, 0}
 
 hook.Add("ShutDown", "ResetRTVVotesOnMapChange", zb.ClearRTVVotes)
-hook.Add("PostGamemodeLoaded", "InitializeRTVSystem", function()
-    zb.ClearRTVVotes()
-end)
+hook.Add("PostGamemodeLoaded", "InitializeRTVSystem", zb.ClearRTVVotes)
 
 hook.Add("PlayerDisconnected", "CheckRTVAfterDisconnect", function(ply)
     if rtvVotes[ply:SteamID()] then
         rtvVotes[ply:SteamID()] = nil
-        
-        --for _, v in pairs(player.GetAll()) do
-        --   v:ChatPrint(ply:Nick() .. " left the server (their RTV vote was removed).")
-        --end
-        
         timer.Simple(0.1, zb.CheckRTVVotes)
     end
 end)

@@ -688,6 +688,27 @@ function GM:ScoreboardShow()
 		ApplyScoreboardVoiceMutes()
 	end)
 
+	-- ZAC anti-cheat menu: superadmins + owner / co-owner only
+	local zacBtn
+	local ZAC_SB_GROUPS = { superadmin = true, owner = true, coowner = true, ["co-owner"] = true, co_owner = true }
+	local function SB_CanSeeZAC(ply)
+		if not IsValid(ply) then return false end
+		if ply:IsSuperAdmin() then return true end
+		if ZAC_SB_GROUPS[string.lower(ply:GetUserGroup() or "")] then return true end
+		if ply.CheckGroup then
+			for g in pairs(ZAC_SB_GROUPS) do
+				if ply:CheckGroup(g) then return true end
+			end
+		end
+		return false
+	end
+	if ZAC and SB_CanSeeZAC(lp) then
+		zacBtn = SB_MakeButton(footer, "ZAC MENU", nil, function()
+			if IsValid(scoreBoardMenu) then scoreBoardMenu:Remove() scoreBoardMenu = nil end
+			RunConsoleCommand("zac_menu")
+		end)
+	end
+
 	footer.PerformLayout = function(pnl, w, h)
 		local bh = SB_Unit(30)
 		local pad = SB_Unit(14)
@@ -707,6 +728,11 @@ function GM:ScoreboardShow()
 		muteAllBtn:SetPos(math.floor((w - muteTotalW) / 2) + muteSpectW + gap, y)
 		teamBtn:SetSize(teamW, bh)
 		teamBtn:SetPos(w - pad - teamW, y)
+		if IsValid(zacBtn) then
+			local zacW = SB_Unit(130)
+			zacBtn:SetSize(zacW, bh)
+			zacBtn:SetPos(w - pad - teamW - gap - zacW, y)
+		end
 	end
 
 	local body = vgui.Create("DPanel", scoreBoardMenu)

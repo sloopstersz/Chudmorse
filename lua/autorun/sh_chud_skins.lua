@@ -16,6 +16,8 @@ ChudSkins.Weapons = {
     weapon_hk_usp = {name = "HK USP", base = {}},
     weapon_combatknife = {name = "M7 BAYONET", base = {}},
     weapon_sogknife = {name = "SOG SEAL 2000", base = {}},
+    -- model: what the shop preview shows (the held model is a knife rig the cube rides on).
+    weapon_tungsten = {name = "TUNGSTEN CUBE", base = {}, model = "models/linnaeus/tungsten_cube.mdl"},
 }
 
 -- order: position in the shop list. sub: material slot -> texture swapped into
@@ -74,6 +76,11 @@ ChudSkins.Items = {
             ["models/weapons/v_models/sw0rd/sw0rd"] = "chudmorse/skins/didi/sog_held_didi",
             ["models/weapons/sogknife/sog"] = "chudmorse/skins/didi/sog_dropped_didi",
         },
+    },
+    -- Held, dropped and thrown cubes all use the same model and material.
+    tungsten_didi_camel = {
+        order = 9, name = "DIDI CAMEL CUBE", accent = Color(215, 215, 205), weapon = "weapon_tungsten", price = 5000, category = "MELEE SKINS",
+        replace = {["models/linnaeus/tungsten/tungstencube"] = "chudmorse/skins/didi/tungsten_didi"},
     },
 }
 -- class -> equip slot (the item's main weapon), for every class a skin can go on.
@@ -209,12 +216,14 @@ function ChudSkins.ApplyToModel(model, id, wep)
         for slot, path in pairs(info and info.base or {}) do model:SetSubMaterial(slot, path) end
     end
     model.ChudSkin = id
+    model.ChudSkinSlots = {}
     model.ChudSkinModel = model:GetModel()
     if not item then return end
     if item.skin then model:SetSkin(item.skin) end
     for slot, def in pairs(item.sub or {}) do
         local mat = CopyMaterial("chudskin_" .. id .. "_" .. slot, def.from, {["$basetexture"] = def.texture})
         model:SetSubMaterial(slot, mat or def.texture)
+        model.ChudSkinSlots[slot] = mat or def.texture
     end
     if item.replace then
         for i, path in ipairs(model:GetMaterials()) do
@@ -224,7 +233,7 @@ function ChudSkins.ApplyToModel(model, id, wep)
                 local tex = Material(path):GetTexture("$basetexture")
                 if tex and not tex:IsError() then swap = item.replace[Normalize(tex:GetName())] end
             end
-            if swap then model:SetSubMaterial(i - 1, swap) end
+            if swap then model:SetSubMaterial(i - 1, swap) model.ChudSkinSlots[i - 1] = swap end
         end
     end
     if item.tint then
@@ -232,7 +241,7 @@ function ChudSkins.ApplyToModel(model, id, wep)
         for i, path in ipairs(model:GetMaterials()) do
             if IsGunMaterial(path) then
                 local mat = CopyMaterial("chudskin_" .. id .. "_" .. util.CRC(path), path, {["$color2"] = color})
-                if mat then model:SetSubMaterial(i - 1, mat) end
+                if mat then model:SetSubMaterial(i - 1, mat) model.ChudSkinSlots[i - 1] = mat end
             end
         end
     end
@@ -241,13 +250,64 @@ end
 -- Weapon world models are client-side models made on demand, so keep them in
 -- step with each gun's networked skin. This also covers guns on the ground,
 -- holstered, held by other players and in ragdolls.
+-- A skinned slot is fine if it still shows the skin, or a blood-decal copy of it
+-- (the blood system names its copies "<material><entindex>228").
+local function SlotIntact(current, skin)
+    if current == "" then return false end
+    local base = string.lower((string.gsub(skin, "^!", "")))
+    return string.find(string.lower(current), base, 1, true) ~= nil
+end
+local function SkinIntact(model)
+    for slot, skin in pairs(model.ChudSkinSlots or {}) do
+        if not SlotIntact(model:GetSubMaterial(slot), skin) then return false end
+    end
+    return true
+end
+
 -- Melee weapons swap models (held vs dropped), so check each model they draw.
+-- Anything that resets or rebuilds a slot (blood decals, water cleaning) gets the skin put back.
 local function Sync(model, id, wep)
     if not IsValid(model) then return end
-    if (model.ChudSkin or "") ~= id or (id ~= "" and model.ChudSkinModel ~= model:GetModel()) then
+    if (model.ChudSkin or "") ~= id or (id ~= "" and (model.ChudSkinModel ~= model:GetModel() or not SkinIntact(model))) then
         ChudSkins.ApplyToModel(model, id, wep)
     end
 end
+
+-- Blood decals copy the slot's material but keep only its base texture. On a skinned
+-- model, give the bloody copy the skin's full look (normal map, shine) so blood sits on top.
+local function CopyLook(target, source)
+    for key, value in pairs(source:GetKeyValues()) do
+        local lower = string.lower(key)
+        if lower ~= "$basetexture" and lower ~= "$detail" and not string.find(lower, "^%$detail") and not string.find(lower, "^%$flags") then
+            if type(value) == "ITexture" then
+                if not value:IsError() then target:SetTexture(key, value) end
+            elseif isvector(value) then target:SetVector(key, value)
+            elseif isnumber(value) then target:SetFloat(key, value)
+            end
+        end
+    end
+    target:Recompute()
+end
+local function WrapBloodDecals()
+    if not isfunction(AddDecalToEnt) or ChudSkins.DecalWrapped == AddDecalToEnt then return end
+    local original = AddDecalToEnt
+    local wrapped = function(ent, id, ...)
+        local before = IsValid(ent) and ent:GetSubMaterial(id - 1) or ""
+        original(ent, id, ...)
+        if not IsValid(ent) or (ent.ChudSkin or "") == "" or not (ent.ChudSkinSlots or {})[id - 1] then return end
+        local skin = ent.ChudSkinSlots[id - 1]
+        if not SlotIntact(before, skin) then return end
+        local after = ent:GetSubMaterial(id - 1)
+        if after == "" or after == before then return end
+        local bloody, source = Material((string.gsub(after, "^!", ""))), Material((string.gsub(skin, "^!", "")))
+        if not bloody:IsError() and not source:IsError() then CopyLook(bloody, source) end
+    end
+    AddDecalToEnt = wrapped
+    ChudSkins.DecalWrapped = wrapped
+end
+hook.Add("InitPostEntity", "ChudSkins.BloodDecals", WrapBloodDecals)
+timer.Simple(0, WrapBloodDecals)
+
 timer.Create("ChudSkins.Apply", 0.2, 0, function()
     for class in pairs(ChudSkins.ClassSlot) do
         for _, wep in ipairs(ents.FindByClass(class)) do
@@ -255,5 +315,10 @@ timer.Create("ChudSkins.Apply", 0.2, 0, function()
             Sync(wep.worldModel, id, wep)
             Sync(wep.worldModel2, id, wep)
         end
+    end
+    -- Thrown weapons (e.g. the tungsten cube) carry the skin while in the air.
+    for _, ent in ipairs(ents.FindByClass("ent_throwable")) do
+        local id = ent:GetNWString("ChudSkin", "")
+        if id ~= "" or (ent.ChudSkin or "") ~= "" then Sync(ent, id) end
     end
 end)

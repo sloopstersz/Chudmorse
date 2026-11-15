@@ -1,0 +1,144 @@
+-- Values
+local maps = {}
+local time = 0
+local votes = {}
+local winmap = ""
+local rtvStarted = false
+local rtvEnded = false
+
+local VoteCD = 0
+
+-- RTV CL Functions
+local BlurBackground = hg.BlurBackground
+
+function zb.IsRTVActive()
+    return rtvStarted
+end
+
+local function RTVUnit(num)
+    return math.floor(num * math.min(ScrW(), ScrH()) / 1000)
+end
+
+function zb.RTVMenu()
+    system.FlashWindow()
+
+    local RTVMenu = vgui.Create("ZB_RTVMenu")
+    RTVMenu:SetSize(math.min(RTVUnit(760), ScrW() - RTVUnit(40)), math.min(RTVUnit(760), ScrH() - RTVUnit(40)))
+    RTVMenu:Center()
+    RTVMenu:SetTitle("")
+    RTVMenu:SetBackgroundBlur(true)
+    RTVMenu:ShowCloseButton(false)
+    RTVMenu:SetDraggable(false)
+    RTVMenu:MakePopup()
+    RTVMenu:SetKeyboardInputEnabled(false)
+
+    local MAPSPanel = vgui.Create("DPanel", RTVMenu)
+    MAPSPanel:Dock(FILL)
+    MAPSPanel:DockMargin(RTVUnit(12), RTVUnit(48), RTVUnit(12), RTVUnit(18))
+    function MAPSPanel.Paint() end
+
+    local selectedButton
+    for k, v in ipairs(maps) do
+        local MapButton = vgui.Create("ZB_RTVButton", MAPSPanel)
+        MapButton:Dock(TOP)
+        MapButton:DockMargin(0, 0, 0, RTVUnit(4))
+        MapButton:SetSize(0, RTVUnit(34))
+        
+        if v == "random" then
+            MapButton:SetText("Random Map")
+            MapButton.Map = "random"
+            MapButton.MapIcon = Material("icon64/random.png")
+            if MapButton.MapIcon:IsError() then
+                MapButton.MapIcon = nil
+            end
+        else
+            local txt = v
+            txt = string.Explode("_", txt)
+            table.remove(txt, 1)
+            txt[1] = string.upper(string.Left(txt[1], 1)) .. string.sub(txt[1], 2)
+            MapButton:SetText(table.concat(txt, " "))
+            MapButton.Map = v
+            MapButton.MapIcon = Material("maps/thumb/" .. MapButton.Map .. ".png")
+            if MapButton.MapIcon:IsError() then
+                MapButton.MapIcon = nil
+            end
+        end
+
+        function MapButton:Think()
+            self.Votes = votes[self.Map] or 0
+            if self.Map == winmap then 
+                self.Win = true 
+            else 
+                self.Win = false 
+            end
+        end
+
+        function MapButton:DoClick()
+            if VoteCD > CurTime() then return end
+            net.Start("ZB_RockTheVote_vote")
+                net.WriteString(self.Map)
+            net.SendToServer()
+            if IsValid(selectedButton) then
+                selectedButton:SetSelected(false)
+            end
+            selectedButton = self
+            self:SetSelected(true)
+            VoteCD = CurTime() + 1
+        end
+    end
+
+    local button = vgui.Create("DButton", RTVMenu)
+    button:SetPos(RTVMenu:GetWide() - RTVUnit(48), RTVUnit(12))
+    button:SetSize(RTVUnit(36), RTVUnit(14))
+    button:SetText("")
+
+    function button:Paint(w, h)
+        local hovered = self:IsHovered()
+
+        surface.SetDrawColor(hovered and 95 or 30, hovered and 95 or 30, hovered and 95 or 30, hovered and 190 or 110)
+        surface.DrawRect(0, 0, w, h)
+
+        surface.SetDrawColor(155, 155, 155, 210)
+        surface.DrawOutlinedRect(0, 0, w, h, 1)
+
+        local x, y = w / 2, h / 2
+        local txt = "Exit"
+        surface.SetFont("ZCity_RTV_Tiny")
+        surface.SetTextColor(255, 255, 255, 255)
+        local tw, th = surface.GetTextSize(txt)
+        surface.SetTextPos(x - tw / 2, y - th / 2)
+        surface.DrawText(txt)
+    end
+
+    function button:DoClick()
+        if IsValid(RTVMenu) then
+            RTVMenu:Remove()
+        end
+    end
+end
+
+function zb.StartRTV()
+    maps = net.ReadTable()
+    time = net.ReadFloat()
+    zb.RTVMenu()
+    rtvStarted = true
+end
+
+net.Receive("RTVMenu", function()
+    zb.RTVMenu()
+end)
+
+function zb.RTVregVote()
+    votes = net.ReadTable()
+end
+
+function zb.EndRTV()
+    winmap = net.ReadString()
+    rtvEnded = true
+end
+
+-- NETWORKING
+
+net.Receive("ZB_RockTheVote_start", zb.StartRTV)
+net.Receive("ZB_RockTheVote_voteCLreg", zb.RTVregVote)
+net.Receive("ZB_RockTheVote_end", zb.EndRTV)

@@ -1660,8 +1660,9 @@ function PANEL:OpenCoinCategory(category)
     local function ShowPreview(item)
         local weaponData = weapons.GetStored(item.weapon)
         -- Melee weapons keep their real model in DroppedWorldModel / WorldModelReal.
-        local model
-        for _,key in ipairs({"WorldModelFake","DroppedWorldModel","WorldModelReal","WorldModel"}) do
+        local info = ChudSkins.Weapons[item.weapon]
+        local model = info and isstring(info.model) and file.Exists(info.model,"GAME") and info.model or nil
+        for _,key in ipairs(model and {} or {"WorldModelFake","DroppedWorldModel","WorldModelReal","WorldModel"}) do
             local path = weaponData and weaponData[key]
             if isstring(path) and path ~= "" and file.Exists(path,"GAME") then model = path break end
         end

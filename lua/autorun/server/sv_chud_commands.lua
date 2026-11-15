@@ -2,14 +2,15 @@ local function Reply(ply, text)
     if IsValid(ply) then ply:ChatPrint(text) else print(text) end
 end
 
-concommand.Add("coins", function(ply, _, args)
+-- Admin: give COIN. Used by both "coins" and "chudadd_money".
+local function GiveCoinCommand(ply, cmd, args)
     if IsValid(ply) and not ply:IsAdmin() then
         Reply(ply, "Only admins can give COIN.")
         return
     end
     local amount = tonumber(args[#args])
     if #args < 2 or not amount or amount ~= amount or amount <= 0 or amount > 1000000000 or amount ~= math.floor(amount) then
-        Reply(ply, 'Usage: coins "player name" <positive whole amount>')
+        Reply(ply, 'Usage: ' .. cmd .. ' "player name" <positive whole amount>')
         return
     end
     local name = string.lower(table.concat(args, " ", 1, #args - 1))
@@ -34,7 +35,9 @@ concommand.Add("coins", function(ply, _, args)
     end
     Reply(ply, "Gave " .. amount .. " COIN to " .. target:Nick() .. ".")
     if target ~= ply then Reply(target, "You received " .. amount .. " COIN.") end
-end)
+end
+concommand.Add("coins", GiveCoinCommand)
+concommand.Add("chudadd_money", GiveCoinCommand)
 
 -- Self-only death command: remove the body, never the player entity.
 concommand.Add("didimoney", function(ply)

@@ -105,8 +105,11 @@ end
 function MODE:RoundStart()
 	self.EventersList = {}
 	for _, ply in player.Iterator() do
-		if ply:IsAdmin() then
-			self.EventersList[ply:SteamID()] = true
+		local sid = ply:SteamID()
+		-- Queued/Excluded come from the Event Setup menu (sv_event_setup.lua)
+		if (ply:IsAdmin() and not (self.ExcludedEventers and self.ExcludedEventers[sid]))
+			or (self.QueuedEventers and self.QueuedEventers[sid]) then
+			self.EventersList[sid] = true
 		end
 	end
 
