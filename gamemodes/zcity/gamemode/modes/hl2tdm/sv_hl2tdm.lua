@@ -149,6 +149,9 @@ function MODE:GiveEquipment()
         elseif self.SelectedScenario == 2 then
             role = "Refugee"
             ply:SetPlayerClass("Refugee", {})
+        elseif self.SelectedScenario == 3 then
+            role = "Rebel"
+            ply:SetPlayerClass("Rebel", {})
         elseif self.SelectedScenario == 4 and i == 1 then
             role = "Freeman"
             ply:SetPlayerClass("Gordon", {equipment = "rebel"})
