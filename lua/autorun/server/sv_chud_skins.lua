@@ -27,11 +27,11 @@ util.AddNetworkString("ChudSkins.Action")
 util.AddNetworkString("ChudSkins.JackpotNotice")
 util.AddNetworkString("ChudSkins.JackpotTimer")
 util.AddNetworkString("ChudSkins.JackpotHuntTimer")
-CreateConVar("chud_coin_jackpot_chance", "1000000", 0,
-    "Denominator for the Coin Shop jackpot crate chance; set to 1 to guarantee it.", 1, 1000000)
+CreateConVar("chud_coin_jackpot_chance", "150000", 0,
+    "Denominator for the Coin Shop jackpot crate chance; set to 1 to guarantee it.", 1, 150000)
 for _, fakeout in pairs(ChudSkins.CrateFakeouts) do
     CreateConVar(fakeout.convar, tostring(fakeout.chance), 0,
-        "Denominator for the " .. fakeout.name .. " fakeout chance; set to 1 to guarantee it.", 1, 1000000)
+        "Denominator for the " .. fakeout.name .. " fakeout chance; set to 1 to guarantee it.", 1, 150000)
 end
 
 function ChudSkins.GetCrateFakeoutChance(fakeout)

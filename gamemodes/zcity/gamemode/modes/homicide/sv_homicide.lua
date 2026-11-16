@@ -118,6 +118,7 @@ MODE.LootTable = {
 		{1,"weapon_metalbat"},
 		{4,"weapon_leadpipe"},
 		{3,"weapon_hg_extinguisher"},
+		{1,"weapon_tungsten"},
 		{0.25,"weapon_chainsaw"},
 		{0.75,"weapon_defibrillator"},
 
@@ -146,7 +147,6 @@ MODE.LootTable = {
 		{15,"weapon_mp-80"},
 		{8,"weapon_makarov"},
 		{7,"weapon_ruger"},
-		{6,"weapon_tungsten"},
 		{4,"weapon_revolver2"},
 		{4,"weapon_px4beretta"},
 		{3.5,"weapon_m1911"},
