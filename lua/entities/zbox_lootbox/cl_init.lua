@@ -18,6 +18,9 @@ local Dynamic = 0
 local cooldown = 0
 
 local function nameThings(i)
+    local fakeout = ChudSkins and ChudSkins.CrateFakeouts and ChudSkins.CrateFakeouts[i]
+    if fakeout then return fakeout.name end
+
     local weps = weapons.Get(i)
 	local entss = scripted_ents.Get(i)
 	if weps then return weps.PrintName end
@@ -26,6 +29,12 @@ local function nameThings(i)
 end
 
 local function getIconThing(i)
+    local fakeout = ChudSkins and ChudSkins.CrateFakeouts and ChudSkins.CrateFakeouts[i]
+    if fakeout then
+        if fakeout.icon then return fakeout.icon, true, false, true end
+        return nil, false, false, false
+    end
+
     if weapons.Get(i) then
         local GunTable = weapons.Get(i)
         
@@ -160,6 +169,10 @@ local function OpenContainer( ent )
 		end
 
 		local name = nameThings(item.class)
+		local isJackpot = item.class == "ent_chud_coin_jackpot"
+		local fakeout = ChudSkins and ChudSkins.CrateFakeouts and ChudSkins.CrateFakeouts[item.class]
+		local isGold = isJackpot or (fakeout and fakeout.highlight == "gold")
+		local isBrown = fakeout and fakeout.highlight == "brown"
 		button.col1 = 100
 		button.Paint = function(self, w, h)
 			button.col1 = Lerp(0.1, button.col1, button:IsHovered() and 255 or 100)
@@ -168,7 +181,13 @@ local function OpenContainer( ent )
 				if (grid.SoundKD or 0) < CurTime() and button.SoundKD < CurTime() then surface.PlaySound("arc9_eft_shared/generic_mag_pouch_out" .. math.random(7) .. ".ogg") end
 				button.SoundKD = CurTime() + 0.1
 			end
-			surface.SetDrawColor(button.col1, 25, 25, 150)
+			if isGold then
+				surface.SetDrawColor(195 + button.col1 / 4, 125 + button.col1 / 2, 20, 230)
+			elseif isBrown then
+				surface.SetDrawColor(90 + button.col1 / 3, 55 + button.col1 / 4, 25, 230)
+			else
+				surface.SetDrawColor(button.col1, 25, 25, 150)
+			end
 			surface.DrawRect(0, 0, w, h)
 			local Icon, HaveIcon, Overide, Quad = getIconThing(item.class)
 			if Icon then
@@ -179,12 +198,21 @@ local function OpenContainer( ent )
 				surface.SetDrawColor(255, 255, 255)
 				surface.DrawTexturedRect(Quad and w / 5 + 5 or 0 - 5, 5, Quad and (w / 2 + 2.5) or (w + 10), Quad and h / 1.3 or h - 10)
 			end
-			surface.SetDrawColor(colRed)
+			local outline = isGold and Color(255, 220, 120) or isBrown and Color(185, 130, 80) or colRed
+			surface.SetDrawColor(outline)
 			surface.DrawOutlinedRect(0, 0, w, h, 1)
 			local Text = language.GetPhrase(name)
-			local SubText = utf8.sub(Text, 14)
-			Text = utf8.sub(Text, 1, 13) .. "\n" .. utf8.sub(Text, 14)
-			draw.DrawText(Text, "DermaDefault", w / 2, (HaveIcon and h / ((#SubText > 0 and 1.65) or 1.3)) or h / 3, color_white, TEXT_ALIGN_CENTER)
+			if isJackpot then
+				draw.SimpleTextOutlined(Text, "DermaDefaultBold", w / 2, h - 5, color_white,
+					TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM, 1, Color(50, 30, 0))
+			else
+				local SubText = utf8.sub(Text, 14)
+				Text = utf8.sub(Text, 1, 13) .. "\n" .. utf8.sub(Text, 14)
+				surface.SetFont("DermaDefault")
+				local _, lineHeight = surface.GetTextSize("Ag")
+				local lineCount = select(2, string.gsub(Text, "\n", "")) + 1
+				draw.DrawText(Text, "DermaDefault", w / 2, h - lineHeight * lineCount - 4, color_white, TEXT_ALIGN_CENTER)
+			end
 		end
 		grid:AddItem(button)
     end
