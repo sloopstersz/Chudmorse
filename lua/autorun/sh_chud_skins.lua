@@ -6,10 +6,10 @@ if SERVER then AddCSLuaFile() end
 ChudSkins = ChudSkins or {}
 
 ChudSkins.CrateFakeouts = {
-    chud_fakeout_didi_camel = {name = "Didi Camel", chance = 750000, convar = "chud_fakeout_didi_camel_chance", icon = "chud/didicamel.png"},
-    chud_fakeout_pirate_token = {name = "Pirate Shop Token", chance = 500000, convar = "chud_fakeout_pirate_token_chance", icon = "chud/fort.png", highlight = "gold"},
-    chud_fakeout_chuddy = {name = "Chuddy", chance = 250000, convar = "chud_fakeout_chuddy_chance", icon = "chud/chuddy.png"},
-    chud_fakeout_poop = {name = "Poop", chance = 100000, convar = "chud_fakeout_poop_chance", highlight = "brown"},
+    chud_fakeout_didi_camel = {name = "Didi Camel", chance = 75000, convar = "chud_fakeout_didi_camel_chance", icon = "chud/didicamel.png"},
+    chud_fakeout_pirate_token = {name = "Pirate Shop Token", chance = 50000, convar = "chud_fakeout_pirate_token_chance", icon = "chud/fort.png", highlight = "gold"},
+    chud_fakeout_chuddy = {name = "Chuddy", chance = 25000, convar = "chud_fakeout_chuddy_chance", icon = "chud/chuddy.png"},
+    chud_fakeout_poop = {name = "Poop", chance = 500, convar = "chud_fakeout_poop_chance", highlight = "brown"},
 }
 
 local P22_BODY = "models/zcity/skins/walther_p22/classic/walther2"
@@ -81,12 +81,6 @@ ChudSkins.Items = {
         replace = {
             ["models/weapons/v_models/sw0rd/sw0rd"] = "chudmorse/skins/didi/sog_held_didi",
             ["models/weapons/sogknife/sog"] = "chudmorse/skins/didi/sog_dropped_didi",
-        },
-    },
-    tungsten_didi = {
-        order = 9, name = "DIDI TUNGSTEN CUBE", accent = Color(215, 215, 205), weapon = "weapon_tungsten", price = 1, category = "MELEE SKINS",
-        replace = {
-            ["models/linnaeus/tungsten_cube"] = "chudmorse/skins/didi/tungsten_didi",
         },
     },
 }
@@ -200,6 +194,34 @@ net.Receive("ChudSkins.JackpotTimer", function()
     local duration = math.max(net.ReadFloat(), 0)
     jackpotTimer = {endTime = CurTime() + duration}
     createJackpotTimerFont()
+end)
+
+hook.Add("PreDrawHalos", "ChudSkins.JackpotOutline", function()
+    local targets, seen = {}, {}
+    for steamID, huntTimer in pairs(jackpotHuntTimers) do
+        if huntTimer.endTime <= CurTime() then
+            jackpotHuntTimers[steamID] = nil
+            continue
+        end
+
+        for _, ply in ipairs(player.GetAll()) do
+            if not IsValid(ply) or not ply:Alive() or ply:SteamID64() ~= steamID then continue end
+
+            local character = ply:GetNWEntity("FakeRagdoll")
+            if not IsValid(character) and IsValid(ply.FakeRagdoll) then character = ply.FakeRagdoll end
+            if not IsValid(character) then character = ply end
+            if character:GetNoDraw() and character ~= ply and not ply:GetNoDraw() then character = ply end
+            if character:GetNoDraw() or seen[character] then break end
+
+            seen[character] = true
+            targets[#targets + 1] = character
+            break
+        end
+    end
+
+    if #targets > 0 then
+        halo.Add(targets, Color(255, 215, 65), 3, 3, 2, true, false)
+    end
 end)
 
 hook.Add("HUDPaint", "ChudSkins.JackpotTimer", function()

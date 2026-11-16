@@ -263,6 +263,8 @@ function ChudSkins.StartJackpot(ply)
         if jackpot.failed or not ply:Alive() or IsRTVStarted() then return end
 
         if MakeJackpotPermanent(ply) then
+            PrintMessage(HUD_PRINTTALK, "[Chud Shop Token] " .. ply:Nick()
+                .. " survived 30 seconds and now owns all Coin Shop skins!")
             Send(ply, "You survived 30 seconds. Every Coin Shop skin is now permanently yours.")
         end
     end)
@@ -297,6 +299,8 @@ hook.Add("PlayerDeath", "ChudSkins.JackpotDeath", function(victim)
     if jackpot then
         jackpot.failed = true
         timer.Remove("ChudSkins.Jackpot." .. victim:UserID())
+        PrintMessage(HUD_PRINTTALK, "[Chud Shop Token] " .. victim:Nick()
+            .. " died before surviving 30 seconds. The temporary shop skins are lost.")
         ClearTemporaryJackpot(victim, "You died and lost the temporary Coin Shop jackpot.")
     end
 end)
@@ -332,7 +336,3 @@ hook.Add("WeaponEquip", "ChudSkins.Apply", function(wep, ply)
 end)
 
 -- File reload: refresh connected players.
-for _, ply in ipairs(player.GetHumans()) do
-    ply.ChudSkinData = nil
-    Send(ply)
-end
