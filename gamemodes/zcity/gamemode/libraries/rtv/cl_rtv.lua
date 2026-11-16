@@ -16,23 +16,21 @@ local MV = {
 }
 
 local C = {
-    bg        = Color(12, 12, 14, 242),
-    header    = Color(0, 0, 0, 210),
-    red       = Color(200, 30, 36),
-    redDark   = Color(70, 12, 15, 235),
-    card      = Color(30, 30, 33, 230),
-    cardHover = Color(46, 46, 51, 240),
-    cardLow   = Color(20, 20, 22, 230),
-    badge     = Color(8, 8, 9, 235),
-    edge      = Color(120, 120, 126),
-    text      = Color(236, 236, 236),
-    dim       = Color(150, 150, 154),
-    faint     = Color(255, 255, 255, 24),
-    black     = Color(0, 0, 0, 220),
+    bg        = Color(10, 10, 19, 235),
+    card      = Color(0, 0, 0, 120),
+    cardHover = Color(255, 255, 255, 10),
+    cardLow   = Color(0, 0, 0, 80),
+    badge     = Color(0, 0, 0, 235),
+    line      = Color(255, 255, 255, 25),
+    edge      = Color(255, 255, 255, 70),
+    text      = Color(225, 225, 225),
+    dim       = Color(105, 105, 105),
+    faint     = Color(255, 255, 255, 25),
+    black     = Color(0, 0, 0, 235),
     silver    = Color(215, 215, 220),
     gold      = Color(235, 235, 240),   -- lit stars: bright silver
     starOff   = Color(70, 70, 75),
-    rateBg    = Color(22, 22, 25, 235),
+    rateBg    = Color(0, 0, 0, 120),
 }
 
 local OPTION_SLOT = {extend = 6, reroll = 7, random = 8}
@@ -40,7 +38,9 @@ local SLOT_OPTION = {[6] = "extend", [7] = "reroll", [8] = "random"}
 local OPTION_COLOR = {extend = C.edge, reroll = C.edge, random = C.edge}
 
 local gradUp = Material("gui/gradient_up")
-local gradDown = Material("gui/gradient_down")
+local gradientL = surface.GetTextureID("vgui/gradient-l")
+local gradientR = surface.GetTextureID("vgui/gradient-r")
+local gradientD = surface.GetTextureID("vgui/gradient-d")
 
 local function U(n)
     return math.floor(n * ScrH() / 1080 + 0.5)
@@ -129,7 +129,7 @@ local function TextShadow(text, font, x, y, col, ax, ay)
     draw.SimpleText(text, font, x, y, col, ax, ay)
 end
 
---;; ---------- juice: springs, particles, shake ----------
+--;; ---------- animation helpers ----------
 -- Damped spring on obj.s toward target. Kick obj.sv for a bounce.
 local function Spring(obj, target, k, damp)
     local dt = math.min(FrameTime(), 1 / 30)
@@ -154,7 +154,6 @@ end
 
 local particles = {}
 
--- Converts a point inside any child panel to frame space (particles live there).
 local function ToFrame(panel, x, y)
     if not IsValid(MV.frame) then return x, y end
     return MV.frame:ScreenToLocal(panel:LocalToScreen(x, y))
@@ -272,53 +271,10 @@ local function CastVote(opt)
     net.Start("ZB_RockTheVote_vote")
         net.WriteString(opt)
     net.SendToServer()
-    surface.PlaySound("garrysmod/ui_click.wav")
-    return true
 end
 
--- Click feedback for a card: squash-and-bounce, a ripple and red sparks.
-local function PunchCard(card, cx, cy)
-    if not IsValid(card) then return end
-    local w, h = card:GetSize()
-    cx, cy = cx or w / 2, cy or h / 2
-    card.bulge = card.bulge or {s = 1, sv = 0}
-    card.bulge.sv = card.bulge.sv - 2.2
-    card.ripples = card.ripples or {}
-    table.insert(card.ripples, {x = cx, y = cy, t = CurTime()})
-    local fx, fy = ToFrame(card, cx, cy)
-    local accent = card.opt and OPTION_COLOR[card.opt] or C.red
-    Emit(fx, fy, 14, {speed = {120, 380}, life = {0.35, 0.7}, size = {U(2), U(5)}, gravity = 700, up = 120, col = {color_white, C.silver, C.edge}})
-end
-
-local function PaintRipples(s, w, h, accent)
-    if not s.ripples then return end
-    for i = #s.ripples, 1, -1 do
-        local r = s.ripples[i]
-        local t = (CurTime() - r.t) / 0.5
-        if t >= 1 then
-            table.remove(s.ripples, i)
-        else
-            local rad = (1 - (1 - t) ^ 3) * w * 0.9
-            local a = 200 * (1 - t)
-            surface.DrawCircle(r.x, r.y, rad, accent.r, accent.g, accent.b, a)
-            surface.DrawCircle(r.x, r.y, rad + 1, accent.r, accent.g, accent.b, a * 0.6)
-            surface.DrawCircle(r.x, r.y, rad * 0.6, 255, 255, 255, a * 0.35)
-        end
-    end
-end
-
--- Percentage that pops whenever its vote count changes.
-local function PaintPct(s, text, x, y, ax)
-    local count = s.lastCount
-    if s.popCount ~= count then
-        if s.popCount ~= nil then s.pop = {s = 1, sv = 9} end
-        s.popCount = count
-    end
-    s.pop = s.pop or {s = 1, sv = 0}
-    local sc = Spring(s.pop, 1, 320, 14)
-    WithScale(s, x, y, sc, function()
-        TextShadow(text, "ChudMV_Pct", x, y, C.text, ax, TEXT_ALIGN_CENTER)
-    end)
+local function PaintPct(text, x, y, ax)
+    TextShadow(text, "ChudMV_Pct", x, y, C.text, ax, TEXT_ALIGN_CENTER)
 end
 
 --;; Shows who voted for a card as small avatars.
@@ -402,31 +358,23 @@ local function PaintCardState(s, w, h, opt, accent)
     local pct = TotalVotes() > 0 and Count(opt) / TotalVotes() or 0
     s.barFrac = Lerp(FrameTime() * 8, s.barFrac or 0, pct)
 
+    Outline(0, 0, w, h, C.line, 1)
+
     surface.SetDrawColor(C.faint)
     surface.DrawRect(0, h - U(3), w, U(3))
     surface.SetDrawColor(accent)
     surface.DrawRect(0, h - U(3), w * s.barFrac, U(3))
 
-    PaintRipples(s, w, h, accent)
-
-    -- hover: glowing edge + a light sweep across the card
     local hf = s.hf or 0
     if hf > 0.01 then
-        Outline(0, 0, w, h, Color(255, 255, 255, 90 * hf), 1)
-        local sweep = ((CurTime() - (s.hoverAt or 0)) * 1.6) % 2.2 - 0.6
-        if sweep < 1.2 then
-            surface.SetDrawColor(255, 255, 255, 18 * hf)
-            draw.NoTexture()
-            local x = sweep * w
-            surface.DrawPoly({{x = x, y = 0}, {x = x + U(40), y = 0}, {x = x + U(10), y = h}, {x = x - U(30), y = h}})
-        end
+        Outline(0, 0, w, h, Color(255, 255, 255, 70 * hf), 1)
     end
 
     if MV.result and MV.result.opt == opt then
         local pulse = 150 + math.sin(CurTime() * 6) * 100
         Outline(0, 0, w, h, Color(255, 255, 255, pulse), 2)
     elseif MV.myVote == opt then
-        Outline(0, 0, w, h, C.red, 2)
+        Outline(0, 0, w, h, C.silver, 2)
     end
 
     if IsOut(opt) or not Offered(opt) then
@@ -448,22 +396,20 @@ local function PaintMapCard(s, w, h)
     end
 
     s.hf = Lerp(FrameTime() * 10, s.hf or 0, (s:IsHovered() and Votable(opt)) and 1 or 0)
-    local bg = C.card
-    surface.SetDrawColor(Lerp(s.hf, bg.r, C.cardHover.r), Lerp(s.hf, bg.g, C.cardHover.g), Lerp(s.hf, bg.b, C.cardHover.b), bg.a)
+    surface.SetDrawColor(C.card)
+    surface.DrawRect(0, 0, w, h)
+    surface.SetDrawColor(C.cardHover.r, C.cardHover.g, C.cardHover.b, C.cardHover.a * s.hf)
     surface.DrawRect(0, 0, w, h)
 
     -- thumbnail (square art cropped to the card)
     local th = math.floor(h * 140 / 220)
     local mat = Thumb(opt)
     if mat then
-        -- slow zoom into the art while hovered
-        local zoom = 1 + 0.12 * s.hf
-        local frac = math.Clamp(th / w, 0, 1) / zoom
-        local u = 0.5 / zoom
+        local frac = math.Clamp(th / w, 0, 1)
         local v0 = 0.5 - frac / 2
-        surface.SetDrawColor(255, 255, 255, 220 + 35 * s.hf)
+        surface.SetDrawColor(255, 255, 255, 220)
         surface.SetMaterial(mat)
-        surface.DrawTexturedRectUV(0, 0, w, th, 0.5 - u, v0, 0.5 + u, v0 + frac)
+        surface.DrawTexturedRectUV(0, 0, w, th, 0, v0, 1, v0 + frac)
     else
         surface.SetDrawColor(40, 40, 42, 255)
         surface.DrawRect(0, 0, w, th)
@@ -481,7 +427,7 @@ local function PaintMapCard(s, w, h)
         local pw = surface.GetTextSize(prefix) + U(10)
         surface.SetDrawColor(8, 8, 9, 200)
         surface.DrawRect(bx, U(14), pw, U(20))
-        Outline(bx, U(14), pw, U(20), Color(255, 255, 255, 110))
+        Outline(bx, U(14), pw, U(20), C.edge)
         draw.SimpleText(prefix, "ChudMV_Tiny", bx + pw / 2, U(24), C.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     end
     PaintRatingBadge(opt, w - U(10), U(12))
@@ -493,12 +439,11 @@ local function PaintMapCard(s, w, h)
         local lw = surface.GetTextSize("LEADING") + U(12)
         surface.SetDrawColor(C.badge)
         surface.DrawRect(U(10), th - U(28), lw, U(20))
-        Outline(U(10), th - U(28), lw, U(20), Color(255, 255, 255, 140))
+        Outline(U(10), th - U(28), lw, U(20), C.edge)
         draw.SimpleText("LEADING", "ChudMV_Tiny", U(10) + lw / 2, th - U(18), C.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     end
     local pct = total > 0 and math.Round(count / total * 100) or 0
-    s.lastCount = count
-    PaintPct(s, pct .. "%", w - U(10), th - U(16), TEXT_ALIGN_RIGHT)
+    PaintPct(pct .. "%", w - U(10), th - U(16), TEXT_ALIGN_RIGHT)
 
     -- name + votes
     local votesTxt = count == 1 and "1 vote" or (count .. " votes")
@@ -564,33 +509,23 @@ local function PaintOptionCard(s, w, h)
     local accent = OPTION_COLOR[opt]
 
     s.hf = Lerp(FrameTime() * 10, s.hf or 0, (s:IsHovered() and Votable(opt)) and 1 or 0)
-    local bg = C.card
-    surface.SetDrawColor(Lerp(s.hf, bg.r, C.cardHover.r), Lerp(s.hf, bg.g, C.cardHover.g), Lerp(s.hf, bg.b, C.cardHover.b), bg.a)
+    surface.SetDrawColor(C.card)
+    surface.DrawRect(0, 0, w, h)
+    surface.SetDrawColor(C.cardHover.r, C.cardHover.g, C.cardHover.b, C.cardHover.a * s.hf)
     surface.DrawRect(0, 0, w, h)
     surface.SetDrawColor(accent)
     surface.DrawRect(0, 0, U(3), h)
 
     local iconS = U(68)
     local ix, iy = U(12), U(11)
-    -- the icon bulges and wobbles while the card is hovered
-    s.icon = s.icon or {s = 1, sv = 0}
-    local hovering = s:IsHovered() and Votable(opt)
-    if hovering and not s.iconWas then s.icon.sv = s.icon.sv + 5 end
-    s.iconWas = hovering
-    local isc = Spring(s.icon, hovering and (1.16 + math.sin(CurTime() * 7) * 0.025) or 1, 340, 15)
-    local old = DisableClipping(true)
-    WithScale(s, ix + iconS / 2, iy + iconS / 2, isc, function()
-        PaintOptionIcon(opt, ix, iy, iconS)
-        PaintNumberBadge(OPTION_SLOT[opt], ix - U(2), iy - U(1))
-    end)
-    DisableClipping(old)
+    PaintOptionIcon(opt, ix, iy, iconS)
+    PaintNumberBadge(OPTION_SLOT[opt], ix - U(2), iy - U(1))
 
     local count, total = Count(opt), TotalVotes()
     local pct = total > 0 and math.Round(count / total * 100) or 0
     local tx = ix + iconS + U(14)
 
-    s.lastCount = count
-    PaintPct(s, pct .. "%", w - U(14), U(20), TEXT_ALIGN_RIGHT)
+    PaintPct(pct .. "%", w - U(14), U(20), TEXT_ALIGN_RIGHT)
     draw.SimpleText(count == 1 and "1 vote" or (count .. " votes"), "ChudMV_Small", w - U(14), U(41), C.dim, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
 
     local textW = w - tx - U(90)
@@ -616,12 +551,12 @@ local function MakeCrack()
     return {pts = pts, branch = {bp, b1, b2}, t = 0}
 end
 
-local function StarCenter(b)
-    local w, h = b:GetSize()
-    return ToFrame(b, w / 2, h / 2)
+local function StarCenter(button)
+    local w, h = button:GetSize()
+    return ToFrame(button, w / 2, h / 2)
 end
 
-local STAR_COLS = {color_white, color_white, C.silver, C.silver, Color(160, 160, 166), C.red}
+local STAR_COLS = {color_white, color_white, C.silver, C.silver, Color(160, 160, 166), C.text}
 
 local function RateFX(stars)
     local list = MV.stars or {}
@@ -635,9 +570,9 @@ local function RateFX(stars)
         surface.PlaySound("physics/glass/glass_cup_break1.wav")
         Shake(U(7), 0.35)
         timer.Simple(0.1, function()
-            local b = list[1]
-            if not IsValid(b) then return end
-            local fx, fy = StarCenter(b)
+            local button = list[1]
+            if not IsValid(button) then return end
+            local fx, fy = StarCenter(button)
             Emit(fx, fy, 7, {kind = "shard", speed = {60, 200}, up = 80, gravity = 1100, life = {0.6, 1.0}, size = {U(3), U(6)}, col = {Color(110, 110, 116), Color(70, 70, 75)}})
             Emit(fx, fy, 14, {speed = {20, 110}, gravity = 250, drag = 3, life = {0.4, 0.9}, size = {U(1), U(3)}, jitter = U(6), col = {Color(90, 90, 95), Color(55, 55, 60)}})
         end)
@@ -697,7 +632,6 @@ local function PaintRatingStar(s, w, h, i, rate)
     s.spr = s.spr or {s = 1, sv = 0}
     local sc
     if s.boomAt then
-        -- the 5th star swells, spins and goes white-hot, then bursts
         local t = (CurTime() - s.boomAt) / 0.3
         if t < 1 then
             sc = 1 + t * t * 1.4
@@ -712,7 +646,7 @@ local function PaintRatingStar(s, w, h, i, rate)
     sc = sc or Spring(s.spr, target, 360, 13)
 
     local ox, oy = 0, 0
-    local cracked = i == 1 and mine == 1 and hover == 0
+    local cracked = i == 1 and mine == 1 and MV.crack ~= nil
     if cracked then
         MV.crack = MV.crack or MakeCrack()
         col = Color(95, 95, 100)
@@ -730,7 +664,6 @@ local function PaintRatingStar(s, w, h, i, rate)
         DrawStar(cx, cy, r * 1.3, Color(255, 255, 255, 40), rot)
     end
     DrawStar(cx, cy, r, col, rot)
-
     if cracked then
         local crack = MV.crack
         local function line(pts, col2, off)
@@ -742,7 +675,7 @@ local function PaintRatingStar(s, w, h, i, rate)
         end
         local dark = Color(8, 8, 9, 255)
         line(crack.pts, dark, 0) line(crack.pts, dark, 1)
-        line(crack.pts, Color(C.red.r, C.red.g, C.red.b, 200), -1)
+        line(crack.pts, Color(C.silver.r, C.silver.g, C.silver.b, 200), -1)
         line(crack.branch, dark, 0)
     end
     DisableClipping(old)
@@ -753,6 +686,7 @@ local function PaintRatingStrip(s, w, h)
     local d = MV.data
     surface.SetDrawColor(C.rateBg)
     surface.DrawRect(0, 0, w, h)
+    Outline(0, 0, w, h, C.line)
     surface.SetDrawColor(C.edge)
     surface.DrawRect(0, 0, U(3), h)
 
@@ -835,14 +769,23 @@ local function PaintFrame(s, w, h)
     local d = MV.data
     if not d then return end
 
+    draw.RoundedBox(0, 0, 0, w, h, C.bg)
     if hg and hg.DrawBlur then hg.DrawBlur(s, 4) end
     surface.SetDrawColor(C.bg)
     surface.DrawRect(0, 0, w, h)
-    surface.SetDrawColor(C.header)
-    surface.SetMaterial(gradDown)
-    surface.DrawTexturedRect(0, 0, w, U(110))
-    surface.SetDrawColor(C.red)
-    surface.DrawRect(0, 0, w, U(3))
+    surface.SetDrawColor(18, 18, 18, 65)
+    surface.SetTexture(gradientR)
+    surface.DrawTexturedRect(0, 0, w, h)
+    surface.SetDrawColor(C.bg)
+    surface.SetTexture(gradientL)
+    surface.DrawTexturedRect(0, 0, w * 0.6, h)
+    surface.SetDrawColor(100, 100, 100, 35)
+    surface.SetTexture(gradientD)
+    surface.DrawTexturedRect(0, 0, w, h)
+    surface.SetDrawColor(C.edge)
+    surface.DrawOutlinedRect(0, 0, w, h, 2)
+    surface.SetDrawColor(C.edge)
+    surface.DrawRect(0, 0, U(24), U(2))
 
     local pad = U(22)
 
@@ -863,7 +806,11 @@ local function PaintFrame(s, w, h)
         label = "MAP VOTE"
         title = "Vote for the next map"
     end
-    draw.SimpleText(label, "ChudMV_Label", pad, U(28), C.dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+    local first = label:sub(1, 1)
+    surface.SetFont("ChudMV_Label")
+    local firstWidth = surface.GetTextSize(first)
+    draw.SimpleText(first, "ChudMV_Label", pad, U(28), C.dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+    draw.SimpleText(label:sub(2), "ChudMV_Label", pad + firstWidth, U(28), C.dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
     draw.SimpleText(Fit(title, "ChudMV_Title", w - pad * 2 - U(160)), "ChudMV_Title", pad, U(53), C.text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 
     local left = math.max(0, (d.endTime or 0) - CurTime())
@@ -879,7 +826,7 @@ local function PaintFrame(s, w, h)
     local tsc = Spring(MV.timerPop, 1, 320, 12)
     local urgent = secs > 0 and secs <= 5
     WithScale(s, w - pad, U(36), tsc, function()
-        draw.SimpleText(tostring(secs), "ChudMV_Timer", w - pad, U(36), urgent and C.red or C.text, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+        draw.SimpleText(tostring(secs), "ChudMV_Timer", w - pad, U(36), urgent and C.silver or C.text, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
     end)
     draw.SimpleText("SECONDS LEFT", "ChudMV_Tiny", w - pad, U(60), C.dim, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
 
@@ -895,6 +842,10 @@ local function PaintFrame(s, w, h)
         and "Click or press the card's number  ·  Most votes wins, ties are random"
         or "Click or press 1-8  ·  50%+ wins outright, otherwise the top two go head to head"
     draw.SimpleText(hint, "ChudMV_Small", w - pad, U(118), C.dim, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+    surface.SetDrawColor(C.line)
+    surface.DrawRect(pad, U(130), w - pad * 2, 1)
+    surface.SetDrawColor(C.edge)
+    surface.DrawRect(pad, U(130), U(24), 1)
 end
 
 local function SetHidden(hidden)
@@ -907,33 +858,21 @@ local function SetHidden(hidden)
     end
 end
 
--- Hover bulge for a card: springs its size around its resting rect.
 local function CardThink(s, opt)
     local hov = s:IsHovered() and Votable(opt)
-    s.bulge = s.bulge or {s = 1, sv = 0}
     if hov and not s.hovWas then
-        s.hoverAt = CurTime()
-        s.bulge.sv = s.bulge.sv + 1.6
         s:MoveToFront()
         surface.PlaySound("garrysmod/ui_hover.wav")
     end
     s.hovWas = hov
-    local sc = Spring(s.bulge, hov and 1.05 or 1, 300, 14)
-    local w, h = math.floor(s.baseW * sc + 0.5), math.floor(s.baseH * sc + 0.5)
-    if w ~= s:GetWide() or h ~= s:GetTall() then
-        s:SetSize(w, h)
-        s:SetPos(s.baseX - (w - s.baseW) / 2, s.baseY - (h - s.baseH) / 2)
-    end
     s:SetCursor(Votable(opt) and "hand" or "arrow")
 end
 
 local function PlaceCard(c, x, y, w, h, delay)
-    c.baseX, c.baseY, c.baseW, c.baseH = x, y, w, h
     c:SetPos(x, y)
     c:SetSize(w, h)
     c:SetAlpha(0)
     c:AlphaTo(255, 0.22, delay)
-    c.bulge = {s = 0.85, sv = 0}
 end
 
 function zb.BuildMapVote()
@@ -953,10 +892,10 @@ function zb.BuildMapVote()
     f.Paint = PaintFrame
     f.PaintOver = function() DrawParticles() end
     MV.frame = f
-    MV.cards, MV.stars = {}, {}
+    MV.stars = {}
     table.Empty(particles)
 
-    -- slide + fade in, and screen shake on big moments
+    -- slide and fade in
     f.baseX, f.baseY = f:GetPos()
     f.openT = CurTime()
     f:SetAlpha(0)
@@ -984,7 +923,6 @@ function zb.BuildMapVote()
         c:SetText("")
         PlaceCard(c, pad + (i - 1) * (cw + gap), U(139), cw, U(220), 0.04 * i)
         c.slot = i
-        MV.cards[i] = c
         c.avatarX, c.avatarY, c.avatarSize = U(12), U(186), U(20)
         c.maxAvatars = math.max(1, math.floor((cw - U(50)) / (U(20) + U(6))))
         c.Paint = PaintMapCard
@@ -994,7 +932,7 @@ function zb.BuildMapVote()
             CardThink(s, opt)
         end
         c.DoClick = function(s)
-            if CastVote(SlotOption(s.slot)) then PunchCard(s, s:CursorPos()) end
+            CastVote(SlotOption(s.slot))
         end
     end
 
@@ -1005,7 +943,6 @@ function zb.BuildMapVote()
         c:SetText("")
         PlaceCard(c, pad + (i - 1) * (ow + gap), U(372), ow, U(95), 0.24 + 0.05 * i)
         c.opt = opt
-        MV.cards[OPTION_SLOT[opt]] = c
         c.avatarX, c.avatarY, c.avatarSize = U(94), U(62), U(18)
         c.maxAvatars = math.max(1, math.floor((ow - U(130)) / (U(18) + U(6))))
         c.Paint = PaintOptionCard
@@ -1014,7 +951,7 @@ function zb.BuildMapVote()
             CardThink(s, s.opt)
         end
         c.DoClick = function(s)
-            if CastVote(s.opt) then PunchCard(s, s:CursorPos()) end
+            CastVote(s.opt)
         end
     end
 
@@ -1066,7 +1003,7 @@ function zb.BuildMapVote()
         end
         surface.SetDrawColor(hov and 40 or 22, hov and 40 or 22, hov and 44 or 25, 235)
         surface.DrawRect(0, 0, w, h)
-        Outline(0, 0, w, h, hov and C.silver or Color(90, 90, 96, 200))
+        Outline(0, 0, w, h, hov and C.edge or C.line)
         draw.SimpleText("Hide  [F3]", "ChudMV_Small", w / 2, h / 2, C.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         return true
     end
@@ -1115,7 +1052,7 @@ hook.Add("Think", "ChudMV_Keys", function()
 
     if MV.hidden or not IsValid(MV.frame) then return end
     for i = 1, 8 do
-        if nums[i] and CastVote(SlotOption(i)) then PunchCard(MV.cards and MV.cards[i]) end
+        if nums[i] then CastVote(SlotOption(i)) end
     end
 end)
 
@@ -1127,7 +1064,7 @@ end)
 
 --;; ---------- networking ----------
 local function MapVoteChat(...)
-    chat.AddText(C.red, "[Map Vote] ", color_white, ...)
+    chat.AddText(C.silver, "[Map Vote] ", color_white, ...)
 end
 
 net.Receive("ZB_RockTheVote_start", function()
