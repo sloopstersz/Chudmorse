@@ -21,6 +21,51 @@ local EXTEND_ROUNDS   = 8    -- "Extend map" keeps the map for this many rounds
 local MAX_EXTENDS     = 2    -- per map
 local MAP_CHOICES     = 5
 local RATE_KARMA      = 5    -- karma for rating the map (once per vote)
+local REVIEW_MAX_LEN  = 140  -- characters per written review
+local REVIEWS_SHOWN   = 12   -- newest reviews sent per map
+local SLUR_BAN_MINUTES = 60  -- ban length for slurs in a review
+
+-- Tags players can stick on a review (max 3). Order matters: the client sends a bitmask.
+local REVIEW_TAGS = {"mixed", "outside", "inside", "dark", "silly", "limitedloot", "barryapproved"}
+local MAX_TAGS = 3
+
+-- Tags only certain SteamID64s may use. Everyone else never sees the button.
+local TAG_OWNERS = {
+    ["barryapproved"] = {["76561199043924494"] = true},
+}
+
+local VALID_TAG = {}
+for _, tag in ipairs(REVIEW_TAGS) do VALID_TAG[tag] = true end
+
+local function CanUseTag(ply, tag)
+    local owners = TAG_OWNERS[tag]
+    return VALID_TAG[tag] and (not owners or owners[ply:SteamID64()]) or false
+end
+
+local function LockedTagsFor(ply)
+    local locked = {}
+    for tag in pairs(TAG_OWNERS) do
+        if not CanUseTag(ply, tag) then locked[tag] = true end
+    end
+    return locked
+end
+
+-- Drops tags that are no longer in the list (old saves).
+local function LiveTags(list)
+    local out = {}
+    for _, tag in ipairs(istable(list) and list or {}) do
+        if VALID_TAG[tag] then table.insert(out, tag) end
+    end
+    return out
+end
+
+-- Checked against the review with spaces/symbols removed and look-alike characters
+-- swapped back (n1gg@ -> nigga), so spacing or leetspeak doesn't get around it.
+local SLUR_PATTERNS = {"n+i+gg+e+r", "n+i+gg+a", "f+a+g+o+t"}
+
+-- These hide inside normal words (raccoon, tycoon, "which ink"), so they only
+-- count as a whole word. Spaced-out letters ("c o o n") are joined first.
+local SLUR_WORDS = {"^c+o+o+n+s*$", "^k+i+k+e+s*$", "^c+h+i+n+k+s*$"}
 local RTV_ROUND_LIMIT = 15   -- sv_roundsystem starts a vote when Roundscount > 15
 
 local cooldown = {}
@@ -98,18 +143,110 @@ end
 
 hook.Add("ShutDown", "ZB_MapVote_SaveRatings", SaveRatings)
 
+-- Entries are {s = score 1-10, r = review text, n = name, t = os.time()}.
+-- Old saves stored a bare 1-5 star number; read those as score * 2.
+local function Entry(v)
+    if istable(v) then return v end
+    local n = tonumber(v)
+    if n then return {s = math.Clamp(n * 2, 1, 10), r = "", n = "", t = 0} end
+end
+
 local function RatingSummary(map)
     local sum, n = 0, 0
-    for _, stars in pairs(mapRatings[map] or {}) do
-        stars = tonumber(stars)
-        if stars then sum = sum + stars n = n + 1 end
+    for _, v in pairs(mapRatings[map] or {}) do
+        local e = Entry(v)
+        local sc = e and tonumber(e.s)
+        if sc then sum = sum + sc n = n + 1 end
     end
     return {n > 0 and math.Round(sum / n, 1) or 0, n}
 end
 
-local function MyRating(ply, map)
+local function MyEntry(ply, map)
     local r = mapRatings[map]
-    return r and tonumber(r[ply:SteamID64()]) or 0
+    return r and Entry(r[ply:SteamID64()])
+end
+
+local function ReviewList(map)
+    local out = {}
+    for _, v in pairs(mapRatings[map] or {}) do
+        local e = Entry(v)
+        local tags = e and LiveTags(e.g) or {}
+        local hasTags = #tags > 0
+        if e and ((e.r and e.r ~= "") or hasTags) then
+            table.insert(out, {n = e.n or "?", s = e.s or 0, r = e.r or "", t = e.t or 0, g = hasTags and tags or nil})
+        end
+    end
+    table.sort(out, function(a, b) return a.t > b.t end)
+    for i = #out, REVIEWS_SHOWN + 1, -1 do out[i] = nil end
+    return out
+end
+
+-- Most used tags on a map: {{tag, count}, ...}, top 3.
+local function TagCounts(map)
+    local counts = {}
+    for _, v in pairs(mapRatings[map] or {}) do
+        local e = Entry(v)
+        if e then
+            for _, tag in ipairs(LiveTags(e.g)) do counts[tag] = (counts[tag] or 0) + 1 end
+        end
+    end
+    local list = {}
+    for tag, n in pairs(counts) do table.insert(list, {tag, n}) end
+    table.sort(list, function(a, b) return a[2] > b[2] end)
+    for i = #list, 4, -1 do list[i] = nil end
+    return list
+end
+
+local LEET = {["0"] = "o", ["1"] = "i", ["!"] = "i", ["|"] = "i", ["3"] = "e", ["4"] = "a", ["@"] = "a", ["$"] = "s", ["5"] = "s", ["6"] = "g", ["9"] = "g", ["7"] = "t", ["+"] = "t"}
+
+local function HasSlur(text)
+    local flat = string.lower(text or ""):gsub(".", function(c) return LEET[c] or c end):gsub("[^%a]", "")
+    for _, pat in ipairs(SLUR_PATTERNS) do
+        if flat:find(pat) then return true end
+    end
+
+    local spaced = string.lower(text or ""):gsub(".", function(c) return LEET[c] or c end):gsub("[^%a]", " ")
+    local words, run = {}, ""
+    for word in spaced:gmatch("%a+") do
+        if #word == 1 then
+            run = run .. word
+        else
+            if run ~= "" then table.insert(words, run) run = "" end
+            table.insert(words, word)
+        end
+    end
+    if run ~= "" then table.insert(words, run) end
+    for _, word in ipairs(words) do
+        for _, pat in ipairs(SLUR_WORDS) do
+            if word:find(pat) then return true end
+        end
+    end
+    return false
+end
+
+local function BanForSlur(ply)
+    local name, sid = ply:Nick(), ply:SteamID()
+    local reason = "Slur in a map review (" .. SLUR_BAN_MINUTES .. " minute ban)"
+    if ULib and ULib.addBan then
+        ULib.addBan(sid, SLUR_BAN_MINUTES, reason, name, "MapVote")
+    else
+        ply:Ban(SLUR_BAN_MINUTES, false)
+        ply:Kick(reason)
+    end
+    for _, v in player.Iterator() do
+        v:ChatPrint(name .. " was banned for " .. SLUR_BAN_MINUTES .. " minutes for a slur in a map review.")
+    end
+    ServerLog("[MapVote] Banned " .. name .. " (" .. sid .. ") for a slur in a map review\n")
+end
+
+-- Strip control characters and cap length without cutting a UTF-8 character.
+local function CleanReview(text)
+    text = tostring(text or ""):gsub("[%c]", " "):gsub("%s+", " ")
+    text = string.Trim(text)
+    if utf8.len(text) and utf8.len(text) > REVIEW_MAX_LEN then
+        text = text:sub(1, (utf8.offset(text, REVIEW_MAX_LEN + 1) or #text + 1) - 1)
+    end
+    return text
 end
 
 --;; ---------- map pool ----------
@@ -118,7 +255,7 @@ local function getmaps()
     for _, map in ipairs(file.Find("maps/*.bsp", "GAME")) do
         map = map:sub(1, -5)
         local prefix = map:Split("_")[1]
-        if (allowedPrefix[prefix] or not string.find(map, "_")) and not blacklist[map] then
+        if (allowedPrefix[prefix] or not string.find(map, "_")) and not blacklist[map] and not map:lower():StartWith("background") then
             table.insert(mappull, map)
         end
     end
@@ -327,7 +464,14 @@ end
 local function PayloadFor(ply)
     local cur = game.GetMap()
     local ratings = {[cur] = RatingSummary(cur)}
-    for _, m in ipairs(vote.maps) do ratings[m] = RatingSummary(m) end
+    local reviews = {[cur] = ReviewList(cur)}
+    local tagCounts = {[cur] = TagCounts(cur)}
+    for _, m in ipairs(vote.maps) do
+        ratings[m] = RatingSummary(m)
+        reviews[m] = ReviewList(m)
+        tagCounts[m] = TagCounts(m)
+    end
+    local mine = MyEntry(ply, cur)
 
     return {
         phase = vote.phase,
@@ -338,7 +482,15 @@ local function PayloadFor(ply)
         duration = vote.duration,
         current = cur,
         ratings = ratings,
-        myRating = MyRating(ply, cur),
+        reviews = reviews,
+        myRating = mine and mine.s or 0,
+        myReview = mine and mine.r or "",
+        myTags = LiveTags(mine and mine.g),
+        tagList = REVIEW_TAGS,
+        lockedTags = LockedTagsFor(ply),
+        maxTags = MAX_TAGS,
+        tagCounts = tagCounts,
+        reviewMax = REVIEW_MAX_LEN,
         rated = vote.rated[ply:SteamID64()] and true or false,
         myVote = vote.ballots[ply],
         extendRounds = EXTEND_ROUNDS,
@@ -358,12 +510,18 @@ end
 local function SendRating()
     local cur = game.GetMap()
     local summary = RatingSummary(cur)
+    local reviews = ReviewList(cur)
     for _, ply in ipairs(player.GetHumans()) do
+        local mine = MyEntry(ply, cur)
         net.Start("ZB_MapVote_Rating")
             net.WriteFloat(summary[1])
             net.WriteUInt(summary[2], 16)
-            net.WriteUInt(MyRating(ply, cur), 3)
+            net.WriteUInt(mine and mine.s or 0, 4)
             net.WriteBool(vote and vote.rated[ply:SteamID64()] or false)
+            net.WriteString(mine and mine.r or "")
+            net.WriteTable(reviews)
+            net.WriteTable(LiveTags(mine and mine.g))
+            net.WriteTable(TagCounts(cur))
         net.Send(ply)
     end
 end
@@ -527,12 +685,39 @@ net.Receive("ZB_MapVote_Rate", function(len, ply)
     if (ply.ZB_MapRateCD or 0) > CurTime() then return end
     ply.ZB_MapRateCD = CurTime() + 0.5
 
-    local stars = net.ReadUInt(3)
-    if stars < 1 or stars > 5 then return end
+    local score = net.ReadUInt(4)
+    local hasText = net.ReadBool()
+    local text = hasText and CleanReview(net.ReadString()) or nil
+    local hasTags = net.ReadBool()
+    local tags
+    if hasTags then
+        local mask = net.ReadUInt(8)
+        tags = {}
+        for i, tag in ipairs(REVIEW_TAGS) do
+            if bit.band(mask, bit.lshift(1, i - 1)) ~= 0 and #tags < MAX_TAGS and CanUseTag(ply, tag) then table.insert(tags, tag) end
+        end
+    end
+    if score < 1 or score > 10 then return end
+
+    if text and HasSlur(text) then
+        BanForSlur(ply)
+        return
+    end
 
     local cur, sid = game.GetMap(), ply:SteamID64()
     mapRatings[cur] = mapRatings[cur] or {}
-    mapRatings[cur][sid] = stars
+    local old = Entry(mapRatings[cur][sid])
+    if hasText or hasTags then
+        if (ply.ZB_MapReviewCD or 0) > CurTime() then return end
+        ply.ZB_MapReviewCD = CurTime() + 3
+    end
+    mapRatings[cur][sid] = {
+        s = score,
+        r = text or (old and old.r) or "",
+        g = tags or (old and old.g) or nil,
+        n = string.sub(ply:Nick(), 1, 32),
+        t = (hasText or hasTags or not old) and os.time() or (old.t or os.time()),
+    }
     QueueSaveRatings()
 
     if not vote.rated[sid] then
@@ -568,6 +753,25 @@ function zb.RTVMenu(ply)
     net.Start("RTVMenu")
     net.Send(ply)
 end
+
+-- !clearreview <name or part of it>: removes that player's review on this map.
+COMMANDS.clearreview = {function(ply, args)
+    if not ply:IsAdmin() then ply:ChatPrint("You don't have access") return end
+    local needle = string.lower(table.concat(args or {}, " "))
+    if needle == "" then ply:ChatPrint("Usage: !clearreview <name>") return end
+    local cur, removed = game.GetMap(), 0
+    for sid, v in pairs(mapRatings[cur] or {}) do
+        local e = Entry(v)
+        if e and string.find(string.lower(e.n or ""), needle, 1, true) then
+            e.r = ""
+            mapRatings[cur][sid] = e
+            removed = removed + 1
+        end
+    end
+    QueueSaveRatings()
+    ply:ChatPrint("Cleared " .. removed .. " review(s) on " .. cur .. ".")
+    if vote then SendRating() end
+end, 0}
 
 COMMANDS.forcertv = {function(ply, args)
     if not ply:IsAdmin() then ply:ChatPrint("You don't have access") return end
