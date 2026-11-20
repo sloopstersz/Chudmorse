@@ -20,6 +20,9 @@ resource.AddFile("materials/chud/realshop.vtf")
 resource.AddFile("materials/chud/didicamel.png")
 resource.AddFile("materials/chud/fort.png")
 resource.AddFile("materials/chud/chuddy.png")
+resource.AddFile("materials/chud/skelle.png")
+resource.AddFile("materials/chud/car.png")
+resource.AddFile("materials/chud/jerry.png")
 resource.AddFile("sound/rem_chudtoken.mp3")
 
 util.AddNetworkString("ChudSkins.Sync")
@@ -27,11 +30,11 @@ util.AddNetworkString("ChudSkins.Action")
 util.AddNetworkString("ChudSkins.JackpotNotice")
 util.AddNetworkString("ChudSkins.JackpotTimer")
 util.AddNetworkString("ChudSkins.JackpotHuntTimer")
-CreateConVar("chud_coin_jackpot_chance", "150000", 0,
-    "Denominator for the Coin Shop jackpot crate chance; set to 1 to guarantee it.", 1, 150000)
+CreateConVar("chud_coin_jackpot_chance", "65000", 0,
+    "Denominator for the Coin Shop jackpot crate chance; set to 1 to guarantee it.", 1, 65000)
 for _, fakeout in pairs(ChudSkins.CrateFakeouts) do
     CreateConVar(fakeout.convar, tostring(fakeout.chance), 0,
-        "Denominator for the " .. fakeout.name .. " fakeout chance; set to 1 to guarantee it.", 1, 150000)
+        "Denominator for the " .. fakeout.name .. " fakeout chance; set to 1 to guarantee it.", 1, 65000)
 end
 
 function ChudSkins.GetCrateFakeoutChance(fakeout)

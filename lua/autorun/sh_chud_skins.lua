@@ -6,10 +6,13 @@ if SERVER then AddCSLuaFile() end
 ChudSkins = ChudSkins or {}
 
 ChudSkins.CrateFakeouts = {
-    chud_fakeout_didi_camel = {name = "Didi Camel", chance = 75000, convar = "chud_fakeout_didi_camel_chance", icon = "chud/didicamel.png"},
-    chud_fakeout_pirate_token = {name = "Pirate Shop Token", chance = 50000, convar = "chud_fakeout_pirate_token_chance", icon = "chud/fort.png", highlight = "gold"},
+    chud_fakeout_didi_camel = {name = "Didi Camel", chance = 45000, convar = "chud_fakeout_didi_camel_chance", icon = "chud/didicamel.png"},
+    chud_fakeout_pirate_token = {name = "Pirate Shop Token", chance = 35000, convar = "chud_fakeout_pirate_token_chance", icon = "chud/fort.png", highlight = "gold"},
     chud_fakeout_chuddy = {name = "Chuddy", chance = 25000, convar = "chud_fakeout_chuddy_chance", icon = "chud/chuddy.png"},
     chud_fakeout_poop = {name = "Poop", chance = 500, convar = "chud_fakeout_poop_chance", highlight = "brown"},
+    chud_fakeout_jerry = {name = "Jerry", chance = 100, convar = "chud_fakeout_jerry_chance", icon = "chud/jerry.png"},
+    chud_fakeout_skelle = {name = "Skelle", chance = 300, convar = "chud_fakeout_skelle_chance", icon = "chud/skelle.png"},
+    chud_fakeout_car = {name = "Car", chance = 400, convar = "chud_fakeout_car_chance", icon =  "chud/car.png"},
 }
 
 local P22_BODY = "models/zcity/skins/walther_p22/classic/walther2"
