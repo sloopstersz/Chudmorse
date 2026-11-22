@@ -148,8 +148,10 @@ hook.Add("PlayerDropWeapon", "homigrad-inventory", function(ply)
     wep:SetCollisionGroup(COLLISION_GROUP_WORLD)
     ply:DropWeapon(wep, ply:EyePos(), vecZero)
     wep:SetPos(ply:EyePos())
-    ply.inventory.Weapons[wep:GetClass()] = nil
-    ply:SetNetVar("Inventory", ply.inventory)
+    if ply.inventory then
+        ply.inventory.Weapons[wep:GetClass()] = nil
+        ply:SetNetVar("Inventory", ply.inventory)
+    end
     ply:SetActiveWeapon(NULL)
 	if ply.organism and ishgweapon(wep) then ply.organism.postureGunfireWeapon = wep end
 
@@ -272,12 +274,10 @@ end)
 
 local functions = {
     ["Weapons"] = function(ply, ent, wep)
+        if not istable(ent.inventory) or not istable(ent.inventory.Weapons) then return end
+        if not isstring(wep) or not ent.inventory.Weapons[wep] then return end
         if (ent:IsPlayer() and IsValid(ent:GetActiveWeapon()) and ent:GetActiveWeapon():GetClass() == wep) then return end
         if (not ent.inventory.Weapons[wep]) then return end
-        if ChudSkins and ChudSkins.CrateFakeouts and ChudSkins.CrateFakeouts[wep] then
-            ent.inventory.Weapons[wep] = nil
-            return
-        end
 
         --local weapon = weapons.Get(wep)
         --if not weapon then return end
@@ -285,7 +285,7 @@ local functions = {
         local weapon
         local storedWeapon = ent.inventory.Weapons[wep]
         local weaponIsEnt = IsEntity(storedWeapon) and IsValid(storedWeapon) and storedWeapon:IsWeapon()
-        
+        --print(weaponIsEnt)
         if not weaponIsEnt then
             weapon = ents.Create(wep)
             weapon.DontEquipInstantly = (not weapon.NoHolster) and (weapon.weaponInvCategory != 1)
@@ -314,7 +314,7 @@ local functions = {
             --if weapon.SetInfo then weapon:SetInfo(tbl) end
         end
 
-        
+        --print(weapon:GetPos())
 
         ent.inventory.Weapons[wep] = nil
 
@@ -335,7 +335,7 @@ local functions = {
         weapon.init = false
 
         if hook.Run("PlayerCanPickupWeapon",ply,weapon) == false then 
-            
+            --print("huy")
             weapon.IsSpawned = true weapon.init = true 
             weapon:SetPos(ply:EyePos())
             return
@@ -360,6 +360,8 @@ local functions = {
         end
     end,
     ["Armor"] = function(ply, ent, placement, armor)
+        if not isstring(placement) or not isstring(armor) then return end
+        if not istable(hg.armor) or not istable(hg.armor[placement]) or not istable(hg.armor[placement][armor]) then return end
         if hg.armor[placement][armor].nodrop then return end
         if (not ent.armors[placement]) or (ent.armors[placement] ~= armor) or ply.armors[placement] then return end
         if !hg.AddArmor(ply, armor) then return end
@@ -373,7 +375,9 @@ local functions = {
         hook.Run("ItemTransfer",ply, ent, placement, armor)
     end,
     ["Attachments"] = function(ply, ent, att)
+        if not istable(ent.inventory) or not istable(ent.inventory.Attachments) then return end
         att = tonumber(att)
+        if not att or (att % 1 != 0) or att < 1 or att > 100 then return end
         if not ent.inventory.Attachments[att] then return end
         ply.inventory.Attachments[#ply.inventory.Attachments + 1] = ent.inventory.Attachments[att]
         ent.inventory.Attachments[att] = nil
@@ -429,8 +433,20 @@ net.Receive("ply_take_item", function(len, ply)
     if isAwakeAndFree(ply, ent) then return end
 
     if ent:GetPos():Distance(ply:GetPos()) > 125 then return end
+    if not istable(ent.inventory) or not istable(ply.inventory) or not istable(ply.armors) or not istable(ent.armors) then return end
+
+    local args = {}
+    if istable(tbl) then
+        for i = 1, 4 do
+            local v = tbl[i]
+            if v == nil then break end
+            args[i] = v
+        end
+    end
+
+    if not (tblIndex == "Weapons" or tblIndex == "Ammo" or tblIndex == "Armor" or tblIndex == "Attachments") then return end
     local func = functions[tblIndex]
-    if func then func(ply, ent, thing, unpack(tbl)) end
+    if func then func(ply, ent, thing, unpack(args)) end
     ply:SetNetVar("Inventory", ply.inventory)
     ent:SetNetVar("Inventory", ent.inventory)
     ply:SyncArmor()

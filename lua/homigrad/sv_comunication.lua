@@ -188,7 +188,7 @@ hook.Add("PlayerCanHearPlayersVoice", "RealisticVoice", function(listener,speake
 	
 	if speaker.IsOldSpeak ~= speaker.IsSpeak then
 		speaker.IsOldSpeak = speak
-		
+		--print("huy")
 		if speak then hook.Run( "StartVoice", speaker, listener ) else hook.Run( "EndVoice", speaker, listener )  end
 	end
 

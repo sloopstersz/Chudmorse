@@ -317,7 +317,7 @@ if SERVER then
 		local bandaged = false
 		
 		if not bone then
-			
+			--print(#org.wounds)
 			for i = 1, #org.wounds do
 				if self.modeValues[1] > 0 and #org.wounds > 0 then
 					local biggestWound = org.wounds[1][1]
@@ -627,13 +627,13 @@ if SERVER then
 							if !tbl or !tbl[4] or !ent:LookupBone(tbl[4]) then continue end
 							local bonename = ent:GetBoneName(ent:LookupBone(tbl[4]))
 							local sec_bonename = ent:GetBoneName(ent:LookupBone(wound[4]))
-							
+							--print(1,bonename,sec_bonename)
 							if bonename == sec_bonename or (tourniqet_bones[sec_bonename] and tourniqet_bones[sec_bonename][bonename]) then
-								
+								--print(2,bonename,sec_bonename)
 								table.insert(bonewounds,i1)
 							end
 						end
-						
+						--PrintTable(bonewounds)
 					break end
 				end
 				
@@ -664,7 +664,7 @@ if SERVER then
 
 			for i = 1, #bonewounds do
 				if org.wounds[bonewounds[i]] then
-					
+					--print(org.wounds[bonewounds[i]], bonewounds[i])
 					org.wounds[bonewounds[i]][1] = 0
 				end
 			end
@@ -908,7 +908,7 @@ else
 
 	--hook.Add("PostDrawPlayerRagdoll", "draw_bandages", function(ent,ply)
 	function hg.RenderBandages(ent, ply)
-		
+		--PrintTable(ent.bandaged_limbs)
 		if not ent.bandaged_limbs then return end
 		if !next(ent.bandaged_limbs) then return end
 		if not IsValid( ent.bandagesModel ) then

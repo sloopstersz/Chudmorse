@@ -86,7 +86,7 @@ end
 
 function ENT:OnCondition( iCondition )
 
-	
+	--Msg( self, " Condition: ", iCondition, " - ", self:ConditionName(iCondition), "\n" )
 
 end
 

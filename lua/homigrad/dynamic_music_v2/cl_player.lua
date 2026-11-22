@@ -51,7 +51,7 @@ hg.DynamicMusicV2.Player.Layers = hg.DynamicMusicV2.Player.Layers or {}
 local layers = hg.DynamicMusicV2.Player.Layers
 local function SetupMusicFile(name, path, callback)
     sound.PlayFile("sound/" .. path, "noplay noblock", function(Channel, Err, ErrStr)
-        
+        --print(Channel, Err, ErrStr)
         if IsValid( Channel ) then
             Channel:EnableLooping( true )
             layers[#layers + 1] = {name, Channel}
@@ -77,7 +77,7 @@ function hg.DynamicMusicV2.Player.SetupLayers()
     for k,v in pairs(Track.Layers) do
         SetupMusicFile(k, v, function()
             amount = amount - 1
-            
+            --print(amount)
             if amount <= 0 then hg.DynamicMusicV2.Player.Play() end
         end)
     end

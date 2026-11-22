@@ -38,7 +38,7 @@ net.Receive("DynamicAnims_SendGesture", function()
 	local anim_time = net.ReadFloat()
 	local AnimDuration = net.ReadFloat()
 	local autokill = net.ReadBool()
-	
+	--print(ent, AnimID, weight, sv_start_time, start_time, anim_time, AnimDuration, autokill)
 	if !IsValid(ent) then return end
 
 	ent:PlayCustomAnimAsGesture(AnimID, weight, anim_time, sv_start_time, start_time, AnimDuration, autokill)

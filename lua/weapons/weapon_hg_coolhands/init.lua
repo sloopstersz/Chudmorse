@@ -610,7 +610,7 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
 
 		local dist, posHit, distLine = util.DistanceToLine(pos + aimvec * 100, pos, trace.HitPos)
 
-		
+		//print(dist, distLine)
 
 		local dmg = wep.DamagePrimary
 		local selfdmg = self.DamagePrimary * 0.2

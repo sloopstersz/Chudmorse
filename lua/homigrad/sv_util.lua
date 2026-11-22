@@ -499,7 +499,7 @@ hook.Add("PostEntityFireBullets","bulletsuppression",function(ent,bullet)
 		end
 
 		if !org.otrub then
-			
+			--print(1 * dmg / math.max(dist / 2,10) / 1)
 			ply:AddNaturalAdrenaline(0.05 * dmg / math.max(dist / 2,10) / 1)
 			org.fearadd = org.fearadd + 0.2
 			hg.organism.AddPanicAttack(org, math.Clamp(0.0008 * dmg / math.max(dist / 10, 8), 0.0004, 0.0065), true)
@@ -784,7 +784,7 @@ function hgWreckBuildings(blaster, pos, power, range, ignoreVisChecks) -- taken 
 		if coroutine.status( co ) == "dead" then
 			timer.Remove("ProcessCheck_" .. index)
 		end
-		
+		--print("Yes yelid", coroutine.status( co ))
 		coroutine.resume(co)
 	end)
 end
@@ -1395,7 +1395,7 @@ end
 				glass.IsSpawned = true
 				glass.init = true
 				--Player(2):SetPos(IsValid(inf) and inf:GetPos() or dmginfo:GetAttacker():GetPos())
-				
+				--print(ent, glass) -- bro im spawned and etc.
 			end
 		end
 	end)
@@ -1414,7 +1414,7 @@ function entMeta:StealthOpenDoor(user)
 	self.oldsnd7 = self.oldsnd7 or self:GetInternalVariable("soundunlockedoverride")
 	
 	self.firstOpen = 0--((self.firstOpen or -1) + 1)
-	
+	--print(self.firstOpen)
 	local amt = 1 - math.min(math.abs(user:EyeAngles().p) / 60, 1)
 	
 	--local dist = self:GetInternalVariable("distance")
@@ -1753,7 +1753,7 @@ hook.Add("Org Think", "BodyTemperature", function(owner, org, timeValue) -- пе
 
 	org.heatbuff = math.Approach(org.heatbuff, 120 * MaxWarmMul, timeValue * math.Clamp(warming * 1, 0, 4))
 
-	
+	//PrintTable(ents.FindInSphere(org.owner:GetPos(), 128))
 	--мб сделать тепло от env_sprite?
 	--hz...
 	--дороговато

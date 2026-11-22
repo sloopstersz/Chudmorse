@@ -111,38 +111,33 @@ net.Receive("hg_eye_gore_pop", function()
 end)
 
 
--- Use actual transparent pixels and alpha testing, not a white texture whose
--- shader alpha can render opaque on player eye meshes.
-local zoomHiddenMaterial = "!chud_zoom_hidden_eyes_v2"
-local hiddenEyeTexture = GetRenderTarget("chud_zoom_hidden_eyes_rgba_v2", 16, 16)
-render.PushRenderTarget(hiddenEyeTexture)
-render.Clear(0, 0, 0, 0, true, true)
-render.PopRenderTarget()
-CreateMaterial("chud_zoom_hidden_eyes_v2", "VertexLitGeneric", {
-    ["$basetexture"] = hiddenEyeTexture:GetName(), ["$model"] = "1",
-    ["$alphatest"] = "1", ["$alphatestreference"] = "0.5"
-})
+-- Chud zoom eyes: the bulging eye model is drawn over the socket, so the real
+-- eyes no longer need hiding. (Hiding them with sub-materials is what left
+-- players with invisible eyes after zooming.)
+
+-- How far the eyes pop out at full zoom (units along the face). Lower = subtler.
+local ZOOM_EYE_START = -1.0 -- eye sits back in the socket when zoom begins
+local ZOOM_EYE_END = 0.5    -- eye position at full zoom (was +2.0)
+
 local zoomTargets = setmetatable({}, {__mode = "k"})
+
+-- Clear any invisible-eye material an older version of this file left behind.
 local function IsZoomHidden(material)
-    if not isstring(material) then return false end
+    if not isstring(material) or material == "" then return false end
     local name = string.lower(string.gsub(material, "^!", ""))
     return name == "chud_zoom_hidden_eyes" or name == "chud_zoom_hidden_eyes_v2"
 end
-local function RestoreZoomEyes(ent, state)
-    if not IsValid(ent) then return end
-    for slot, original in pairs(state.materials or {}) do
-        if IsZoomHidden(ent:GetSubMaterial(slot)) then
-            -- nil clears the override and restores the model's own eye material.
-            if original == "" or IsZoomHidden(original) then ent:SetSubMaterial(slot)
-            else ent:SetSubMaterial(slot, original) end
-        end
-    end
-    -- Recover eyes left hidden by an older patch or a Lua refresh.
+local function ClearLeftoverHiddenEyes(ent)
+    if not IsValid(ent) or not ent.GetMaterials then return end
     for i in ipairs(ent:GetMaterials() or {}) do
-        if IsZoomHidden(ent:GetSubMaterial(i - 1)) then ent:SetSubMaterial(i - 1) end
+        if IsZoomHidden(ent:GetSubMaterial(i - 1)) then ent:SetSubMaterial(i - 1, "") end
     end
-    state.materials = {}
 end
+timer.Create("ChudZoomEyesLeftoverCleanup", 1, 0, function()
+    for _, ply in player.Iterator() do ClearLeftoverHiddenEyes(ply) end
+    for _, rag in ipairs(ents.FindByClass("prop_ragdoll")) do ClearLeftoverHiddenEyes(rag) end
+end)
+
 hook.Add("Think", "ChudZoomEyeAnimation", function()
     local seen = {}
     eachTarget(function(ent, org)
@@ -151,41 +146,17 @@ hook.Add("Think", "ChudZoomEyeAnimation", function()
         local healthy = not org.headamputated and eyeValue(org, "l") < 1 and eyeValue(org, "r") < 1
             and not eyePopped(org, "l") and not eyePopped(org, "r")
         local active = healthy and IsValid(owner) and owner:Alive() and owner:GetNWBool("ChudZoomEyes", false)
-        local state = zoomTargets[ent] or ent.ChudZoomEyeState or {amount = 0, materials = {}, model = ent:GetModel()}
-        ent.ChudZoomEyeState = state
-        zoomTargets[ent] = state
-        if state.model ~= ent:GetModel() then
-            RestoreZoomEyes(ent, state)
-            state.model = ent:GetModel()
-        end
-        state.amount = healthy and math.Approach(state.amount, active and 1 or 0, FrameTime() / 0.25) or 0
-        ent.ChudZoomEyeAmount = state.amount
-        if state.amount > 0 then
-            for i, material in ipairs(ent:GetMaterials() or {}) do
-                local name = string.lower(material)
-                if string.find(name, "eye", 1, true) or string.find(name, "pupil", 1, true) then
-                    local slot = i - 1
-                    if state.materials[slot] == nil then
-                        local original = ent:GetSubMaterial(slot) or ""
-                        state.materials[slot] = IsZoomHidden(original) and "" or original
-                    end
-                    ent:SetSubMaterial(slot, zoomHiddenMaterial)
-                end
-            end
-        else
-            RestoreZoomEyes(ent, state)
-        end
+        local amount = zoomTargets[ent] or 0
+        amount = healthy and math.Approach(amount, active and 1 or 0, FrameTime() / 0.25) or 0
+        zoomTargets[ent] = amount
+        ent.ChudZoomEyeAmount = amount
     end)
-    for ent, state in pairs(zoomTargets) do
+    for ent in pairs(zoomTargets) do
         if not seen[ent] then
-            RestoreZoomEyes(ent, state)
             if IsValid(ent) then ent.ChudZoomEyeAmount = nil end
             zoomTargets[ent] = nil
         end
     end
-end)
-hook.Add("ShutDown", "ChudZoomEyeMaterials", function()
-    for ent, state in pairs(zoomTargets) do RestoreZoomEyes(ent, state) end
 end)
 
 hook.Add("PostDrawOpaqueRenderables", "hg_eye_gore_draw", function()
@@ -211,7 +182,7 @@ hook.Add("PostDrawOpaqueRenderables", "hg_eye_gore_draw", function()
                     local cfg = eyeData[side]
                     local m = eyeModel(cfg.model)
                     if IsValid(m) then
-                        local pos, ang = LocalToWorld(cfg.bulge.offset + Vector(-2 + 4 * zoomSlide, 0, 0), cfg.bulge.angle, att.Pos, att.Ang)
+                        local pos, ang = LocalToWorld(cfg.bulge.offset + Vector(Lerp(zoomSlide, ZOOM_EYE_START, ZOOM_EYE_END), 0, 0), cfg.bulge.angle, att.Pos, att.Ang)
                         m:SetPos(pos)
                         m:SetAngles(ang)
                         m:SetupBones()

@@ -233,7 +233,7 @@ function SWEP:Shoot(override)
 					else
 						cons2 = cons
 					end
-					
+					--PrintTable(cons:GetSaveTable())
 					timer.Simple(7, function()
 						if IsValid(cons) then
 							cons:SetKeyValue("Dangling", 1)

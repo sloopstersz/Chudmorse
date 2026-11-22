@@ -13,7 +13,7 @@ SWEP.WorldModel = "models/weapons/w_shotgun.mdl"
 SWEP.WorldModelFake = "models/weapons/arccw/c_ur_spas12.mdl"
 
 
-
+--PrintTable(Entity(1):GetActiveWeapon():GetWM():GetAttachments())
 --uncomment for funny
 SWEP.FakePos = Vector(-10, 4.15, 3.85)
 SWEP.FakeAng = Angle(0.2, 0, 1)
@@ -260,7 +260,7 @@ local function reloadFunc(self)
 		end
 		
 		local key = hg.KeyDown(self:GetOwner(), IN_RELOAD)
-		
+		--print("reload",key)
 		
 		if key and self:CanReload() then
 			reloadFunc(self)
@@ -281,7 +281,7 @@ local function reloadFunc(self)
 end
 
 function SWEP:Reload(time)
-	
+	--print(self:GetNetVar("shootgunReload",0))
 	local ply = self:GetOwner()
 	if ply.organism and (ply.organism.larmamputated or ply.organism.rarmamputated) then return end
 	if self.AnimStart_Draw > CurTime() - 0.5 then return end
@@ -289,7 +289,7 @@ function SWEP:Reload(time)
 	if self.reloadCoolDown > CurTime() then return end
 	if self.Primary.Next > CurTime() then return end
 	if self:GetNetVar("shootgunReload",0) > CurTime() then return end
-	
+	--print(self.drawBullet)
 	if not self:CanReload() and not self.drawBullet and SERVER then
 		cock(self,1)
 		self:SetNetVar("shootgunReload",CurTime() + 1.3)

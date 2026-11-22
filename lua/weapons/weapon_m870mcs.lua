@@ -290,7 +290,7 @@ local function reloadFunc(self)
 		end
 		
 		local key = hg.KeyDown(self:GetOwner(), IN_RELOAD)
-		
+		--print("reload",key)
 		
 		if key and self:CanReload() then
 			reloadFunc(self)
@@ -309,7 +309,7 @@ end
 SWEP.FakeEjectBrassATT = "2"
 
 function SWEP:Reload(time)
-	
+	--print(self:GetNetVar("shootgunReload",0))
 	if self.AnimStart_Draw > CurTime() - 0.5 then return end
 	if not self:CanUse() then return end
 	if self.reloadCoolDown > CurTime() then return end

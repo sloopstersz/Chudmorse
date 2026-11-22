@@ -198,7 +198,7 @@ hook.Add("HG_CalcView","InsaneRollCam",function(ply, origin, angles, fova)
 		local intensity = 1 - ((hg.berserkStation:GetTime() - offset:GetFloat()) / 60 * bpm:GetInt())
 		angles[1] = angles[1] - hg.berserkIntensity * 0.2
 		angles[3] = math.cos(CurTime() * 0.3) * hg.berserkClamped + hg.berserkIntensity * 2 * (intensity % 2 > 1 and 1 or -1)
-		
+		--print(fova)
 		fova[1] = fova[1] + hg.berserkIntensity * -2
 	end
 end)
@@ -273,7 +273,7 @@ hook.Add("PostDrawTranslucentRenderables", "berserkSky", function(depth, drawsky
 		HM_sky_material:SetFloat("$duskscale",math.abs(math.sin(CurTime()*1.5))*1)
 		HM_sky_material:SetFloat("$duskintensity",0.2*hg.berserkIntensity/(hg.berserkIntensity/3))
 
-		
+		--print(hg.berserkIntensity)
 		cam.Start3D(vector_origin, EyeAngles())
 			render.SetMaterial(HM_sky_material)
 			cam.IgnoreZ(true)

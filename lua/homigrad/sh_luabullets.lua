@@ -216,8 +216,8 @@ local PLAYER = FindMetaTable("Player")
 local ENTITY = FindMetaTable("Entity")
 
 function ENTITY:GetMD5Seed()
-	
-	
+	--print(self)
+	--print(self:EntIndex())
 	local iCommandNumber = util.SharedRandom( self:EntIndex(), -65535, 65535 )--self:GetCurrentCommand():CommandNumber() -- FIXME: Change to FrameNumber when it is finally binded serverside
 	
 	if (self.m_iMD5SeedSavedNumber ~= iCommandNumber) then
@@ -744,8 +744,8 @@ function ENTITY:FireLuaBullets(tInfo)
 						mask = iMask,
 						filter = Filter
 					})
-				
-				
+				--print(tr.FractionLeftSolid)
+				--print(tr.Entity, tr.HitGroup, hitgroup, tr.PhysicsBone, tr.StartSolid)
 			end
 
 			-- Shields are virtual OBBs shared with their rendered/IK pose. Stop only

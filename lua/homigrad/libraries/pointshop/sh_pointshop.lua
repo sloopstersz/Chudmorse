@@ -33,7 +33,7 @@ if CLIENT then
 
     net.Receive("hg_pointshop_net",function()
         LocalPlayer().PS_MyItensens = net.ReadTable()
-        
+        --print(callbacks[#callbacks])
         if callbacks[#callbacks] then
             callbacks[#callbacks](LocalPlayer().PS_MyItensens)
             callbacks[#callbacks] = nil

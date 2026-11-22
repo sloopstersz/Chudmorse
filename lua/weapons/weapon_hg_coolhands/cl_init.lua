@@ -289,7 +289,7 @@ function SWEP:DrawWorldModel()
 			pos = pos + ang:Forward() * 10
 		end
 
-		
+		--print(pos)
 		WorldModel:SetRenderOrigin(pos)
 		WorldModel:SetRenderAngles(ang)
 	else

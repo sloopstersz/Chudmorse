@@ -238,7 +238,7 @@ function SWARM:Psych(ply,time)
 	
 	ply.SWARM_PsychEnd = CurTime()+time
 	--seq_cower
-	
+	--print(ply:LookupSequence("seq_cower"))
 	--ply:AddVCDSequenceToGestureSlot( GESTURE_SLOT_CUSTOM, ply:LookupSequence("seq_cower"), 0, true )
 	--ply:AnimSetGestureWeight( GESTURE_SLOT_CUSTOM, 1 )
 	--ply:DoCustomAnimEvent(PLAYERANIMEVENT_CUSTOM_GESTURE_SEQUENCE,ply:LookupSequence("seq_cower"))
@@ -390,12 +390,12 @@ hook.Add("StartCommand","Swarm",function(ply,cmd)
 		local bestmul = 1
 		
 		if(ply.SWARM_AfterKnockoutEnd)then
-			
+			--print(1/((ply.SWARM_AfterKnockoutEnd-CurTime())/ply.SWARM_AfterKnockoutTime))
 			local mul = math.min((1-((ply.SWARM_AfterKnockoutEnd-CurTime())/ply.SWARM_AfterKnockoutTime))*0.04,0.08)
 			bestmul = mul
 		end
 		if(ply.SWARM_PsychEnd)then
-			
+			--print(ply.SWARM_PsychEnd-CurTime())
 			bestmul = math.min(bestmul,(1-((ply.SWARM_PsychEnd-CurTime())/15))*0.5)
 		end
 		if(ply.SWARM_Bleed)then

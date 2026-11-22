@@ -167,7 +167,7 @@ else
 	net.Receive("send_huyhuy2", function(len)
 		local self = net.ReadEntity()
 		local twohands = net.ReadBool()
-		
+		--print(twohands)
 		self.HoldType = twohands and "ar2" or "revolver"
 		self.SprayRand = twohands and recoilAng1 or recoilAng2
 		self.AnimShootHandMul = twohands and 0.25 or 1

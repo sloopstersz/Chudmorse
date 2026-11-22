@@ -56,7 +56,7 @@ function module.TriggerRandomEvent(owner, eventName)
 end
 
 module[2] = function(owner, org, timeValue)
-    
+    --print("huy")
     if org.timeToRandom < CurTime() and owner:IsPlayer() and owner:Alive() then
 		if owner:GetPlayerClass() and owner:GetPlayerClass().CanEmitRNDSound ~= nil and not owner:GetPlayerClass().CanEmitRNDSound then
 			return

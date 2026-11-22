@@ -56,7 +56,7 @@ local IsValid, math_Clamp = IsValid, math.Clamp
 	local hg_no_camera_in_cars = CreateConVar("hg_no_camera_in_cars","0",FCVAR_ARCHIVE + FCVAR_REPLICATED, "disables camera in cars", 0, 1)
 	function DrawPlayerRagdoll(ent, ply) --// actually not only ragdoll render but player too
 		if ply.prevragdoll_index != nil and ply.prevragdoll_index != ply.ragdoll_index and ply.ragdoll_index == 0 then
-			
+			//print(ply.ragdoll_index, ply.prevragdoll_index, Entity(ply.ragdoll_index))
 
 			ply.gettingup = CurTime()
 			ply.OldRagdoll = Entity(ply.prevragdoll_index)
@@ -109,7 +109,7 @@ local IsValid, math_Clamp = IsValid, math.Clamp
 		--local current = ent:GetManipulateBoneScale(lkp)
 		local fountains = GetNetVar("fountains") or {}
 		local wawanted = (GetViewEntity() != ply) and !fountains[ent] and (!(!lply:Alive() and lply:GetNWEntity("spect") == ply and viewmode == 1) and !(hg_firstperson_death:GetBool() and follow == ent)) and vector_full or vector_small
-		
+		--print(ent, wawanted, GetViewEntity(), ply, (GetViewEntity() != ply), !fountains[ent], !(!lply:Alive() and lply:GetNWEntity("spect") == ply and viewmode == 1))
 		--if !current:IsEqualTol(wawanted, 0.01) then
 			--ent:ManipulateBoneScale(lkp, wawanted)
 			local mat = ent:GetBoneMatrix(lkp)

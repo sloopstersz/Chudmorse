@@ -210,12 +210,12 @@ end
 
 function plyMeta:PS_HasItem( uid )
     local pointshopVars = self:GetPointshopVars()
-    
+    --PrintTable(pointshopVars)
     if !pointshopVars then return false end
     return pointshopVars.items[ uid ] or false
 end
 
-
+--print(Player(2):PS_HasItem( "test_item_1" ))
 
 -- networking and other
 

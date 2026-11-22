@@ -66,6 +66,9 @@ SWEP.AmmoTypes2 = {
 		[2] = {".50 Action Express Copper Solid"},
 		[3] = {".50 Action Express JHP"}
 	},
+	[".500 S&W Magnum"] = {
+		[1] = {".500 S&W Magnum"}
+	},
 	["9mm PAK Blank"] = {
 		[1] = {"9mm PAK Blank"},
 		[2] = {"9mm PAK Flash Defense"},
@@ -307,7 +310,7 @@ local owner
 local CurTime = CurTime
 function SWEP:IsZoom()
 	local owner = self:GetOwner()
-	
+	--print( (owner.armors and (hg.armor.head[owner.armors["head"]] and not hg.armor.head[owner.armors["head"]].cantsight)))
 	return self:CanUse() and
 		(!hg_aimtoshoot:GetBool() or self:GetNWBool("aiming")) and
 		(self:GetButtstockAttack() - CurTime() < -1) and 
@@ -935,13 +938,13 @@ if CLIENT then
 
 			lerpAmmoCheck = LerpFT((ammoCheck > CurTime()) and 0.2 or 0.1, lerpAmmoCheck, ammoCheck > CurTime() and 1 or 0)
 			local Yellow = (( clipsize/clip )-1)/(clipsize/5)
-			
+			--print(Yellow)
 			color_bg.r = 55*Yellow
 			--draw.RoundedBox(0,scrW*0.75-(scrH*0.12/2),scrH*0.72,scrH*0.12,scrH*0.18,ColorAlpha(color_black,50))
 			color_bg.a = (250*lastShoot) * lerpAmmoCheck
 			WhiteColor.a = (150*lastShoot) * lerpAmmoCheck
 			local PosLerp = Lerp(math.ease.OutExpo(lerpAmmoCheck),150,0)
-			
+			--print(PosLerp)
 			if clip > 0 then
 				DrawBullet(texture,posX - (scrH*0.16)+(scrH*0.08)*(1+lastShoot) + 2 + PosLerp,scrH*(HudHPos) + 2,scrH*0.08, color_bg)
 				DrawBullet(texture,posX - (scrH*0.16)+(scrH*0.08)*(1+lastShoot) + PosLerp,scrH*(HudHPos),scrH*0.08, WhiteColor)
@@ -954,13 +957,13 @@ if CLIENT then
 			--	end
 			--else
 			--end
-			
-			
+			--print(clipsize)
+			--print(lastShoot)
 			for i = 2, clip do
 				if i > 6 and lastShootFor > 0.5 or i > 7 then continue end
 				i = i - 1
 				local PosAdjust = math.max(PosLerp - i*15,0)
-				
+				--print(PosAdjust)
 				if i < 2 then
 					DrawBullet(texture,posX + 2 + PosAdjust,scrH*((HudHPos) + i*(0.026*lastShoot))+2,scrH*0.08, color_bg)
 					DrawBullet(texture,posX + PosAdjust,scrH*((HudHPos) + i*(0.026*lastShoot)),scrH*0.08, WhiteColor)
@@ -1292,7 +1295,7 @@ function SWEP:CoreStep()
 	--	if SERVER and self.UseCustomWorldModel then self:WorldModel_Transform() end
 
 	if SERVER and not owner:IsNPC() and self != actwep and not hg.KeepWeaponInRagdoll(owner) then
-		--local inv = owner:GetNetVar("Inventory",{})
+		local inv = owner:GetNetVar("Inventory",{})
 
 		if not (inv["Weapons"] and inv["Weapons"]["hg_sling"] and not self:IsPistolHoldType()) then
 			//hg.drop(owner, self)
@@ -1301,8 +1304,21 @@ function SWEP:CoreStep()
 	end
 
 	if SERVER and not owner:IsNPC() and owner.organism and (not owner.organism.canmove or ((owner.organism.stun - CurTime()) > 0) or (owner.organism.larm == 1 and owner.organism.rarm == 1)) and IsValid(actwep) and self == actwep then
-        -- Keep inventory and the selected weapon while incapacitated.
-        -- The early return still prevents firing until control is recovered.
+		self:RemoveFake()
+		
+		if hg_slings:GetBool() and (zb.CROUND and zb.CROUND == "hmcd" or gamemod == "sandbox") then
+			local inv = owner:GetNetVar("Inventory",{})
+			if not (inv["Weapons"] and inv["Weapons"]["hg_sling"] and not self:IsPistolHoldType()) then
+				hg.drop(owner, self)
+				hook.Run("PlayerDropWeapon", owner)
+			else
+				hook.Run("PlayerDropWeapon", owner)
+                                local hands = hg.GetHandsWeapon and hg.GetHandsWeapon(owner) or owner:GetWeapon("weapon_hands_sh")
+                                if IsValid(hands) then
+                                        owner:SetActiveWeapon(hands)
+                                end
+			end
+		end
 
 		return
 	end
@@ -1340,7 +1356,7 @@ function SWEP:CoreStep()
                     if not contact then owner:LagCompensation(false) return end
                     tr = contact
                 end
-                local kickVictim = tr.Entity
+				local kickVictim = tr.Entity
 				if IsValid(kickVictim) and kickVictim.IsRagdoll and kickVictim:IsRagdoll() then
 					kickVictim = hg.RagdollOwner and hg.RagdollOwner(kickVictim)
 				end
@@ -1929,11 +1945,11 @@ function SWEP:GetAdditionalValues()
 		if self:CanSprintFire() then
 			walk = walk * self:GetSprintFireShake()
 		else
-			walk = walk * 2
-		end
+		walk = walk * 2
+	end
 	end
 
-	
+	--print(self:IsSprinting())
 	
 	local huy = self.huytime
 
@@ -2273,7 +2289,7 @@ function SWEP:SetHandPos(noset)
 			end--]]
 
 			//if name != "ValveBiped.Bip01_L_Hand" then continue end
-			
+			--print(name)
 			local wm_boneindex = bone1
 			if !wm_boneindex then continue end
 			local wm_bonematrix = mdl:GetBoneMatrix(wm_boneindex)
@@ -2421,7 +2437,7 @@ function SWEP:PlayAnim(anim, data, cycling, callback, reverse, sendtoclient)
         net.SendPVS(self:GetPos())
 		
 		self.callback = callback
-		
+		--print(self.callback)
 		timer.Create("AnimCallback"..self:EntIndex(), time or 0, 1, function()
 			if not self.callback then return end
 			self.callback(self)
@@ -2496,7 +2512,7 @@ if CLIENT then
 end
 
 hook.Add( "EntityEmitSound", "WeaponDropSound", function( t )
-	
+	--print(string.find(t.SoundName,"physics/metal/weapon_impact_*"))
 	if string.find(t.SoundName,"physics/metal/weapon_impact_*") then
 		t.SoundName = "weapon_impact_soft"..math_random(1,3)..".wav"
 		t.Pitch = t.Pitch - 10
@@ -2566,7 +2582,7 @@ function SWEP:CanRest()
     local trace = util.TraceLine(tr)
 	local pos, _ = LocalToWorld(-(self.BipodOffset or vector_origin), angle_zero, trace.HitPos, ang)
 	trace.HitPos = pos
-	
+	--print(pos + vec * 10)
     if trace.Hit and !trace.StartSolid then--and trace.HitPos[3] > (self:GetOwner():EyePos()[3] - 32)/*and trace.HitNormal:Dot(ang:Up()) > 0.9*/ then
         return true, trace
     end

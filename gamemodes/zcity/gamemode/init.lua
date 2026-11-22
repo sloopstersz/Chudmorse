@@ -243,7 +243,7 @@ AddCSLuaFile("homigrad/cl_camera.lua")
 util.AddNetworkString("ChudSpectatorStateV2")
 util.AddNetworkString("ChudSpectatorInputV2")
 util.AddNetworkString("ChudSpectatorReadyV2")
-
+	
 local function SpectatorTargets(observer)
     local targets = {}
     for _, target in player.Iterator() do
@@ -253,7 +253,7 @@ local function SpectatorTargets(observer)
     end
     table.sort(targets, function(a, b) return a:EntIndex() < b:EntIndex() end)
     return targets
-end
+	end
 
 local function UpdateSpectator(ply, key)
     if not IsValid(ply) or ply:Alive() then return end
@@ -283,7 +283,7 @@ local function UpdateSpectator(ply, key)
     ply.viewmode = mode
     ply:SetNWEntity("spect", target or NULL)
     ply:SetNWInt("viewmode", mode)
-
+		
 
     if target ~= ply.lastSpectTarget or mode ~= ply.ChudLastSpectMode or (ply.ChudSpectatorSyncAt or 0) <= CurTime() then
         net.Start("ChudSpectatorStateV2")
@@ -291,11 +291,11 @@ local function UpdateSpectator(ply, key)
         net.WriteUInt(IsValid(target) and target:EntIndex() or 0, 16)
         net.WriteUInt(IsValid(previous) and previous:EntIndex() or 0, 16)
         net.WriteUInt(mode, 2)
-        net.Send(ply)
+		net.Send(ply)
         ply.lastSpectTarget = target
         ply.ChudLastSpectMode = mode
         ply.ChudSpectatorSyncAt = CurTime() + 1
-    end
+	end
 
     -- The shared camera handles follow modes; the engine only handles free flight.
     if ply:GetObserverMode() ~= OBS_MODE_ROAMING then ply:Spectate(OBS_MODE_ROAMING) end
@@ -308,10 +308,10 @@ local function UpdateSpectator(ply, key)
             ply.netsendtime = CurTime() + 1
             hg.send_organism(target.organism, ply)
         end
-    end
-
+	end
+	
 end
-
+	
 local function SafeUpdateSpectator(ply, key)
     local ok, err = pcall(UpdateSpectator, ply, key)
     if not ok and (ply.ChudSpectatorErrorAt or 0) <= CurTime() then
@@ -346,7 +346,7 @@ hook.Add("SetupPlayerVisibility", "spectPVS", function(ply)
         AddOriginToPVS(target:EyePos())
         local character = hg.GetCurrentCharacter(target)
         if IsValid(character) then AddOriginToPVS(character:GetPos()) end
-    end
+	end
 end)
 
 -- PlayerDeathThink hooks may return false to prevent respawning. Do not depend on
@@ -367,7 +367,7 @@ timer.Create("ChudSharedSpectatorUpdate", 0.05, 0, function()
             ply:UnSpectate()
             if ply:GetMoveType() == MOVETYPE_NONE then ply:SetMoveType(MOVETYPE_WALK) end
         end
-    end
+	end
 end)
 
 net.Receive("ZB_ChooseSpecPly", function(len, ply)
@@ -419,7 +419,7 @@ end
 
 util.AddNetworkString("ZB_SpecMode")
 net.Receive("ZB_SpecMode",function(len,ply)
-    local bool = net.ReadBool()
+	local bool = net.ReadBool()
     if CurrentRound() and CurrentRound().name == "vip" then
         if bool and ply:Team() ~= TEAM_SPECTATOR then
             if ply:Alive() then ply:Kill() end
@@ -497,7 +497,7 @@ hook.Add("PostCleanupMap","changelevel_generate",function()
     for ent, pos in pairs(maps) do
 		if ent.map == game.GetMap() then continue end
         local dist2 = pos:Distance(player_pos)
-        
+        --print(dist,dist2,ent.map,pos,player_pos)
         if dist2 > dist then
             dist = dist2
             map = ent

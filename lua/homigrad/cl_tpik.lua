@@ -633,7 +633,7 @@ function hg.MainTPIKFunction(ent, ply, wpn)
     
     //local systime = SysTime()
     local should = hg.ShouldTPIK(ply)
-    
+    //print("shouldtpik func: ", SysTime() - systime)
 
     if should then
         if ent != ply then
@@ -645,15 +645,15 @@ function hg.MainTPIKFunction(ent, ply, wpn)
             wpn:SetHandPos()
         end
 
-        
+        //print("sethandpos: ", SysTime() - systime)
         
         if ply:InVehicle() then
-            
+            --print(ply:IsDrivingSimfphys())
             local Car = ply.IsDrivingSimfphys and ply.GetSimfphys and ply:IsDrivingSimfphys() and IsValid(ply:GetSimfphys()) and ply:GetSimfphys() or (ply.GlideGetVehicle and IsValid(ply:GlideGetVehicle()) and ply:GlideGetSeatIndex() == 1 and ply:GlideGetVehicle() ) or ply:GetVehicle()
             if(IsValid(Car))then
                 Car:SetupBones()
                 local bone,adjust = hg.GetCarSteering(Car)
-                
+                --print(adjust)
                 
                 if bone and Car:GetBoneMatrix(bone) and wpn and not wpn.reload then
                     local pos, ang = Car:GetBoneMatrix(bone):GetTranslation(), Car:GetBoneMatrix(bone):GetAngles()
@@ -678,7 +678,7 @@ function hg.MainTPIKFunction(ent, ply, wpn)
 
         //local systime = SysTime()
         hg.FlashlightPos(ply)
-        
+        //print("FlashlightPos: ", SysTime() - systime)
 
         //local systime = SysTime()
         if IsValid(wpn) and (wpn:GetClass() ~= "weapon_hands_sh") and IsValid(ply:GetNetVar("carryent2")) then
@@ -691,7 +691,7 @@ function hg.MainTPIKFunction(ent, ply, wpn)
 			hg.DragHandsToPos(ply, ply:GetActiveWeapon(), pos + ang:Right() * 7 - ang:Forward() * 5, true, 5.5, ang:Right(), ang_head1, ang_head2)
 		end
         
-        
+        //print("DragHands: ", SysTime() - systime)
         hg.DoZManip(ent, ply)
         if hg.ShieldFistsContact then hg.ShieldFistsContact(ent, wpn) end
         -- The active weapon keeps the right hand; the shield owns the left grip.
@@ -699,7 +699,7 @@ function hg.MainTPIKFunction(ent, ply, wpn)
         //local systime = SysTime()
         hg.DoTPIK(ply, ent)
         --hg._DeprecatedDoTPIK(ply, ent)
-        
+        //print("DoTPIK: ", SysTime() - systime)
     end
 
     if ent ~= ply and ent.organism and ent.organism.stamina and ent.organism.stamina[1] then

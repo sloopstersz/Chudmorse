@@ -109,7 +109,7 @@ function ENT:OnTakeDamage( dmginfo )	--Taking damage...
 		self:Remove()
 	end
 	if((dude:IsNPC() and (dude:Disposition(self)==D_HT or dude:Disposition(self)==D_FR)) or (dude:IsPlayer() and !ignoreplayers:GetBool()))then
-		
+		--print("TRIGGERED BY",dude)
 		self:SetEnemy( dude, true )
 		self:UpdateEnemyMemory( dude, dude:GetPos() )
 		self.RunAway = nil
@@ -121,7 +121,7 @@ end
 local angleZero = Angle(0,0,0)
 function ENT:TraceCircle(pos,traceamt,tracerange,filter,ang,arc)
 	local found = {}
-	
+	--print(ang)
 	ang = ang or angleZero
 	ang[2] = ang[2] - arc/2
 	arc = arc or 360
@@ -134,7 +134,7 @@ function ENT:TraceCircle(pos,traceamt,tracerange,filter,ang,arc)
 			endpos = pos + Vector(math.cos(math.rad(ang[2]+i*space))*rng, math.sin(math.rad(ang[2]+i*space))*rng, high),
 			filter = filter,
 		})
-		
+		--print(rng,high)
 		--if(arc==1 and i == 1)then
 		--Entity(1):SetPos(pos + Vector(math.cos(math.rad(ang[2]+i*space))*rng, math.sin(math.rad(ang[2]+i*space))*rng, high))
 		--	self:Shoot( Vector(math.cos(math.rad(ang[2]+i*space))*rng, math.sin(math.rad(ang[2]+i*space))*rng, high)*10 )
@@ -175,7 +175,7 @@ function ENT:Psych( )--Heavy on performance. Rethink
 	end
 	
 	local found = self:TraceCircle(self:GetPos()+vector_up*self.SearchHeight,90,SWARM_CV_Thumper_PsychRange:GetInt(),{self},angle,45)
-	
+	--print(self:GetAngles())
 	--ents.FindInSphere(self:GetPos(),SWARM_CV_Thumper_PsychRange:GetInt())
 	
 	for p,distance in pairs(found)do
@@ -195,14 +195,14 @@ function ENT:Psych( )--Heavy on performance. Rethink
 			dmg:SetAttacker(self)
 			dmg:SetInflictor(self)
 			p:TakeDamageInfo(dmg)
-			
+			--print((IsValid(lastenem) and math.Round( distance/SWARM_CV_Thumper_PsychRange:GetInt()*15 )) or (1))
 			local calc = distance/SWARM_CV_Thumper_PsychRange:GetInt()
 			if(SWARM_CV_Thumper_PsychInvert:GetBool())then
 				calc = math.min(1-calc+0.1,1)
 			else
 				--calc = calc*15
 			end
-			
+			--print(calc)
 			SWARM:Psych(p,(IsValid(lastenem) and math.Round( calc*15 )) or (1))
 			--[[
 			p.Stamina=p.Stamina or 100
@@ -238,7 +238,7 @@ function ENT:Classify(  )
 end
 
 --function ENT:StartEngineSchedule(sched)
-
+--	print(sched,self:GetEnemy())
 	
 --end
 
@@ -246,8 +246,8 @@ function ENT:TaskStart_FindEnemy( data )
 	if(data==nil)then data = {} end
 
 	local lastenem = self:GetEnemy()
-	
-	
+	--print(lastenem)
+	--PrintTable(self:GetKnownEnemies())
 	--self:SetNPCState(NPC_STATE_IDLE)
 
 	self:EmitSound("npc/stalker/stalker_alert"..math.random(1,3).."b.wav",65)
@@ -256,13 +256,13 @@ function ENT:TaskStart_FindEnemy( data )
 		--local et = ents.FindInSphere( self:GetPos(), data.Radius or 1024 )
 		local et = self:TraceCircle(self:GetPos()+vector_up*self.SearchHeight,360,SWARM_CV_Thumper_DetectRange:GetInt(),{self},self:GetAngles(),360)
 		table.Merge(et,self:TraceCircle(self:GetPos()+vector_up*self.SmallerSearchHeight,360,SWARM_CV_Thumper_DetectRange:GetInt()/3,{self},self:GetAngles(),360))
-		
+		--PrintTable(et)
 		local bestdistance = math.huge
 		local bestenemy = nil
 		for v, _ in pairs( et ) do
 			if ( v:IsValid() && v != self && (self:Disposition(v)==D_HT or self:Disposition(v)==D_FR) and (!v.Alive or v:Alive()) and self:IsEntityPossibleEnemy(v) ) then
 				local dist = v:GetPos():DistToSqr(self:GetPos())
-				
+				--print((!v:IsPlayer() or !ignoreplayers:GetBool()))
 				if(bestdistance>dist and (!v:IsPlayer() or !ignoreplayers:GetBool()))then
 					bestenemy=v
 					bestdistance=dist
@@ -288,7 +288,7 @@ function ENT:TaskStart_FindEnemy( data )
 
 	self:SetEnemy( NULL )
 	self:ClearEnemyMemory( )
-	
+	--print("NULLING")
 end
 
 function ENT:ValidateEnemyData( )
@@ -380,7 +380,7 @@ end
 
 function ENT:OnCondition( iCondition )
 
-	
+	--Msg( self, " Condition: ", iCondition, " - ", self:ConditionName(iCondition), "\n" )
 
 end
 
@@ -401,13 +401,13 @@ end
 
 function ENT:Think()
 	--if(SERVER and self:GetNPCState() != NPC_STATE_NONE)then
-	
+	--	print(self:GetNPCState())
 	--end
 	if(SERVER)then
 		--self:SetMoveVelocity(self:GetMoveVelocity()*2)
 		--self:SetVelocity(self:GetMoveVelocity()*2)
 		--self:SetMoveInterval(0)
-		
+		--print(self:GetIdealMoveSpeed())
 		self:SetNPCState(NPC_STATE_NONE) -- Hack to make it blind
 		if(SWARM_CV_AllowSpeed:GetBool())then
 			self:SetVelocity(self:GetMoveVelocity()*(self:GetSpeedMul(2)-1))
@@ -458,7 +458,7 @@ function ENT:Think()
 				local time = SWARM_CV_Thumper_KOTime:GetFloat()
 				if(SWARM_CV_Thumper_ScaleKOTime:GetBool())then
 					time = math.max((1-math.min(self.AttackEnemy:Health()/self.AttackEnemy:GetMaxHealth(),1))*SWARM_CV_Thumper_KOScaleTime:GetFloat(),0.2)
-					
+					--print(time)
 				end
 				SWARM:Knockout(self.AttackEnemy,math.Round(time,2),SWARM_CV_Thumper_AKOTime:GetFloat())
 			end
@@ -478,7 +478,7 @@ end
 
 function ENT:RunAI( strExp )
 --self:SetIdealActivity(ACT_IDLE_AIM_RIFLE_STIMULATED)
-	
+	--print(4)
 	if(SWARM_CV_Thumper_AllowMelee:GetBool())then
 		local lastenem = self:GetEnemy()
 		if( IsValid(lastenem) and (!lastenem.Alive or lastenem:Alive()) )then
@@ -549,7 +549,7 @@ function ENT:RunAI( strExp )
 	if ( !self.CurrentSchedule ) then
 		self:SelectSchedule()
 	end
-	
+	--print(self:GetIdealActivity())
 	self:MaintainActivity()
 	
 end

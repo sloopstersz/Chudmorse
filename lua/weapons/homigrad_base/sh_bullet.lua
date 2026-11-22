@@ -154,7 +154,7 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 	local MaxRicAngle = 60 * hardness * (bullet.noricochet and 0 or 1)
 	
 	-- all the way through
-	
+	--print(ApproachAngle > MaxRicAngle * 0.7  )
 	if ApproachAngle > MaxRicAngle * 1 or tr.Entity:IsVehicle() then
 		local Pen = (bullet.Penetration or 5) * 3 or dmg
 		local MaxDist, SearchPos, SearchDist, Penetrated = math.min(Pen / hardness * 0.4, 100), hitPos, 5, false
@@ -390,7 +390,7 @@ local ang = math.cos( math.rad( 125 ) )
 local function gasInertia(pos, force, dir, self, tr)
 	--if force >= 150 then return end
 	for _, ent in ipairs(ents_FindInCone(pos, dir, force, ang)) do
-		
+		--print(ent)
 		if IsValid(ent) and not ent:IsNPC() and not ent:IsPlayer() then
 			local phys = ent:GetPhysicsObject()
 
@@ -708,7 +708,7 @@ function SWEP:FireBullet()
 	local trace
 	local dir = ang:Forward()
 	if isply then
-		
+		//print(gun:GetAngles(), dir, owner.offsetView)
 		local dist, point = util.DistanceToLine(pos, pos - dir * 50, owner:EyePos())
 		local tr = {}
 		tr.start = point

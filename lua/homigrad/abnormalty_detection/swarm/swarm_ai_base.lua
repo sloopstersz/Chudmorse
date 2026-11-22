@@ -55,7 +55,7 @@ ENT.GenesAddTable = {
 		["E"]=-0.4,
 		["I"]=function(self,amt)
 			local chance = self:GetGene("C")*12 + self:GetGene("I")*20
-			
+			--print(chance)
 			if(chance<20)then
 				return 0
 			end
@@ -270,7 +270,7 @@ ENT.DefenceGeneMuls = {
 }
 --TODO bit.band
 function ENT:GetDefenceMul( dmgtype,max,div )
-	
+	--print(dmgtype)
 	div = div or 1.5
 	local def = 0
 	for ddmg,info in pairs(self.DefenceGeneMuls)do

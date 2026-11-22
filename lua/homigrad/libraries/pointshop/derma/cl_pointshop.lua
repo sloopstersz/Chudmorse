@@ -52,7 +52,7 @@ local function createButton(k,ent,size,Pan,mainpan)
     --but:SetText( k )
     but:SetSize( size, size * 0.8 )
     but:SetModel( ent.MDL )
-    
+    --PrintTable(ent)
     but:SetFOV(ent.FOV or 15)
     but:SetLookAt( ent.VPos or Vector(0,0,0) )
     timer.Simple(0.1,function()
@@ -196,7 +196,7 @@ function PANEL:Init()
         lbl:SetWide(lbl:GetWide()*1.2)
         --lbl:SetMouseInputEnabled( true ) -- We must accept mouse input
         function lbl:DoClick() -- Defines what should happen when the label is clicked
-            
+            --print("I was clicked!")
             --self:Remove()
             AltDonate()
             --RunConsoleCommand("say","/donate")
@@ -348,7 +348,7 @@ function PANEL:Update( data )
 
     self.moneyTxt:SetText(self.Itensens.points.." | ZP")
     --self.DmoneyTxt:SetText(self.Itensens.donpoints.." | DZP")
-    
+    --PrintTable(data)
 end
 
 function PANEL:Paint(w,h)

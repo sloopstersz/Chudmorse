@@ -183,7 +183,7 @@ function ENT:OnTakeDamage( dmginfo )	--Taking damage...
 		self:Remove()
 	end
 	if((dude:IsNPC() and (dude:Disposition(self)==D_HT or dude:Disposition(self)==D_FR)) or (dude:IsPlayer() and !ignoreplayers:GetBool()))then
-		
+		--print("TRIGGERED BY",dude)
 		self:SetEnemy( dude, true )
 		self:UpdateEnemyMemory( dude, dude:GetPos() )
 		for npc,time in pairs(self.CreatedNpcs)do
@@ -416,7 +416,7 @@ function ENT:SelectSchedule( iNPCState )
 	else
 		if(self.NpcOrderTime)then
 			self:SetIdealActivity(self:GetSequenceActivity(self:LookupSequence(self.Anim)))
-			
+			--print(4)
 		else
 			self:SetSchedule( SCHED_SLEEP )
 		end
@@ -427,7 +427,7 @@ end
 
 function ENT:OnCondition( iCondition )
 
-	
+	--Msg( self, " Condition: ", iCondition, " - ", self:ConditionName(iCondition), "\n" )
 
 end
 
@@ -473,7 +473,7 @@ function ENT:RunAI( strExp )
 		PrintTable(tbl)
 		self:NpcOrder(SWARM:WeightedRandomSelect(tbl),0.2)
 	end
-	
+	--print(self.Points)
 	if(self.NextEnemyFind<=CurTime())then	
 		self.NextEnemyFind=CurTime()+self.EnemyFindCD
 		self:TaskStart_BringNpcs()

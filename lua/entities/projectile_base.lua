@@ -302,7 +302,7 @@ elseif CLIENT then
 		if SERVER then return end
 		local view = render.GetViewSetup(true)
 		local time = pos:Distance(view.origin) / 17836
-		
+		--print(time)
 		timer.Simple(time, function()
 			local owner = Entity(0)
 			if not isOnWater then
@@ -321,7 +321,7 @@ elseif CLIENT then
 		local self = net.ReadEntity()
 		local onWater = net.ReadBool()
 		local watersnd = net.ReadString() or ""
-		
+		--print("huy")
 		PlaySndDist(sndfar,snd,pos,onWater,watersnd)
 	end)
 end

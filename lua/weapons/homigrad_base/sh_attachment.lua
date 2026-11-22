@@ -207,7 +207,7 @@ function SWEP:DrawAttachments()
 				if submat ~= (mat or "null") then gun:SetSubMaterial(index, mat or "null") end
 			end
 		end
-		
+		--print(att[1])
 		if not self:HasAttachment(plc,att[1]) then continue end
 
 		local model = self.modelAtt[plc]

@@ -466,6 +466,7 @@ end)
 --util.AddNetworkString("tracePosesSend")
 --util.AddNetworkString("wound_debug")
 util.AddNetworkString("hg_bloodimpact")
+util.AddNetworkString("hg_skullfracture")
 --util.AddNetworkString("blood particle explode")
 util.AddNetworkString("bloodsquirt")
 
@@ -755,8 +756,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	dir:Set(dmgInfo:GetDamageForce())
 	dir:Normalize()
 	dir:Mul(pen)
-	
-	
+	--print(bullet.Penetration, pen, bullet ~= nil)
+	--print(dmgInfo:GetDamageType() == DMG_BULLET)
 
 	ent.armors = ent.armors or {}
 	
@@ -937,7 +938,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		hitgroup = org.lastGibHitGroup
 		bonename = hitgroup == HITGROUP_STOMACH and "ValveBiped.Bip01_Pelvis" or bonename
 	end
-	
+	--print(dmg_before, 1)
 	--if ent:IsRagdoll() then
 		if RagdollForceBoneMul[hitgroup] then len = len * RagdollForceBoneMul[hitgroup] end
 		if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and RagdollDamageBoneMul[hitgroup] then
@@ -967,7 +968,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		end)
 	end
 
-	
+	--print(dmg_before, 2)
 	local dmgBlood, dmgHurt, instaPain, immobilization = hg.organism.DamageTypeAffliction(dmg_before / 12, dmgInfo, ent, org)
 	
 	local hitbody = #inputHole > 0 or not dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT)
@@ -1073,7 +1074,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST + DMG_SLASH + DMG_CLUB + DMG_GENERIC) then
 		local force = dirCool * len
-		
+		--print("HIT")
 		if ply then
 			--if ply.lastFake then ply.lastFake = ply.lastFake - len end
 			ply.HitBones = ply.HitBones or {}
@@ -1123,7 +1124,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	if hitgroup == HITGROUP_HEAD and dmgInfo:IsDamageType(DMG_SLASH) then damageStack = damageStack * 25 end
 	local inflictorClass = IsValid(dmgInfo:GetInflictor()) and dmgInfo:GetInflictor():GetClass() or ""
 	local grenadeBlastMul = string.find(inflictorClass, "ent_hg_grenade") and 1.8 or 1
-	
+	--print(damageStack, 3)
 	damageStack = damageStack * (dmgInfo:IsDamageType(DMG_BLAST) and blast_gib_damage_mul / lend * grenadeBlastMul or 1) * (!dmgInfo:IsDamageType(DMG_CLUB+DMG_SLASH+DMG_BULLET+DMG_BUCKSHOT+DMG_BLAST+DMG_SNIPER) and 0 or 1) * (ent:IsNPC() and 3 or 1)
 	--damageStack = damageStack * (bullet and bullet.AmmoType and hg.ammotypeshuy[bullet.AmmoType] and hg.ammotypeshuy[bullet.AmmoType].BulletSettings and hg.ammotypeshuy[bullet.AmmoType].BulletSettings.Mass or 1) / 8
 	if hg.FullBodyExplode and !org.fullbodyexploded and dmgInfo:IsDamageType(DMG_BLAST) and hg.CanFullBodyGib and hg.CanFullBodyGib(ent, org, ply) and (damageStack >= full_body_blast_gib_threshold or dmg_before >= full_body_blast_damage_threshold) then
@@ -1166,7 +1167,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	end
 	if dmgInfo:IsDamageType(DMG_BLAST) and hitgrouptolimb[hitgroup] then hitgroup_max = player_blast_limb_gib_threshold end
 	local instant = bodyPartMaxHealth and gibStack >= hitgroup_max or gibStack > hitgroup_max
-	
+	--print(damageStack, org.dmgstack[hitgroup][1], org.dmgstack[hitgroup][3])
 	local blast = dmgInfo:IsDamageType(DMG_BLAST)
 	local slash = dmgInfo:IsDamageType(DMG_SLASH)
 	if not noHeadGib and instant and blast and hitgroup == HITGROUP_HEAD and !ent.headexploded then
@@ -1587,7 +1588,7 @@ local function velocityDamage(ent, data)
 	data.HitEntity.lasttouched = data.HitEntity.lasttouched or {}
 	data.HitEntity.lasttouched[ent] = CurTime()
 
-	
+	--print(data.HitObject:GetEntity():IsWorld())
 	local dmg = speed / 5350 * data.DeltaTime * ((IsValid(data.HitObject) && !data.HitObject:GetEntity():IsWorld()) && math.min(data.HitObject:GetMass() / 20, 1) || 1)
 	dmg = dmg * math.abs(data.OurOldVelocity:GetNormalized():Dot(data.HitNormal))
 	if !data.HitObject:GetEntity():IsWorld() && !data.HitObject:GetEntity():IsRagdoll() then
@@ -1676,12 +1677,12 @@ local function velocityDamage(ent, data)
 		if hitgroup == HITGROUP_CHEST and physAng:Forward():Dot(data.HitNormal) > 0.6 then hg.organism.input_list.spine2(org, bone, dmg * (math.random(3) > 1 and 1 or 0) * 3, dmgInfo) end
 
 
-		
+		--print(dmg * 3, dmg * 80)
 		if surfaceType and surfaceType ~= nil and bleedSurfaces[surfaceType] and (dmg * 3 > 0.17) and math.random(2) == 2 then
 			hg.organism.AddWoundManual(ent,dmg*5,vector_origin,angle_zero,bone,CurTime() + (dmg * 250))
-			
+			--PrintTable(org.wounds)
 		end
-		
+		--print(dmg)
 		if dmg > 0.2 then
 			org.internalBleed = org.internalBleed + (dmg * 2.5) 
 		end
@@ -1914,7 +1915,7 @@ hook.Add("Player Getup", "huyhhgss", function(ply)
 				hook.Run("ZC_SomeoneGetFallBy",attacker,ply)
 				--attacker.Guilt = attacker.Guilt or 0
 				--attacker.Guilt = attacker.Guilt < 4 and 5 or attacker.Guilt 
-				
+				--print(attacker.Guilt)
 			end
 			timer.Simple(0, function()
 				hg.LightStunPlayer(ply,math.min(force / needed,4)) 

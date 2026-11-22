@@ -189,7 +189,7 @@ if CLIENT then
             if self.HideMeshBones then
                 for k,v in ipairs(self.HideMeshBones) do
                     if not WorldModel:LookupBone(v) then continue end
-                    
+                    --print(v)
                     --WorldModel:ManipulateBoneScale(WorldModel:LookupBone(v),vecPochtiZero)
                     local matrix = WorldModel:GetBoneMatrix(WorldModel:LookupBone(v))
                     if self.HideMeshOnlyScale and self.HideMeshOnlyScale[v] then
@@ -225,7 +225,7 @@ if CLIENT then
             self.worldModel2:SetRenderOrigin(pos)
             self.worldModel2:SetRenderAngles(ang)
             self.worldModel2:SetupBones()
-            
+            --print(self.worldModel:GetManipulateBoneScale(self.basebone or 1))
             if self.worldModel:GetManipulateBoneScale(self.basebone or 1) != vector_origin then
                 self.worldModel2:DrawModel()
             end

@@ -179,7 +179,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local up, right, forward = aimvec:Up(), aimvec:Right(), aimvec:Forward()
 	
 	local cocking = (self:GetNetVar("shootgunReload", 0) > CurTime()) or self.reload
-	
+	--print(self:GetNetVar("shootgunReload", 0))
 	local posZoom, angPos = self:GetZoomPos(recoilZoomPos, view, eyePos)
 	
 	local inpain = ply.organism and ply.organism.pain and ply.organism.pain > 50
@@ -188,7 +188,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	painmul = painmul * 2
 	--local noZoomHelmet = (ply.armors and (not ply.armors["head"] or not hg.armor.head[ply.armors["head"]] or not hg.armor.head[ply.armors["head"]].cantsight or self:IsPistolHoldType()))
 	local zooming = self:IsZoom() --and noZoomHelmet
-	
+	--print(zooming)
 	local justzoomed = zooming and !oldzoom
 	lastzoom = (justzoomed or (cocking or self.shot2 == 1)) and CurTime() or lastzoom
 
@@ -221,7 +221,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		view.angles:RotateAroundAxis(view.angles:Up(), self.GunCamAng and self.GunCamAng[2] or -80)
 		view.angles:RotateAroundAxis(view.angles:Forward(), self.GunCamAng and self.GunCamAng[3] or 0 )
 		local fraction = self:GetAnimPos_Shoot2(self.lastShoot or 0, 0.01 * (math.max((self.weight or 1) - 1,0.1) * 5 + 1))
-		
+		--print(CurTime() - self.lastShoot )
 		view.origin = view.origin + VectorRand(-fraction,fraction) * fraction/12
 		view.angles = view.angles + AngleRand(-fraction,fraction) * fraction
 		return view 

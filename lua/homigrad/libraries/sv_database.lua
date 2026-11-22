@@ -35,7 +35,7 @@ end)
 --zb.db.Connect()
 
 hook.Add("DatabaseConnected", "DB_Think", function()
-    
+    --print("asd")
 	timer.Create("zbDatabaseThink", 0.5, 0, function()
 		mysql:Think()
 	end)

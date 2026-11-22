@@ -24,7 +24,7 @@ if (CLIENT) then
         zb.net[index] = zb.net[index] or {}
         zb.net[index][key] = var
 
-		
+		-- print(index, key)
 		
 		if IsValid(Entity(index)) then
 			hook.Run("OnNetVarSet", index, key, var)

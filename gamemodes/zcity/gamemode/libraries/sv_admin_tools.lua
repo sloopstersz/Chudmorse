@@ -265,12 +265,21 @@ local function SendAdminStats(ply)
             end
         end
 
-        table.sort(rows, function(a, b)
-            if a.active ~= b.active then return a.active end
-            return a.name:lower() < b.name:lower()
-        end)
+        local function sortAndSend(list)
+            if not IsValid(ply) then return end
+            table.sort(list, function(a, b)
+                if a.active ~= b.active then return a.active end
+                return a.name:lower() < b.name:lower()
+            end)
+            SendAdminStatsRows(ply, list)
+        end
 
-        SendAdminStatsRows(ply, rows)
+        -- show the shared (both servers) EXP / achievements, especially for offline players
+        if ChudShared and ChudShared.OverlayAdminRows then
+            ChudShared.OverlayAdminRows(rows, sortAndSend)
+        else
+            sortAndSend(rows)
+        end
     end)
 end
 
@@ -304,6 +313,25 @@ net.Receive("ZB_AdminStatsSave", function(len, ply)
     }
     local karma = AdminStatsNumber(data.karma, currentGuilt.value or 100)
     local headshots = AdminStatsNumber(data.headshots, IsValid(target) and target:GetPData("Headshots", 0) or 0, true, 0)
+
+    -- shared DB: write only what the admin changed (compared with what the editor showed)
+    if ChudShared and ChudShared.AdminSetStats then
+        local shown = ChudShared.AdminRowCache and ChudShared.AdminRowCache[steamID64]
+        local before = shown or table.Copy(currentExp)
+        local achBefore = shown and shown.achievements or {}
+        if not shown and hg and hg.achievements and hg.achievements.achievements_data then
+            for key, v in pairs(hg.achievements.achievements_data.player_achievements[steamID64] or {}) do
+                achBefore[key] = tonumber(istable(v) and v.value or v) or 0
+            end
+        end
+        local achAfter = {}
+        for key, value in pairs(istable(data.achievements) and data.achievements or {}) do
+            achAfter[key] = AdminStatsNumber(value, 0)
+        end
+        if headshots ~= tonumber(shown and shown.headshots) then achAfter.gollavo = headshots end
+        ChudShared.AdminSetStats(steamID64, name, before, exp, achBefore, achAfter)
+        if ChudShared.AdminRowCache then ChudShared.AdminRowCache[steamID64] = nil end
+    end
 
     if zb.Experience and zb.Experience.PlayerInstances then
         zb.Experience.PlayerInstances[steamID64] = table.Copy(exp)

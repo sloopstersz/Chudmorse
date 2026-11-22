@@ -75,18 +75,6 @@ function ENT:TakeItem( ply, itemID ) --| Хватай бесплатно
     local item = self.Loot[itemID]
     local spawnFunctions = ZBox.LootSystem.spawnFunctions or {}
     if item then
-        if ChudSkins and ChudSkins.CrateFakeouts and ChudSkins.CrateFakeouts[item.class] then
-            self.Loot[itemID] = nil
-            return
-        end
-
-        if item.class == "ent_chud_coin_jackpot" then
-            if ChudSkins and ChudSkins.StartJackpot and ChudSkins.StartJackpot(ply) then
-                self.Loot[itemID] = nil
-            end
-            return
-        end
-
         loottypes[ "entity" ]( self, ply, item.class, spawnFunctions[ item.class ], item.entData )
         self.Loot[itemID] = nil
         item = nil
@@ -144,23 +132,6 @@ end)
 local SendLootTable = ZBox.LootSystem.SendLootTable
 
 function ENT:OpenContainer( ply ) --| Открываем контейнер игроку.
-    if not self.JackpotRollComplete then
-        self.JackpotRollComplete = true
-        local fakeouts = ChudSkins and ChudSkins.CrateFakeouts
-        if fakeouts then
-            for class, fakeout in pairs(fakeouts) do
-                if math.random(1, ChudSkins.GetCrateFakeoutChance(fakeout)) == 1 then
-                    self.Loot[#self.Loot + 1] = {class = class}
-                end
-            end
-        end
-
-        local jackpotChance = GetConVar("chud_coin_jackpot_chance")
-        if math.random(1, jackpotChance and jackpotChance:GetInt() or 1000000) == 1 then
-            self.Loot[#self.Loot + 1] = {class = "ent_chud_coin_jackpot"}
-        end
-    end
-
     local OptimizedTable = {} --| Создаем пустую таблицу для отправки клиенту.
     for k, data in pairs( self.Loot ) do --| Запись в таблицу.
         OptimizedTable[ k ] = { class = data.class }

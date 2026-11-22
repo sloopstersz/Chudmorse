@@ -99,3 +99,4 @@ if CLIENT then
     
 end
 
+--PrintTable(zb.GetAllPoints())

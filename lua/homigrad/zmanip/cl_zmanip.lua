@@ -201,7 +201,7 @@ function hg.DoZManip(ent, ply)
 	local ang = ply:EyeAngles()
 
 	local ml = time * 1
-	
+	--print(ml)
 	local pos = tr.StartPos + ang:Forward() * (1 - 6 - ml / 1.5) + ang:Right() * (-1 + ml / 2)
 
 	-- position adjust

@@ -265,8 +265,8 @@ SWEP.GunCamAng = Angle(190,-5,-95)
 SWEP.FakeEjectBrassATT = "4"
 
 function SWEP:Reload(time)
-	
-	
+	--PrintTable(self:GetWM():GetAttachments())
+	--print(self:GetNetVar("shootgunReload",0))
 	local ply = self:GetOwner()
 	--if ply.organism and (ply.organism.larmamputated or ply.organism.rarmamputated) then return end
 	if self.AnimStart_Draw > CurTime() - 0.5 then return end

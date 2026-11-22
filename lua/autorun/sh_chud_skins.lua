@@ -5,16 +5,6 @@ if SERVER then AddCSLuaFile() end
 
 ChudSkins = ChudSkins or {}
 
-ChudSkins.CrateFakeouts = {
-    chud_fakeout_didi_camel = {name = "Didi Camel", chance = 45000, convar = "chud_fakeout_didi_camel_chance", icon = "chud/didicamel.png"},
-    chud_fakeout_pirate_token = {name = "Pirate Shop Token", chance = 35000, convar = "chud_fakeout_pirate_token_chance", icon = "chud/fort.png", highlight = "gold"},
-    chud_fakeout_chuddy = {name = "Chuddy", chance = 25000, convar = "chud_fakeout_chuddy_chance", icon = "chud/chuddy.png"},
-    chud_fakeout_poop = {name = "Poop", chance = 500, convar = "chud_fakeout_poop_chance", highlight = "brown"},
-    chud_fakeout_jerry = {name = "Jerry", chance = 100, convar = "chud_fakeout_jerry_chance", icon = "chud/jerry.png"},
-    chud_fakeout_skelle = {name = "Skelle", chance = 300, convar = "chud_fakeout_skelle_chance", icon = "chud/skelle.png"},
-    chud_fakeout_car = {name = "Car", chance = 400, convar = "chud_fakeout_car_chance", icon =  "chud/car.png"},
-}
-
 local P22_BODY = "models/zcity/skins/walther_p22/classic/walther2"
 local P22_PARTS = "models/zcity/skins/walther_p22/classic/walther1"
 
@@ -26,7 +16,8 @@ ChudSkins.Weapons = {
     weapon_hk_usp = {name = "HK USP", base = {}},
     weapon_combatknife = {name = "M7 BAYONET", base = {}},
     weapon_sogknife = {name = "SOG SEAL 2000", base = {}},
-    weapon_tungsten = {name = "TUNGSTEN CUBE", base = {}},
+    -- model: what the shop preview shows (the held model is a knife rig the cube rides on).
+    weapon_tungsten = {name = "TUNGSTEN CUBE", base = {}, model = "models/linnaeus/tungsten_cube.mdl"},
 }
 
 -- order: position in the shop list. sub: material slot -> texture swapped into
@@ -86,6 +77,11 @@ ChudSkins.Items = {
             ["models/weapons/sogknife/sog"] = "chudmorse/skins/didi/sog_dropped_didi",
         },
     },
+    -- Held, dropped and thrown cubes all use the same model and material.
+    tungsten_didi_camel = {
+        order = 9, name = "DIDI CAMEL CUBE", accent = Color(215, 215, 205), weapon = "weapon_tungsten", price = 5000, category = "MELEE SKINS",
+        replace = {["models/linnaeus/tungsten/tungstencube"] = "chudmorse/skins/didi/tungsten_didi"},
+    },
 }
 -- class -> equip slot (the item's main weapon), for every class a skin can go on.
 ChudSkins.ClassSlot = {}
@@ -144,215 +140,6 @@ net.Receive("ChudSkins.Sync", function()
     local message = net.ReadString()
     if message ~= "" then chat.AddText(Color(220, 220, 220), "[SHOP] ", color_white, message) end
     hook.Run("ChudSkinsUpdated", mine)
-end)
-
-local jackpotNotice
-local jackpotFontCache = {}
-local jackpotGlowMaterial = Material("sprites/light_glow02_add")
-local jackpotTimer
-local jackpotHuntTimers = {}
-local jackpotTimerFontsCreated = false
-net.Receive("ChudSkins.JackpotNotice", function()
-    local name = net.ReadString()
-    local steamID = net.ReadString()
-    jackpotNotice = {name = name, steamID = steamID, startTime = CurTime()}
-    surface.PlaySound("rem_chudtoken.mp3")
-end)
-
-local function createJackpotTimerFont()
-    if jackpotTimerFontsCreated then return end
-
-    local scale = math.Clamp(ScrH() / 1080, 0.55, 1.2)
-    surface.CreateFont("ChudSkinsJackpotTimer", {font = "Verily Serif Mono", size = math.floor(30 * scale), weight = 900})
-    jackpotTimerFontsCreated = true
-end
-
-local function getJackpotFont(name, size, weight)
-    if jackpotFontCache[name] then return end
-    surface.CreateFont(name, {font = "Verily Serif Mono", size = size, weight = weight})
-    jackpotFontCache[name] = true
-end
-
-net.Receive("ChudSkins.JackpotHuntTimer", function()
-    local running = net.ReadBool()
-    local steamID = net.ReadString()
-    if not running then
-        jackpotHuntTimers[steamID] = nil
-        return
-    end
-
-    jackpotHuntTimers[steamID] = {
-        name = net.ReadString(),
-        endTime = CurTime() + math.max(net.ReadFloat(), 0)
-    }
-    createJackpotTimerFont()
-end)
-
-net.Receive("ChudSkins.JackpotTimer", function()
-    if not net.ReadBool() then
-        jackpotTimer = nil
-        return
-    end
-
-    local duration = math.max(net.ReadFloat(), 0)
-    jackpotTimer = {endTime = CurTime() + duration}
-    createJackpotTimerFont()
-end)
-
-hook.Add("PreDrawHalos", "ChudSkins.JackpotOutline", function()
-    local targets, seen = {}, {}
-    for steamID, huntTimer in pairs(jackpotHuntTimers) do
-        if huntTimer.endTime <= CurTime() then
-            jackpotHuntTimers[steamID] = nil
-            continue
-        end
-
-        for _, ply in ipairs(player.GetAll()) do
-            if not IsValid(ply) or not ply:Alive() or ply:SteamID64() ~= steamID then continue end
-
-            local character = ply:GetNWEntity("FakeRagdoll")
-            if not IsValid(character) and IsValid(ply.FakeRagdoll) then character = ply.FakeRagdoll end
-            if not IsValid(character) then character = ply end
-            if character:GetNoDraw() and character ~= ply and not ply:GetNoDraw() then character = ply end
-            if character:GetNoDraw() or seen[character] then break end
-
-            seen[character] = true
-            targets[#targets + 1] = character
-            break
-        end
-    end
-
-    if #targets > 0 then
-        halo.Add(targets, Color(255, 215, 65), 3, 3, 2, true, false)
-    end
-end)
-
-hook.Add("HUDPaint", "ChudSkins.JackpotTimer", function()
-    local width, height = ScrW(), ScrH()
-    local scale = math.Clamp(height / 1080, 0.55, 1.2)
-    if jackpotTimer then
-        local remaining = math.max(jackpotTimer.endTime - CurTime(), 0)
-        if remaining <= 0 then
-            jackpotTimer = nil
-        else
-            draw.SimpleText("survive: " .. math.ceil(remaining) .. " seconds", "ChudSkinsJackpotTimer",
-                width * 0.5, height - 24 * scale, Color(255, 210, 115), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-        end
-    end
-
-    local localPlayer = LocalPlayer()
-    local localSteamID = IsValid(localPlayer) and localPlayer:SteamID64() or nil
-    local line = jackpotTimer and 1 or 0
-    for steamID, huntTimer in pairs(jackpotHuntTimers) do
-        if steamID == localSteamID then continue end
-
-        local remaining = math.max(huntTimer.endTime - CurTime(), 0)
-        if remaining <= 0 then
-            jackpotHuntTimers[steamID] = nil
-        else
-            line = line + 1
-            draw.SimpleText("kill " .. huntTimer.name .. ": " .. math.ceil(remaining) .. " seconds",
-                "ChudSkinsJackpotTimer", width * 0.5, height - (24 + (line - 1) * 32) * scale,
-                Color(255, 210, 115), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-        end
-    end
-end)
-
-hook.Add("HUDPaint", "ChudSkins.JackpotNotice", function()
-    if not jackpotNotice then return end
-
-    local elapsed = CurTime() - jackpotNotice.startTime
-    local duration = 5
-    if elapsed >= duration then
-        jackpotNotice = nil
-        return
-    end
-
-    local alpha
-    if elapsed < 0.4 then
-        alpha = elapsed / 0.4 * 255
-    elseif elapsed > duration - 0.5 then
-        alpha = (duration - elapsed) / 0.5 * 255
-    else
-        alpha = 255
-    end
-
-    alpha = math.Clamp(alpha, 0, 255)
-
-    local ox, oy = 0, 0
-    if elapsed < 0.6 then
-        local intensity = Lerp(elapsed / 0.6, 14, 0)
-        ox = math.random(-intensity, intensity)
-        oy = math.random(-intensity, intensity)
-    end
-
-    local sw, sh = ScrW(), ScrH()
-    local scale = math.min(sw / 1920, sh / 1080)
-    local bigSize = math.Clamp(math.floor(60 * scale), 28, 96)
-    local smallSize = math.Clamp(math.floor(34 * scale), 18, 58)
-    local bigFont = "ChudTokenNoticeBig_" .. bigSize
-    local smallFont = "ChudTokenNoticeSmall_" .. smallSize
-
-    getJackpotFont(bigFont, bigSize, 900)
-    getJackpotFont(smallFont, smallSize, 700)
-
-    local blink = (math.sin(elapsed * 4) + 1) / 2
-    local goldR = math.floor(Lerp(blink, 220, 255))
-    local goldG = math.floor(Lerp(blink, 155, 220))
-    local goldB = math.floor(Lerp(blink, 45, 95))
-    local fadeAlpha = alpha
-    if elapsed > duration - 1.5 then
-        fadeAlpha = alpha * ((duration - elapsed) / 1.5)
-    end
-    fadeAlpha = math.Clamp(fadeAlpha, 0, 255)
-
-    local topY = sh * 0.07
-    local line1 = jackpotNotice.name .. " found the Chud Shop Token"
-    local localPlayer = LocalPlayer()
-    local isTokenHolder = IsValid(localPlayer) and localPlayer:SteamID64() == jackpotNotice.steamID
-    local line2 = isTokenHolder and "Survive 30 seconds before Death to Keep every skin"
-        or "Find and kill " .. jackpotNotice.name
-    local line3 = isTokenHolder and "and you will keep all the skins in the shop."
-        or "Before they survive 30 seconds and keep the shop skins."
-    local line1Y = topY
-    local line2Y = topY + bigSize + sh * 0.012
-    local line3Y = topY + bigSize + smallSize + sh * 0.02
-
-    surface.SetFont(bigFont)
-    local line1Width = surface.GetTextSize(line1)
-    surface.SetFont(smallFont)
-    local line2Width = surface.GetTextSize(line2)
-    local line3Width = surface.GetTextSize(line3)
-    local padding = 18 * scale
-    local panelWidth = math.min(sw - 24, math.max(line1Width, line2Width, line3Width) + padding * 2)
-    local panelHeight = line3Y - topY + smallSize + padding * 2
-    local panelX = (sw - panelWidth) * 0.5 + ox
-    local panelY = topY - padding + oy
-
-    surface.SetMaterial(jackpotGlowMaterial)
-    render.SetBlend(fadeAlpha / 255)
-    surface.SetDrawColor(255, 185, 45, 82)
-    local glowWidth = panelWidth * 3
-    local glowHeight = panelHeight * 4
-    surface.DrawTexturedRect(
-        (sw - glowWidth) * 0.5 + ox,
-        panelY + panelHeight * 0.5 - glowHeight * 0.5,
-        glowWidth,
-        glowHeight
-    )
-    render.SetBlend(1)
-
-    local function drawCentered(text, font, y, r, g, b)
-        surface.SetFont(font)
-        local textWidth = surface.GetTextSize(text)
-        local x = sw / 2 - textWidth / 2
-        draw.SimpleText(text, font, x + ox + 2, y + oy + 2, Color(65, 40, 5, fadeAlpha * 0.85), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-        draw.SimpleText(text, font, x + ox, y + oy, Color(r, g, b, fadeAlpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-    end
-
-    drawCentered(line1, bigFont, line1Y, goldR, goldG, goldB)
-    drawCentered(line2, smallFont, line2Y, goldR, math.max(goldG - 18, 0), goldB)
-    drawCentered(line3, smallFont, line3Y, 245, 205, 105)
 end)
 
 -- action: "sync", "buy", "equip" or "unequip"
@@ -429,12 +216,14 @@ function ChudSkins.ApplyToModel(model, id, wep)
         for slot, path in pairs(info and info.base or {}) do model:SetSubMaterial(slot, path) end
     end
     model.ChudSkin = id
+    model.ChudSkinSlots = {}
     model.ChudSkinModel = model:GetModel()
     if not item then return end
     if item.skin then model:SetSkin(item.skin) end
     for slot, def in pairs(item.sub or {}) do
         local mat = CopyMaterial("chudskin_" .. id .. "_" .. slot, def.from, {["$basetexture"] = def.texture})
         model:SetSubMaterial(slot, mat or def.texture)
+        model.ChudSkinSlots[slot] = mat or def.texture
     end
     if item.replace then
         for i, path in ipairs(model:GetMaterials()) do
@@ -444,7 +233,7 @@ function ChudSkins.ApplyToModel(model, id, wep)
                 local tex = Material(path):GetTexture("$basetexture")
                 if tex and not tex:IsError() then swap = item.replace[Normalize(tex:GetName())] end
             end
-            if swap then model:SetSubMaterial(i - 1, swap) end
+            if swap then model:SetSubMaterial(i - 1, swap) model.ChudSkinSlots[i - 1] = swap end
         end
     end
     if item.tint then
@@ -452,7 +241,7 @@ function ChudSkins.ApplyToModel(model, id, wep)
         for i, path in ipairs(model:GetMaterials()) do
             if IsGunMaterial(path) then
                 local mat = CopyMaterial("chudskin_" .. id .. "_" .. util.CRC(path), path, {["$color2"] = color})
-                if mat then model:SetSubMaterial(i - 1, mat) end
+                if mat then model:SetSubMaterial(i - 1, mat) model.ChudSkinSlots[i - 1] = mat end
             end
         end
     end
@@ -461,13 +250,64 @@ end
 -- Weapon world models are client-side models made on demand, so keep them in
 -- step with each gun's networked skin. This also covers guns on the ground,
 -- holstered, held by other players and in ragdolls.
+-- A skinned slot is fine if it still shows the skin, or a blood-decal copy of it
+-- (the blood system names its copies "<material><entindex>228").
+local function SlotIntact(current, skin)
+    if current == "" then return false end
+    local base = string.lower((string.gsub(skin, "^!", "")))
+    return string.find(string.lower(current), base, 1, true) ~= nil
+end
+local function SkinIntact(model)
+    for slot, skin in pairs(model.ChudSkinSlots or {}) do
+        if not SlotIntact(model:GetSubMaterial(slot), skin) then return false end
+    end
+    return true
+end
+
 -- Melee weapons swap models (held vs dropped), so check each model they draw.
+-- Anything that resets or rebuilds a slot (blood decals, water cleaning) gets the skin put back.
 local function Sync(model, id, wep)
     if not IsValid(model) then return end
-    if (model.ChudSkin or "") ~= id or (id ~= "" and model.ChudSkinModel ~= model:GetModel()) then
+    if (model.ChudSkin or "") ~= id or (id ~= "" and (model.ChudSkinModel ~= model:GetModel() or not SkinIntact(model))) then
         ChudSkins.ApplyToModel(model, id, wep)
     end
 end
+
+-- Blood decals copy the slot's material but keep only its base texture. On a skinned
+-- model, give the bloody copy the skin's full look (normal map, shine) so blood sits on top.
+local function CopyLook(target, source)
+    for key, value in pairs(source:GetKeyValues()) do
+        local lower = string.lower(key)
+        if lower ~= "$basetexture" and lower ~= "$detail" and not string.find(lower, "^%$detail") and not string.find(lower, "^%$flags") then
+            if type(value) == "ITexture" then
+                if not value:IsError() then target:SetTexture(key, value) end
+            elseif isvector(value) then target:SetVector(key, value)
+            elseif isnumber(value) then target:SetFloat(key, value)
+            end
+        end
+    end
+    target:Recompute()
+end
+local function WrapBloodDecals()
+    if not isfunction(AddDecalToEnt) or ChudSkins.DecalWrapped == AddDecalToEnt then return end
+    local original = AddDecalToEnt
+    local wrapped = function(ent, id, ...)
+        local before = IsValid(ent) and ent:GetSubMaterial(id - 1) or ""
+        original(ent, id, ...)
+        if not IsValid(ent) or (ent.ChudSkin or "") == "" or not (ent.ChudSkinSlots or {})[id - 1] then return end
+        local skin = ent.ChudSkinSlots[id - 1]
+        if not SlotIntact(before, skin) then return end
+        local after = ent:GetSubMaterial(id - 1)
+        if after == "" or after == before then return end
+        local bloody, source = Material((string.gsub(after, "^!", ""))), Material((string.gsub(skin, "^!", "")))
+        if not bloody:IsError() and not source:IsError() then CopyLook(bloody, source) end
+    end
+    AddDecalToEnt = wrapped
+    ChudSkins.DecalWrapped = wrapped
+end
+hook.Add("InitPostEntity", "ChudSkins.BloodDecals", WrapBloodDecals)
+timer.Simple(0, WrapBloodDecals)
+
 timer.Create("ChudSkins.Apply", 0.2, 0, function()
     for class in pairs(ChudSkins.ClassSlot) do
         for _, wep in ipairs(ents.FindByClass(class)) do
@@ -475,5 +315,10 @@ timer.Create("ChudSkins.Apply", 0.2, 0, function()
             Sync(wep.worldModel, id, wep)
             Sync(wep.worldModel2, id, wep)
         end
+    end
+    -- Thrown weapons (e.g. the tungsten cube) carry the skin while in the air.
+    for _, ent in ipairs(ents.FindByClass("ent_throwable")) do
+        local id = ent:GetNWString("ChudSkin", "")
+        if id ~= "" or (ent.ChudSkin or "") ~= "" then Sync(ent, id) end
     end
 end)

@@ -25,7 +25,7 @@ local angZero = Angle(0, 0, 0)
 local CurTime = CurTime
 function SWEP:Animation()
 	--local systime = SysTime()
-	
+	--print("first",systime)
 	local owner = self:GetOwner()
 	
 	--local bon = owner:LookupBone("ValveBiped.Bip01_Spine")
@@ -58,7 +58,7 @@ function SWEP:Animation()
 
 	self:AnimZoom()
 
-	
+	--print("end",SysTime()-systime)
 end
 
 function SWEP:AnimationRender()
@@ -258,7 +258,7 @@ function SWEP:CloseAnim(dtime)
 	//local newPos, newAng = LocalToWorld(self.WorldPos, self.WorldAng, desiredPos, desiredAng)
 	//newAng:RotateAroundAxis(newAng:Forward(),180)
 	
-	
+	--print(desiredAng)
 	local _, pos, ang = self:GetTrace(nil, nil, nil, true, true)
 	
 	if !ang or !pos or !self.fuckingfuckangle then return 0 end

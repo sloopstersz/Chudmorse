@@ -282,6 +282,7 @@ if SERVER then
 		local val = tonumber(args[1])
 		local wep = ply:GetActiveWeapon() 
 		if not IsValid(wep) then return end
+		if not wep.Drum or not val or val % 1 != 0 or val < 1 or val > #wep.Drum then return end
 		local primaryammo = wep:GetPrimaryAmmoType()
 		local primaryammocount = ply:GetAmmoCount(primaryammo)
 

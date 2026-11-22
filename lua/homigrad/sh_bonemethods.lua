@@ -129,13 +129,13 @@ local function recursive_bones(ply, bone)
 
 	if ply.matrixes[bone] then
 		local new_matrix = ply.matrixes[bone]
-		
+		--print(new_matrix:GetAngles())
 		local old_matrix = ply.unmanipulated[bone]
 		
 		local lmat = old_matrix:GetInverse() * new_matrix
 		local ang = lmat:GetAngles()
 		local vec, _ = WorldToLocal(new_matrix:GetTranslation(), angle_zero, old_matrix:GetTranslation(), matp:GetAngles())
-		
+		--print(old_matrix:GetTranslation())
 		--ply.manipulate[bone] = {vec, ang}
 
 		--ply:ManipulateBonePosition(bone, vec)
@@ -406,20 +406,20 @@ function hg.bone.Set(ply, lookup_name, vec, ang, layer, lerp, dtime2)
 		end
 		
 		local oldpos, oldang = hg.bone.Get(ply, boneID)
-		
+		--print(oldang)
 		local setPos = oldpos - ply.manipulated[boneID].layers[layer].Pos + vec
 		local setAng = oldang - ply.manipulated[boneID].layers[layer].Ang + ang
 
 		hg.bone.SetRaw(ply, boneID, setPos, setAng)
 
-		
+		--print(layer, lookup_name, oldang, ply.layers[layer][lookup_name].Ang, ang, setAng)
 
 		ply.manipulated[boneID].layers[layer].Pos = -(-vec)
 		ply.manipulated[boneID].layers[layer].Ang = -(-ang)
 		ply.manipulated[boneID].layers[layer].lastset = CurTime()
 	end
 end
-
+--PrintTable(Player(3).manipulated)
 function hg.bone.SetRaw(ply, boneID, vec, ang)
 	ply.manipulated = ply.manipulated or {}
 	ply.manipulated[boneID] = ply.manipulated[boneID] or {}

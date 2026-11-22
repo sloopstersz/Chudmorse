@@ -33,8 +33,8 @@ function DMusic:Start( strPack, strTrack )
         strTrack and DMusic.Pack[DMusic.CurrentPack][strTrack] or 
         table.Random(DMusic.Pack[DMusic.CurrentPack])
     ) do
-        
-        
+        --print(k)
+        --PrintTable(song)
         if not song[1] then return end
         sound.PlayFile( "sound/"..song[1] , "noplay noblock", function( station )
             if not IsValid(station) then return end
@@ -75,20 +75,20 @@ hook.Add( "Think", "DMusic.Think", function()
     local Keys = table.GetKeys(DMusic.Tracks)
     local PlyAdr = (ply.organism and ply.organism.adrenalineAdd) or 0
     local musicVolume = MusicVolume:GetFloat()
-    
-    
+    --print(PlyAdr/15)
+    --print(math.max(PlyAdr*100,10))
     DMusic.threaded = math.min(DMusic.threaded + FrameTime() * 100 * (PlyAdr / (math.max((PlyAdr*25)-.2,20))),4)
-    
+    --print(math.Round(threaded,0.1))
 
     for adr,song in pairs(DMusic.Tracks) do
         if not ply.organism then song[1]:Pause() return end
-        
-        
-        
-        
-        
-        
-        
+        --print(PlyAdr)
+        --print(adr,Keys[i])
+        --print(song[1],PlyAdr <= Keys[i] and PlyAdr >= adr)
+        --print(song[1],PlyAdr <= (Keys[i+1] or math.huge) and PlyAdr >= adr)
+        --print(math.Round(threaded,1))
+        --print(adr)
+        --print(threaded, ( Keys[i+1] or 5 ),threaded < ( Keys[i+1] or 5 ))
         if DMusic.threaded < ( Keys[i+1] or 5 ) and
             DMusic.threaded >= adr and 
             ply:Alive() and not 
@@ -119,7 +119,7 @@ hook.Add( "Think", "DMusic.Think", function()
                 end
                 --song[1]:SetTime(0)
             else
-                
+                --print(song[1],song[1]:GetVolume())
                 song[1]:SetVolume( math.min( song[1]:GetVolume() - ( math.max(DMusic.threaded/1000,0.001) ), (song[2] or 1) * musicVolume) )
             end
         end
@@ -128,5 +128,5 @@ hook.Add( "Think", "DMusic.Think", function()
     --if PlyAdr < 0.01 then
     DMusic.threaded = math.max(DMusic.threaded - FrameTime()*0.2,0)
     --end
-    
+    --print(threaded)
 end)

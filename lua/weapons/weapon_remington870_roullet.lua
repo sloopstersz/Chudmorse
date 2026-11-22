@@ -254,9 +254,9 @@ function SWEP:NextBullet()
 			net.WriteBool(self.drawBullet)
 			net.WriteFloat(CurTime())
 		net.Broadcast()
-		
-		
-		
+		--print("------")
+		--PrintTable(self.Tube)
+		--print("------")
 	end
 end
 
@@ -271,7 +271,7 @@ function SWEP:LoadBullet(strBullet)
 	if self.Tube[1] == "Nothing" then
 		self.Tube[1] = strBullet
 	end
-	
+	--PrintTable(self.Tube)
 end
 
 local ang1 = Angle(0, -10, 0)
@@ -347,7 +347,7 @@ local function reloadFunc(self)
 		end
 		
 		local key = hg.KeyDown(self:GetOwner(), IN_RELOAD)
-		
+		--print("reload",key)
 		
 		if key and self:CanReload() then
 			reloadFunc(self)
@@ -366,7 +366,7 @@ end
 SWEP.FakeEjectBrassATT = "2"
 
 function SWEP:Reload(time)
-	
+	--print(self:GetNetVar("shootgunReload",0))
 	local ply = self:GetOwner()
 	if ply.organism and (ply.organism.larmamputated or ply.organism.rarmamputated) then return end
 	if self.AnimStart_Draw > CurTime() - 0.5 then return end
@@ -381,8 +381,8 @@ function SWEP:Reload(time)
 		self:PlayAnim(self.AnimList["cycle"] or "cycle", 1, false, nil, false, true)
 		return
 	end
-	
-	
+	--print("----")
+	--PrintTable(self.Tube)
 	if self.Tube[self.TubeMax] != "Nothing" or not self:CanReload() then return end
 
 	if SERVER then

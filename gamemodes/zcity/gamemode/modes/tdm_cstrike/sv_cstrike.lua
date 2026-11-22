@@ -404,7 +404,7 @@ hook.Add("HarmDone", "MoneyGive", function(ply, victim, amt)
     
     add = math.Round(add,0)
 
-    
+    --print(add,ply,ply:GetNWInt("TDM_Money"),victim)
 
     ply:SetNWInt( "TDM_Money", math.max(ply:GetNWInt( "TDM_Money" ) + add, 0) )
 

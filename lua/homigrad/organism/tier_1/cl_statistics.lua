@@ -27,7 +27,7 @@ net.Receive("organism_send", function()
 	
 	ply.new_organism = org
 
-	
+	--print(org.owner,org.blood)
 	
 	if not ply.organism or force then
 		ply.organism = org
@@ -45,7 +45,7 @@ net.Receive("organism_send", function()
 
 	--[[jit.on()
 	jit.collectgarbage()--]]
-	
+	--print(collectgarbage("collect"))
 end)
 
 hook.Add("Player_Death","removeorg",function(ply)
@@ -114,6 +114,9 @@ local list = {
 	{"analgesia",0,true},
 	{"naloxone",0,true},
 	{"shock", 10, true},
+	{"shockScore", 10, true},
+	{"shockStage", 4, true},
+	{"painUnconscious", true, true},
 	{"hurt", 1, true}, 
 	{"tranquilizer", 1, true}, 
 	"wantToVomit",
@@ -279,7 +282,7 @@ local function LerpVariables(lerp,org_source,org_target)
 			org_source[v] = Lerp(lerp, org_source[v], org_target[v])
 		else
 			org_source[v] = org_target[v]
-			
+			--print(org_source,org_source[v])
 		end
 	end
 end

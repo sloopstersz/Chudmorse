@@ -20,7 +20,7 @@ if engine.ActiveGamemode() == "sandbox" then
             local cmd = string.lower(string.Explode(" ", text)[1])
             local txt = string.Explode(" ", text)
             table.remove(txt,1)
-            
+            --print(cmd)
             if commands[cmd] then
                 local message, color = commands[cmd](table.concat( txt, " " ), ply)
                 chat.AddText( color, message )

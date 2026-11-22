@@ -117,7 +117,7 @@ hg.ConVars = hg.ConVars or {}
 		parent = parent ~= -1 and parent or 0
 
 		local matp = self.unmanipulated[parent] or self:GetBoneMatrix(parent)
-		
+		--print(matp:GetAngles(),parent)
 		local new_matrix = matrix
 		local old_matrix = self.unmanipulated[bone]
 
@@ -154,7 +154,7 @@ hg.ConVars = hg.ConVars or {}
 
 		for i = 1, #tab do
 			current_weight = current_weight + tab[i][1]
-			
+			--print(current_weight,random_weight,current_weight <= random_weight)
 			if(current_weight >= random_weight)then
 				return i, tab[i][2]
 			end
@@ -383,7 +383,7 @@ hg.ConVars = hg.ConVars or {}
 						tooNearPlayer = true
 					end
 				end
-				
+				//print(target, penetrating, tooNearPlayer, target:GetCollisionGroup())
 
 				if (!penetrating and !tooNearPlayer) or i >= (math.Round(time / checkdtime) - 1) then
 					if target:GetCollisionGroup() == COLLISION_GROUP_PASSABLE_DOOR then -- if it somehow changed, we shouldn't touch it
@@ -769,6 +769,7 @@ local IsValid = IsValid
 		local fakeCam = false//IsValid(ent) and ent != ply
 		local ent = (IsValid(ent) and ent) or (IsValid(ply.FakeRagdoll) and ply.FakeRagdoll) or ply
 		local bon = ent:LookupBone("ValveBiped.Bip01_Neck1")
+		if not bon then return end
 		if not IsValid(ply) then return end
 		if not ply.GetAimVector then return end
 
@@ -1696,10 +1697,10 @@ duplicator.Allow( "homigrad_base" )
 			start = start,
 			endpos = endpos,
 			filter = function(ent) -- i think this too shit, need edit...
-				
+				--print(ent:GetModel())
 				if filter1[ent] then return false end 
 				local phys = ent:GetPhysicsObject()
-				
+				--print(ent:GetModel(),phys:GetMass())
 				if not ent:IsPlayer() and IsValid(phys) and phys:GetMass() > 50 then return true end
 				return true
 			end,
@@ -1785,9 +1786,9 @@ function util.ScreenShake(vPos, nAmplitude, nFrequency, nDuration, nRadius, bAir
 		vPos = vPos or Vector(0,0,0)
 		nRadius = nRadius or (nAmplitude * 100)
 		local tEnts = ents.FindInSphere(vPos, nRadius * nRadius)
-		
+		--PrintTable(tEnts)
 		local crf = RecipientFilter()
-		
+		--print(#tEnts)
 		for i = 1, #tEnts do
 			local eEnt = tEnts[i]
 			if !IsValid(eEnt) then continue end
@@ -1795,7 +1796,7 @@ function util.ScreenShake(vPos, nAmplitude, nFrequency, nDuration, nRadius, bAir
 			crf:AddPlayer(eEnt)
 		end
 		crf = crf or crfFilter
-		
+		--print(crf)
 		net.Start("util.ScreenShake")
 			net.WriteVector(vPos)
 			net.WriteFloat(nAmplitude)

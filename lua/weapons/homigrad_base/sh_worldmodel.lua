@@ -366,7 +366,7 @@ local function DrawWorldModel(self, force)
 						local _,gAngles = WorldToLocal(vector_origin,gAngles, WorldModel:GetPos(), WorldModel:GetBoneMatrix(WorldModel:LookupBone(self.FakeViewBobBaseBone) or 0):GetAngles())
 						self.OldAngPunch = self.OldAngPunch or gAngles
 						local punch = ( self.OldAngPunch - gAngles )/(self.ViewPunchDiv or 50)
-						
+						--print(punch)
 						ViewPunch2( -punch )
 						ViewPunch( punch )
 						self.OldAngPunch = gAngles
@@ -376,8 +376,9 @@ local function DrawWorldModel(self, force)
 			
 			if self.seq then self:GetWM():SetSequence(self.seq) end
 			local timing
+			local animTime = hg.HitstopVisualTime and hg.HitstopVisualTime(self) or CurTime()
 			if not self.cycling then
-				timing = (1 - math.Clamp((self.animtime - CurTime()) / self.animspeed, 0, 1))
+				timing = (1 - math.Clamp((self.animtime - animTime) / self.animspeed, 0, 1))
 				timing = self.reverseanim and (1 - timing) or timing
 				self.worldModel:SetCycle(timing)
 
@@ -386,7 +387,7 @@ local function DrawWorldModel(self, force)
 					self.callback = nil
 				end
 			else
-				timing = ((CurTime() - (self.animtime - self.animspeed)) % self.animspeed) / self.animspeed
+				timing = ((animTime - (self.animtime - self.animspeed)) % self.animspeed) / self.animspeed
 				self.worldModel:SetCycle(timing)
 			end
 		end
@@ -561,6 +562,14 @@ end)
 function SWEP:WorldModel_Transform(bNoApply, bNoAdditional, model)
 	local model, owner = model or self.worldModel, self:GetOwner()
 	if not IsValid(model) then self.worldModel = self:CreateWorldModel() model = self.worldModel end
+	if self.UseWorldModelOnDrop then
+		local wanted = IsValid(owner) and self.WorldModelFake or self.WorldModel
+		if model:GetModel() ~= wanted then
+			model:SetModel(wanted)
+			model.boneStage = nil
+			if self.ModelCreated then self:ModelCreated(model) end
+		end
+	end
 	
 	if IsValid(owner) and (owner:IsNPC() or owner:IsPlayer()) then
 		local ent = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
@@ -659,8 +668,8 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional, model)
 	else
 		local pos, ang = self:GetPos(), self:GetAngles()
 
-		if self:ShouldUseFakeModel() then
-			pos, ang = LocalToWorld(self.FakePos, self.FakeAng, pos, ang)
+		if self.WorldModelFake and not self.UseWorldModelOnDrop then
+			pos, ang = LocalToWorld(self.FakeDropPos or self.FakePos, self.FakeDropAng or self.FakeAng, pos, ang)
 		end
 		
 		model:SetRenderOrigin(pos)

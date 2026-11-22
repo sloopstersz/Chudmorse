@@ -94,10 +94,10 @@ function ENT:OnTakeDamage( dmginfo )	--Taking damage...
 			self.SWARM_Mother:DisownNpc(self)
 		end
 		if(self.King)then
-			
-			
+			--print(4)
+			--PrintTable(self.CreatedNpcs)
 			for ent, time in pairs( self.CreatedNpcs ) do
-				
+				--print(ent)
 				if ( ent:IsValid() and ent:GetClass()=="npc_swarm" and ent!=self ) then
 					ent.Points = ent.Points + 30
 					ent.King = true
@@ -233,7 +233,7 @@ function ENT:MoveTo(pos,time)
 		self.MovingTo=CurTime()+time
 		self:SetLastPosition(pos)
 		self.Hiding=nil
-		
+		--print(4)
 	end
 end
 
@@ -337,7 +337,7 @@ function ENT:TaskStart_ShareDeathPoints( data )
 	for k, ent in pairs( et ) do
 		if ( ent:IsValid() and ent.Points and ent:IsNPC() and ent!=self ) then
 			ent.Points = ent.Points + math.Round(self.Points/SWARM_CV_SWARM_DeadPointsDiv:GetFloat())
-			
+			--print(math.Round(self.Points/SWARM_CV_SWARM_DeadPointsDiv:GetFloat()))
 			break
 		end
 	end
@@ -381,7 +381,7 @@ end
 
 function ENT:OnCondition( iCondition )
 
-	
+	--Msg( self, " Condition: ", iCondition, " - ", self:ConditionName(iCondition), "\n" )
 
 end
 
@@ -453,7 +453,7 @@ function ENT:RunAI( strExp )
 	if ( !self.CurrentSchedule ) then
 		self:SelectSchedule()
 	end
-	
+	--print(self:GetIdealActivity())
 	self:MaintainActivity()
 	
 end

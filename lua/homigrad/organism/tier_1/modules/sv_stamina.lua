@@ -118,9 +118,9 @@ module[2] = function(owner, org, timeValue)
     -- Ignore an archived global cheat value for humans and other classes.
     local zombieClass = ZZGetZombieClass and ZZGetZombieClass(owner)
     if zombieClass and zombieClass.infinite then
-        stamina.sub = 0
-        stamina[1] = stamina.max
-    end
+		stamina.sub = 0
+		stamina[1] = stamina.max
+	end
 end
 
 function hg.organism.AddNaturalAdrenaline(org, fAmount)

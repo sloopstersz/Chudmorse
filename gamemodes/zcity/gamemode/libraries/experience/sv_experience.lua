@@ -42,6 +42,9 @@ hook.Add( "PlayerInitialSpawn","ZB_Exp_OnInitSpawn", function( ply )
         query:Select("suicides")
 		query:Where("steamid", steamID64)
 		query:Callback(function(result)
+			-- shared data (ChudShared) already loaded for this player: it wins, keep local DB as backup only
+			if IsValid(ply) and ply.ChudSharedExpApplied then return end
+
 			if (IsValid(ply) and istable(result) and #result > 0 and result[1].experience) then
 				local updateQuery = mysql:Update("zb_experience")
 					updateQuery:Update("steam_name", name)
@@ -55,6 +58,7 @@ hook.Add( "PlayerInitialSpawn","ZB_Exp_OnInitSpawn", function( ply )
                 zb.Experience.PlayerInstances[steamID64].deaths = tonumber(result[1].deaths)
                 zb.Experience.PlayerInstances[steamID64].kills = tonumber(result[1].kills)
                 zb.Experience.PlayerInstances[steamID64].suicides = tonumber(result[1].suicides)
+                if ChudShared and IsValid(ply) then ChudShared.ExpSetBase(ply, zb.Experience.PlayerInstances[steamID64]) end
 
 			else
 				local insertQuery = mysql:Insert("zb_experience")
@@ -74,6 +78,7 @@ hook.Add( "PlayerInitialSpawn","ZB_Exp_OnInitSpawn", function( ply )
                 zb.Experience.PlayerInstances[steamID64].deaths = 0
                 zb.Experience.PlayerInstances[steamID64].kills = 0
                 zb.Experience.PlayerInstances[steamID64].suicides = 0
+                if ChudShared and IsValid(ply) then ChudShared.ExpSetBase(ply, zb.Experience.PlayerInstances[steamID64]) end
 
 			end
 		end)
@@ -98,10 +103,13 @@ local function EnsureExperienceInstance(ply)
 end
 
 local function SaveExperienceInstance(ply)
-    if not zb.Experience.Active then return end
-
     local steamID64 = ply:SteamID64()
     local exp = EnsureExperienceInstance(ply)
+
+    -- shared between servers as +N changes (works even if the local DB is down)
+    if ChudShared then ChudShared.ExpChanged(ply, exp) end
+
+    if not zb.Experience.Active then return end
 
     local insertQuery = mysql:InsertIgnore("zb_experience")
         insertQuery:Insert("steamid", steamID64)
@@ -245,10 +253,64 @@ net.Receive("zb_xp_get",function(len,ply)
     net.Send(ply)
 end)
 
-net.Receive("zb_sql_leaderboard", function(_, ply)
-    if not zb.Experience.Active then return end
+local function SendLeaderboard(ply, result, limit)
+    if not IsValid(ply) then return end
 
+    local rows = {}
+    for _, data in ipairs(result or {}) do
+        local kills = tonumber(data.kills) or 0
+        local deaths = math.max((tonumber(data.deaths) or 0) - (tonumber(data.suicides) or 0), 0)
+        local xp = math.floor(tonumber(data.experience) or 0)
+
+        rows[#rows + 1] = {
+            steamid = tostring(data.steamid or ""),
+            name = tostring(data.steam_name or "Unknown"),
+            skill = tonumber(data.skill) or 0,
+            xp = xp,
+            kills = kills,
+            deaths = deaths,
+            kd = kills / math.max(deaths, 1)
+        }
+    end
+
+    table.sort(rows, function(a, b)
+        if a.xp == b.xp then
+            if a.kd == b.kd then return a.name:lower() < b.name:lower() end
+            return a.kd > b.kd
+        end
+        return a.xp > b.xp
+    end)
+
+    local count = math.min(#rows, limit)
+    net.Start("zb_sql_leaderboard")
+        net.WriteUInt(count, 8)
+        for i = 1, count do
+            local row = rows[i]
+            net.WriteString(row.steamid)
+            net.WriteString(row.name)
+            net.WriteFloat(row.skill)
+            net.WriteUInt(math.Clamp(row.xp, 0, 4294967295), 32)
+            net.WriteUInt(math.Clamp(row.kills, 0, 65535), 16)
+            net.WriteUInt(math.Clamp(row.deaths, 0, 65535), 16)
+            net.WriteFloat(row.kd)
+        end
+    net.Send(ply)
+end
+
+net.Receive("zb_sql_leaderboard", function(_, ply)
     local limit = math.Clamp(net.ReadUInt(8) or 10, 1, 10)
+
+    -- both servers' players on one board
+    if ChudShared and ChudShared.IsReady() then
+        if (ply.ChudLeaderboardNext or 0) > CurTime() then return end
+        ply.ChudLeaderboardNext = CurTime() + 2
+        ChudShared.TopExp(50, function(result)
+            if result then SendLeaderboard(ply, result, limit) end
+        end)
+        return
+    end
+
+    if not zb.Experience.Active then return end
 
     local query = mysql:Select("zb_experience")
         query:Select("steamid")
@@ -318,3 +380,31 @@ end)
 --    ply.RoundEXP = 0
 --    ply.RoundSkill = 0
 --end)
+
+-- Chudmorse: shared EXP between both servers (lua/autorun/server/sv_chud_shared_db.lua)
+hook.Add("ChudShared_PlayerLoaded", "ZB_Exp_Shared", function(ply, data)
+    if not IsValid(ply) then return end
+    local sid = ply:SteamID64()
+    local exp = EnsureExperienceInstance(ply)
+
+    if data.exp then
+        -- shared value + anything this server changed that is not written yet
+        for _, f in ipairs(ChudShared.EXP_FIELDS) do
+            exp[f] = math.max((tonumber(data.exp[f]) or 0) + ChudShared.PendingExp(sid, f), 0)
+        end
+        ChudShared.ExpSetBase(ply, exp)
+        ply.ChudSharedExpApplied = true
+    else
+        -- not in the shared DB yet: seed it with what this server has, once the local load has landed
+        timer.Simple(8, function()
+            if not IsValid(ply) or ply.ChudSharedExpApplied then return end
+            local cur = EnsureExperienceInstance(ply)
+            for _, f in ipairs(ChudShared.EXP_FIELDS) do
+                local seed = (tonumber(cur[f]) or 0) - ChudShared.PendingExp(sid, f)
+                if seed ~= 0 then ChudShared.AddExpDelta(sid, ply:Name(), f, seed) end
+            end
+            ChudShared.ExpSetBase(ply, cur)
+            ply.ChudSharedExpApplied = true
+        end)
+    end
+end)

@@ -105,7 +105,7 @@ end
 			pink = pink / 22
 			
 			-- if(math.abs(pink) > 1)then
-				
+				-- print(pink)
 			-- end
 			
 			return pink
@@ -534,10 +534,10 @@ local vocals = {
 
 	hook.Add("Think", "Synthesizer", function()
 		for id, queue_line in pairs(PLUGIN.TTSQueue) do
-			
+			-- print(id)
 			PLUGIN.TTSQueueCurrent = id
 			
-			
+			-- print(coroutine.status(queue_line.Coroutine))
 			
 			if(!queue_line.Coroutine or coroutine.status(queue_line.Coroutine) == "dead" or !coroutine.resume(queue_line.Coroutine))then
 				PLUGIN.TTSQueue[id] = nil
@@ -682,7 +682,7 @@ local function play_vocal(vocal_id, time)
 			sample = vocal_sample_calc(freq_info[2], current_args, current_sine, freq_mul, work_table) * vol_mul
 		
 			-- if(math.abs(sample) > 1)then
-				
+				-- print(sample)
 			-- end
 		
 			return sample
@@ -691,7 +691,7 @@ local function play_vocal(vocal_id, time)
 		test_sound_id = test_sound_id and test_sound_id + 1 or 0
 		local test_sound_id_local = test_sound_id
 		
-		
+		-- print("vocal_" .. test_sound_id)
 
 		sound.Generate("vocal_" .. test_sound_id, samplerate, time, generate_func)
 		
@@ -757,7 +757,7 @@ function PLUGIN.TextToSpeech(text)
 		end
 	end
 	
-	
+	-- PrintTable(vocal_info)
 	
 	PLUGIN.PlayVocal(vocal_info, time_offset + 0.4)
 end

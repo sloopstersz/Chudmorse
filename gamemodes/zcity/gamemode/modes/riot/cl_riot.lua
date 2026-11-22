@@ -18,11 +18,6 @@ local RiotIntroMusicStart = 0
 local tex_gradient_r = Material("vgui/gradient-r")
 local tex_gradient_l = Material("vgui/gradient-l")
 local tex_gradient_d = Material("vgui/gradient-d")
-local intensityImages = {
-    Material("modes/contained.png", "smooth mips"),
-    Material("modes/escalated.png", "smooth mips"),
-    Material("modes/anarchy.png", "smooth mips"),
-}
 
 net.Receive("riot_start", function()
     shownIntensity = net.ReadInt(4)
@@ -128,7 +123,7 @@ local function OpenVoteMenu()
         surface.DrawTexturedRect(0, 0, w, h)
         draw.SimpleText("RIOT INTENSITY", "ZCity_Menu_Small", w * 0.5, titleY, Color(225, 225, 225, 255 * titleFrac), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         draw.SimpleText("Vote before the round starts", "ZCity_Menu_Settings_Small", w * 0.5, h * 0.16 - (1 - titleFrac) * 18, Color(200, 200, 200, 255 * titleFrac), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-        draw.SimpleText("TIME LEFT: " .. timerLeft, "ZCity_Menu_Small", w * 0.5, h * 0.92, timerColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        draw.SimpleText("TIME LEFT: " .. timerLeft, "ZCity_Menu_Small", w * 0.5, h * 0.86, timerColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     end
     RiotVoteMenu.Think = function()
         if CurTime() >= voteEndTime and IsValid(RiotVoteMenu) then
@@ -139,14 +134,10 @@ local function OpenVoteMenu()
 
     for i = 1, 3 do
         local data = GetIntensity(i)
-        local cardWidth = ScrW() * 0.29
-        local cardHeight = ScrH() * 0.68
-        local cardGap = ScrW() * 0.015
-        local cardStartX = (ScrW() - (cardWidth * 3 + cardGap * 2)) * 0.5
         local button = vgui.Create("DButton", RiotVoteMenu)
-        button:SetSize(cardWidth, cardHeight)
-        button.TargetX = cardStartX + (i - 1) * (cardWidth + cardGap)
-        button.TargetY = ScrH() * 0.18
+        button:SetSize(ScrW() * 0.7, ScrH() * 0.16)
+        button.TargetX = ScrW() * 0.15
+        button.TargetY = ScrH() * (0.25 + (i - 1) * 0.18)
         button:SetPos((i % 2 == 0) and ScrW() + 120 or -button:GetWide() - 120, button.TargetY)
         button:SetText("")
         button.OpenTime = CurTime() + (i - 1) * 0.08
@@ -164,22 +155,17 @@ local function OpenVoteMenu()
             local votes = voteResults[i] or 0
             local percent = total > 0 and math.floor(votes / total * 100) or 0
             local glow = math.max(self.HoverFrac, self.SelectFrac)
-            local isSelected = selectedVote == i
+            local alpha = 190 + glow * 35
+            local borderColor = Color(225, 225, 225, 120 + glow * 80)
+            local fillColor = Color(0, 0, 0, alpha)
 
-            draw.RoundedBox(6, 0, 0, w, h, Color(0, 0, 0, 190 + glow * 35))
-            surface.SetDrawColor(255, 255, 255, 255)
-            surface.SetMaterial(intensityImages[i])
-            surface.DrawTexturedRect(8, h * 0.22, w - 16, h * 0.6)
-
-            local borderColor = Color(225, 225, 225)
-            surface.SetDrawColor(borderColor.r, borderColor.g, borderColor.b, isSelected and 255 or 110 + glow * 120)
-            surface.DrawOutlinedRect(0, 0, w, h, isSelected and 2 or 1)
-
-            draw.SimpleText(data.name, "ZCity_Menu_Small", w * 0.5, h * 0.08, Color(225, 225, 225), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-            draw.SimpleText(data.description, "ZCity_Menu_Settings_Small", w * 0.5, h * 0.15, Color(210, 210, 210), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-
-            draw.SimpleText(percent .. "%", "ZCity_Menu_Small", w * 0.5, h * 0.88, Color(225, 225, 225), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-            draw.SimpleText(votes .. " votes", "ZCity_Menu_Settings_Small", w * 0.5, h * 0.95, Color(190, 190, 190), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            draw.RoundedBox(0, 0, 0, w, h, fillColor)
+            surface.SetDrawColor(borderColor)
+            surface.DrawOutlinedRect(0, 0, w, h, 1)
+            draw.SimpleText(data.name, "ZCity_Menu_Small", 24 + self.HoverFrac * 6, h * 0.32, Color(225, 225, 225), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            draw.SimpleText(data.description, "ZCity_Menu_Settings_Small", 24 + self.HoverFrac * 6, h * 0.7, Color(210, 210, 210), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            draw.SimpleText(percent .. "%", "ZCity_Menu_Small", w - 24 - self.HoverFrac * 6, h * 0.32, Color(225, 225, 225), TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+            draw.SimpleText(votes .. " votes", "ZCity_Menu_Settings_Small", w - 24 - self.HoverFrac * 6, h * 0.7, Color(210, 210, 210), TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
         end
         button.DoClick = function()
             local oldVote = selectedVote

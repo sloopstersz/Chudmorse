@@ -1422,7 +1422,7 @@ hook.Add("Think", "Fake", function()
 					ply:Notify("They seem unresponsive.", 60, "choked"..(org.owner:EntIndex()))
 				end
 			end
-			
+			--print("huy")
 		end
 
 		if ply:KeyDown(IN_MOVELEFT) and ragdoll:IsOnFire() and not inmove and !ply:InVehicle() then

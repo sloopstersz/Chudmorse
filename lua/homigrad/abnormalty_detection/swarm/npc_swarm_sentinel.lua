@@ -83,7 +83,7 @@ end
 local ignoreplayers = GetConVar("ai_ignoreplayers")
 function ENT:OnTakeDamage( dmginfo )	--Taking damage...
 	self:ApplyFireIntoleranceMul(dmginfo)
-	
+	--print(dmginfo:GetDamage())
 	dmginfo:SetDamage(dmginfo:GetDamage()/self:GetDefenceMul(dmginfo:GetDamageType(),4))
 	local newhealth = self:Health()-dmginfo:GetDamage()
 	local dudeF = dmginfo:GetAttacker().Faction
@@ -98,7 +98,7 @@ function ENT:OnTakeDamage( dmginfo )	--Taking damage...
 		self:Remove()
 	end
 	--if((dude:IsNPC() and (dude:Disposition(self)==D_HT or dude:Disposition(self)==D_FR)) or (dude:IsPlayer() and !ignoreplayers:GetBool()))then
-		
+		--print("TRIGGERED BY",dude)
 		--self:SetEnemy( dude, true )
 		--self:UpdateEnemyMemory( dude, dude:GetPos() )
 		--self.RunAway = nil
@@ -224,7 +224,7 @@ function ENT:TaskStart_FindEnemy( data )
 
 	self:SetEnemy( NULL )
 	self:ClearEnemyMemory( )
-	
+	--print("NULLING")
 end
 
 if(SERVER)then
@@ -247,14 +247,14 @@ end
 
 function ENT:SelectSchedule( iNPCState )
 	if(!self.Attacking)then
-		
+		--print(4)
 		if(IsValid(self:GetEnemy()))then
 			self:StartSchedule(self.schd_FACE)
 		else
 			self:StartSchedule(self.schd_IDLE)
 		end
 	else
-		
+		--print(1)
 		if(self._Attacking)then
 			self._Attacking = nil
 			if(math.random(0,1)==0)then
@@ -268,7 +268,7 @@ end
 
 function ENT:OnCondition( iCondition )
 
-	
+	--Msg( self, " Condition: ", iCondition, " - ", self:ConditionName(iCondition), "\n" )
 
 end
 
@@ -282,7 +282,7 @@ end
 --end
 
 function ENT:RunAI( strExp )
-	
+	--print(self.Points)
 	if(self.NextEnemyFind<=CurTime())then	
 		self.NextEnemyFind=CurTime()+self.EnemyFindCD
 		self:TaskStart_FindEnemy()

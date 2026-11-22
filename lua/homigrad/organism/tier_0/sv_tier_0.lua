@@ -86,7 +86,7 @@ local SysTime = SysTime
 timer.Create("homigrad-organism", tickrate, 0, function()
 	time = CurTime()
 	local tickrate2 = tickrate// / math.max(game.GetTimeScale(), 0.01)
-	
+	//print(delay ,time + tickrate)
 	if delay + tickrate2 > time then return end
 
 	delay = time
@@ -108,7 +108,7 @@ timer.Create("homigrad-organism", tickrate, 0, function()
 		hg.UpdateJuggernautHP(owner, org)
 	else
 		if ZZUpdateZombieOrganism then ZZUpdateZombieOrganism(owner, org) end
-        hook_Run("Org Think", owner, org, mulTime)
+		hook_Run("Org Think", owner, org, mulTime)
         if ZZUpdateZombieOrganism then ZZUpdateZombieOrganism(owner, org) end
 	end
 	end
@@ -125,7 +125,7 @@ hook.Add("Org Think Call", "homigrad-organism", function(owner, org)
 		hg.UpdateJuggernautHP(owner, org)
 	else
 		if ZZUpdateZombieOrganism then ZZUpdateZombieOrganism(owner, org) end
-        hook_Run("Org Think", owner, org, 0.00001)
+	hook_Run("Org Think", owner, org, 0.00001)
         if ZZUpdateZombieOrganism then ZZUpdateZombieOrganism(owner, org) end
 	end
 end)

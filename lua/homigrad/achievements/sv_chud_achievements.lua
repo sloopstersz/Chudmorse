@@ -93,6 +93,23 @@ for key in pairs(secretAchievements) do
 end
 resource.AddFile("materials/chudmorse/achievements/friendsmask.png")
 
+-- Shelved while Z-Zombies and Framed are being reworked. Definitions and saved
+-- progress are kept; these are hidden (unless already earned) and do not count
+-- toward chud_complete. Empty this table to bring them back.
+local shelvedAchievements = {
+    chud_virus = true, chud_cure = true, chud_meat = true,
+    chud_runners = true, chud_shamblers = true, chud_heavies = true, -- Z-Zombies
+    chud_silent_assassin = true, -- Framed
+}
+A.ShelvedAchievements = shelvedAchievements
+for key in pairs(shelvedAchievements) do
+    local info = A.achievements_data.created_achevements[key]
+    if info then
+        info.shelved = true
+        info.exclude_completion = true
+    end
+end
+
 local function CompletionGoal()
     local count = 0
     for key, info in pairs(A.achievements_data.created_achevements) do
@@ -157,6 +174,8 @@ local function Persist(ply, key)
     if not live or not live[key] then return end
     LoadSave(ply)[key] = table.Copy(live[key])
     WriteSave(ply)
+    -- shared with the other server (only ever raises)
+    if ChudShared then ChudShared.RaiseAch(ply:SteamID64(), key, Num(live[key]), live[key].obtained_at) end
 end
 
 -- Stable originals prevent wrapper chains during Lua refresh.
@@ -220,6 +239,41 @@ local function SyncPlayer(ply)
 end
 A.ChudSyncPlayer = SyncPlayer
 
+-- Shared achievements arrived (sv_chud_shared_db.lua): raise anything the other server unlocked,
+-- quietly (no popup, no COIN), and push anything only this server had.
+hook.Add("ChudShared_PlayerLoaded", "ChudAchievementShared", function(ply, data)
+    if not Human(ply) then return end
+    local live = Hydrate(ply)
+    if not live then return end
+    local sid = ply:SteamID64()
+    local shared = {}
+    local save = LoadSave(ply)
+    local changed = false
+    for _, row in ipairs(data.ach or {}) do
+        local key, value = row.ach, tonumber(row.value) or 0
+        shared[key] = value
+        if A.GetAchievementInfo(key) and Num(live[key]) < value then
+            live[key] = live[key] or {}
+            live[key].value = value
+            live[key].obtained_at = live[key].obtained_at or tonumber(row.obtained_at)
+            save[key] = table.Copy(live[key])
+            changed = true
+        end
+    end
+    if changed then WriteSave(ply) end
+    -- the headshot counter counts up from PData; keep it at least at the shared value
+    if live.gollavo and Num(live.gollavo) > (tonumber(ply:GetPData("Headshots", 0)) or 0) then
+        ply:SetPData("Headshots", Num(live.gollavo))
+        ply:SetNWInt("Headshots", Num(live.gollavo))
+    end
+    for key, entry in pairs(live) do
+        if A.GetAchievementInfo(key) and istable(entry) and Num(entry) > (shared[key] or 0) then
+            ChudShared.RaiseAch(sid, key, Num(entry), entry.obtained_at)
+        end
+    end
+    SyncPlayer(ply)
+end)
+
 -- SQL loads asynchronously, so sync shortly after joining and again a bit later.
 hook.Add("PlayerInitialSpawn", "ChudAchievementLoad", function(ply)
     for _, delay in ipairs({1, 6}) do
@@ -242,6 +296,7 @@ local function GrantSecret(target, key, value)
     live[key].obtained_at = value == 1 and os.time() or nil
     LoadSave(target)[key] = table.Copy(live[key])
     WriteSave(target)
+    if ChudShared and value == 1 then ChudShared.RaiseAch(target:SteamID64(), key, 1, live[key].obtained_at) end
     return true
 end
 

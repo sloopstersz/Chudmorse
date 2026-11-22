@@ -605,7 +605,7 @@ if CLIENT then
 	hook.Add("HUDPaint", "FindPrey", function()
 		if lply.PlayerClassName != "furry" then return end
 
-		
+		-- PrintTable(foundPrey)
 
 		local scrW, scrH = ScrW(), ScrH()
 

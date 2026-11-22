@@ -248,7 +248,7 @@ function SWEP:AnimHoldPost(model)
 	if CLIENT and IsValid(model) then
 		self.shooanim = LerpFT(0.4,self.shooanim or 0,self:Clip1() > 0 and 0 or 0)
 		model:ManipulateBonePosition(58,Vector(0 ,1.8*self.shooanim ,0),false)
-		
+		--PrintTable(model:GetChildBones())
 	end
 end
 

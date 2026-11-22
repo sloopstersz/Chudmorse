@@ -16,7 +16,7 @@ SWEP.IconOverride = "vgui/m4supert.png"
 SWEP.WorldModelFake = "models/weapons/arccw/c_ud_m1014.mdl"
 
 
-
+--PrintTable(Entity(1):GetActiveWeapon():GetWM():GetAttachments())
 --uncomment for funny
 SWEP.FakePos = Vector(-10, 3.035, 3.45)
 SWEP.FakeAng = Angle(0, 0, 1)
@@ -241,7 +241,7 @@ local function reloadFunc(self)
 		self:GetWM():ManipulateBoneScale(47, vector_origin)
 		
 		local key = hg.KeyDown(self:GetOwner(), IN_RELOAD)
-		
+		--print("reload",key)
 		
 		if key and self:CanReload() then
 			reloadFunc(self)
@@ -254,7 +254,7 @@ local function reloadFunc(self)
 end
 
 function SWEP:Reload(time)
-	
+	--print(self:GetNetVar("shootgunReload",0))
 	local ply = self:GetOwner()
 	if ply.organism and (ply.organism.larmamputated or ply.organism.rarmamputated) then return end
 	if self.AnimStart_Draw > CurTime() - 0.5 then return end

@@ -35,9 +35,9 @@ local function DrawFirstPersonHelmet(ply, strModel, vecAdjust, fFov, setMat)
 		mdl:SetSubMaterial(0,setMat)
 		mdl.matseted = false
 		mdl.matseted1 = true
-		
+		--print('huy')
 	elseif !setMat and !mdl.matseted then
-		
+		--print("huy")
 		mdl:SetSubMaterial(0,nil)
 		mdl.matseted = true
 		mdl.matseted1 = false

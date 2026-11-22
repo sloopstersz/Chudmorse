@@ -161,9 +161,9 @@ function MODE:EndRound()
 		if ply:Team() == winner then
 			ply:GiveExp(math.random(15,30))
 			ply:GiveSkill(math.Rand(0.1,0.15))
-			
+			--print("give",ply)
 		else
-			
+			--print("take",ply)
 			ply:GiveSkill(-math.Rand(0.05,0.1))
 		end
 	end

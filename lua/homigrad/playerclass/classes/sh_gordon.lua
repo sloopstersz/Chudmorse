@@ -144,7 +144,7 @@ function CLASS.On(self, data)
         self:SyncArmor()
         hevchanged(self)
 
-        
+        --print("JOOOPAAAA")
     end
 end
 
@@ -503,7 +503,7 @@ if CLIENT then
         bloodlerp = Lerp(FRT,bloodlerp,self.organism.blood > 4900 and 0 or 1)
         bloodOld = self.organism.blood
         local _,txtSizeY = surface.GetTextSize(self.organism.blood)
-        
+        --print(self.organism.blood)
         BloodTxt = math.Round(math.min(BloodTxt + 25, self.organism.blood))
 
         local color_bg = BGColor

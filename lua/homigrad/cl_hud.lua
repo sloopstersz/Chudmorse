@@ -701,7 +701,7 @@ end
 
 local function PressRadialMenu(mouseClick)
 	local options = hg.radialOptions
-	
+	--print(options[current_option][1])
 	--[[if lply.organism and lply.organism.pain and lply.organism.pain > 100 then
 		hook_Run("RadialMenuPressed")
 
@@ -798,14 +798,14 @@ hook.Add("Think", "hg-radial-menu", function()
 	if input.IsMouseDown(MOUSE_LEFT) then
 		if firstTime2 then
 			firstTime2 = false
-			
+			--print("pressed")
 		end
 
 		firstTime3 = true
 	else
 		if firstTime3 then
 			firstTime3 = false
-			
+			--print("released")
 			PressRadialMenu(1)
 		end
 
@@ -815,14 +815,14 @@ hook.Add("Think", "hg-radial-menu", function()
 	if input.IsMouseDown(MOUSE_RIGHT) then
 		if firstTime5 then
 			firstTime5 = false
-			
+			--print("pressed")
 		end
 
 		firstTime6 = true
 	else
 		if firstTime6 then
 			firstTime6 = false
-			
+			--print("released")
 			PressRadialMenu(2)
 		end
 

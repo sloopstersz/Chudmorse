@@ -100,9 +100,9 @@ function SWEP:SetHandPos(noset)
 	if not rhmat or not lhmat then return end
 
     local headAng = ply:EyeAngles()
-    
+    --print("post",headAng[1],headAng)
     headAng[1] = math.max(math.min(headAng[1],self.HoldClampMax),self.HoldClampMin)
-   
+   -- print("after",headAng[1],headAng)
     local headPos, headAng = LocalToWorld(self.HeadPosOffset,self.HeadAngOffset,headhmat:GetTranslation(),headAng)
 
     self.handPos = headPos

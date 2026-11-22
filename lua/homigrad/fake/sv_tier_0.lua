@@ -194,7 +194,7 @@ function hg.Ragdoll_Create(ply)
 		ply.AddForceRag[physNum] = ply.AddForceRag[physNum] or {}
 		local vel = (ply.AddForceRag[physNum][2] or vecZero) * math.max(0, (ply.AddForceRag[physNum][1] or CurTime()) - CurTime()) / 0.25
 		
-		
+		--print(ragdoll:GetBoneName(ragdoll:TranslatePhysBoneToBone(hg.cachedmodels[model][ragdoll:GetBoneName(bone)])),ragdoll:GetBoneName(bone),IdealMassPlayer[ragdoll:GetBoneName(bone)])
 		
 		phys:SetMass(IdealMassPlayer[ragdoll:GetBoneName(bone)] or 4)
 		phys:SetVelocity(velocity)
@@ -312,7 +312,7 @@ function hg.Ragdoll_Create(ply)
 		--phys:EnableDrag(true)
 		--phys:SetDragCoefficient( 1500 )
 		--phys:SetDamping(0,2)
-		
+		--print(bone)
 		--[[if !string.find(ragdoll:GetBoneName(bone),"L") then
 			phys:EnableMotion(false)
 		end--]]
@@ -321,9 +321,9 @@ function hg.Ragdoll_Create(ply)
 
 	ragdoll:SetNWString("PlayerName", ply:GetNWString("PlayerName") or ply:Name())
 	ragdoll:SetNWVector("PlayerColor", ply:GetPlayerColor())
-	
+	--print(ply:GetNetVar("Accessories","none"))
 	--timer.Simple(1,function()
-	
+	--print(ragdoll:GetNetVar("Accessories","none"))
 	--end)
 
 	ply:SetNWEntity("FakeRagdoll",ragdoll)
@@ -427,7 +427,7 @@ end)
 -- 	local tps = 1 / FrameTimeS
 
 -- 	if tps < 66 then
-
+-- 		print(tps)
 -- 	end
 -- end)
 

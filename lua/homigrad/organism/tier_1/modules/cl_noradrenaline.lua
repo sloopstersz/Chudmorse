@@ -97,7 +97,7 @@ hook.Add("Post Post Processing", "noradrenalineEffect", function()
 		local start = math.Clamp((SysTime() - hg.noradrenalineStartTime) * 2, 0, 1) * lply.organism.noradrenaline
 
 		local asad = math.sin(CurTime() * 10) / 4
-		
+		--print(asad)
 		grainMat:SetFloat("$c0_x", CurTime() * start) -- time
 		grainMat:SetFloat("$c0_y", asad * start) -- gate
 		grainMat:SetFloat("$c0_z", 1) -- Pixelize

@@ -27,7 +27,7 @@ util.AddNetworkString("Abnormalties(SendOpenedPage)")
 
 --\\SQL
 	-- PLUGIN.LoadConsequences(Entity(1))
-	
+	-- print()
 	
 	function PLUGIN.LoadConsequences(ply, dont_create_data)
 		local consequences = PLUGIN.GetConsequences(ply, function(ply, consequences, knowledge, stats, registered)

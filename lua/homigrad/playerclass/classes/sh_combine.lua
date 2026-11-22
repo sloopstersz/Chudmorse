@@ -339,7 +339,7 @@ function CLASS.On(self, data)
     hook.Add( "OnEntityCreated", "relation_shipdo"..index, function( ent )
         if not IsValid(self) then hook.Remove("OnEntityCreated","relation_shipdo"..index) return end
         if ( ent:IsNPC() ) then
-            
+            --print(ent:GetClass())
             if table.HasValue(combines,ent:GetClass()) then
                 ent:AddEntityRelationship( self, D_LI, 0 )
             end

@@ -34,6 +34,13 @@ local seizure_brain_roll_delay = 20
 local seizure_brain_roll_chance = 15
 local seizure_brain_roll_gain_min = 0.04
 local seizure_brain_roll_gain_max = 0.11
+function hg.organism.IsMentalDisabled()
+	if not CurrentRound then return false end
+	local ok, mode = pcall(CurrentRound)
+	if not ok or not mode then return false end
+	return mode.DisableMental == true
+end
+
 hook.Add("Org Clear", "Main", function(org)
 	org.alive = true
 	org.otrub = false
@@ -272,6 +279,9 @@ local function send_organism(org, ply)
 
 	sendtable.superfighter = org.superfighter
 	sendtable.depression = org.depression
+	sendtable.shockScore = org.shockScore
+	sendtable.shockStage = org.shockStage
+	sendtable.painUnconscious = org.painUnconscious
 	sendtable.psycheSchizo = org.psycheSchizo or 0 -- [JUDGE PORT] schizo
 	sendtable.schizoEpisodeEnd = org.schizoEpisodeEnd or 0 -- [JUDGE PORT] schizo
 
@@ -399,6 +409,7 @@ end
 
 local function is_panic_immune(org)
 	if not org then return false end
+	if hg.organism.IsMentalDisabled() then return true end
     if ZZIsZombie and ZZIsZombie(org.owner) then return true end
 
 	local owner = org.owner
@@ -491,6 +502,7 @@ local function resolve_panic_attacker(victim, attacker)
 end
 
 local function panic_witness_event(victim, attacker, amount, radius)
+	if hg.organism.IsMentalDisabled() then return end
 	if not IsValid(victim) then return end
 	if not isnumber(amount) or amount <= 0 then return end
 
@@ -561,6 +573,7 @@ hook.Add("HomigradDamage", "Berserk", function(ply, dmgInfo, hitgroup, ent)
 end)
 
 hook.Add("HomigradDamage", "PanicAttackDamage", function(ply, dmgInfo)
+	if hg.organism.IsMentalDisabled() then return end
 	if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
 	if not ply.organism then return end
 
@@ -834,11 +847,25 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	local just_went_uncon = not org.otrub and org.needotrub
 	local just_woke_up = not org.needotrub and org.otrub and (org.uncon_timer or 0) > 6
 	-- Losing consciousness changes control, not weapon ownership.
-	if isPly and just_went_uncon then hook.Run("HG_OnOtrub", owner) end
+	if isPly and just_went_uncon then hook.Run("HG_OnOtrub", owner); hook.Run("PlayerDropWeapon", owner) end
 	if isPly and just_woke_up then hook.Run("HG_OnWakeOtrub", owner) end
 
 	org.canmove = (org.spine2 < hg.organism.fake_spine2 and org.spine3 < hg.organism.fake_spine3) and not org.otrub
 	org.canmovehead = (org.spine3 < hg.organism.fake_spine3) and not org.otrub
+
+	local spineDis = 0
+	if isPly and alive and not org.otrub then
+		local s1, s2, s3 = org.spine1 or 0, org.spine2 or 0, org.spine3 or 0
+		local f1, f2, f3 = hg.organism.fake_spine1, hg.organism.fake_spine2, hg.organism.fake_spine3
+		if s1 < f1 and s1 >= f1 * 0.5 then spineDis = spineDis + (s1 - f1 * 0.5) / (f1 * 0.5) end
+		if s2 < f2 and s2 >= f2 * 0.5 then spineDis = spineDis + (s2 - f2 * 0.5) / (f2 * 0.5) end
+		if s3 < f3 and s3 >= f3 * 0.5 then spineDis = spineDis + (s3 - f3 * 0.5) / (f3 * 0.5) end
+		spineDis = math.min(spineDis, 1)
+	end
+	if math.abs(spineDis - (org.spineDisorient or -1)) > 0.004 then
+		org.spineDisorient = spineDis
+		owner:SetNWFloat("hg_spineDisorient", spineDis)
+	end
 	
 	if not (org.canmove and org.canmovehead and (org.stun - curTime) < 0) then org.needfake = true end
 	if (org.blood < 2700) then org.needfake = true end
@@ -892,7 +919,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.owner.fullsend = true
 	end
 
-	if org.brain > 0.05 then
+	if org.brain > 0.05 and isPly and alive then
 		if math.random(600) < org.brain * 20 then
 			org.needfake = true
 		end
@@ -908,7 +935,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		owner:TakeDamageInfo(dmgInfo)
 	end
 
-	if owner:IsPlayer() and (org.healthRegen or 0) < CurTime() then
+	if owner:IsPlayer() and org.bleed <= 0 and org.internalBleed <= 0 and (org.healthRegen or 0) < CurTime() then
 		org.healthRegen = CurTime() + 30
 		owner:SetHealth(math.min(owner:GetMaxHealth(), owner:Health() + math.max(1.5 - org.hurt, 0)))
 	end

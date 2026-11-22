@@ -382,7 +382,7 @@ Cost: Free]])
         if not Category then continue end
         if not gun.Spawnable or gun.AdminOnly then continue end
         if BlackList[gun.ClassName] then continue end
-        
+        --print(Category)
         if not CategoresAllowed[Category] then continue end
 
         local Names = gun.PrintName
@@ -393,13 +393,13 @@ Cost: Free]])
 
     for k, ent in pairs(scripted_ents.GetList()) do
         local rent = ent["t"]
-        
+        --PrintTable(ent)
         if not rent then continue end
         local Category = rent.Category or "Other"
         if not Category then continue end
         if not rent.Spawnable or rent.AdminOnly then continue end
         if BlackList[rent.ClassName] then continue end
-        
+        --print(Category)
         if not CategoresAllowed[Category] then continue end
 
         local Names = ent.PrintName
@@ -429,7 +429,7 @@ Cost: Free]])
                 function button:DoClick()
                     swep.LastID = swep.LastID or 0
                     local id = (swep.LastID + 1).."ID"
-                    
+                    --print(id)
                     swep.Cart[id] = {gun[1],gun[2],self.Weight, id, k}
                     addDiliverPanel( RightPanel, {gun[1],gun[2],self.Weight, id}, swep )
                     swep.LastID = swep.LastID + 1

@@ -221,8 +221,8 @@ function PLAYER:LegAttack()
     dmg = dmg * (self:IsBerserk() and org.berserk * 5 or 1)
     dmg = dmg * (org.legstrength or 1)
     dmg = dmg * (isCurbstomp and CURBSTOMP_DAMAGE_MUL or LEG_KICK_DAMAGE_MUL)
-    
-    
+    --print(dmg)
+    --print(speedmul)
     hook.Run("HomigradLegKick", self)
     self:PlayCustomAnims(anim, true, speed, true, animstopAdjust, {
         [0.12] = function(self)

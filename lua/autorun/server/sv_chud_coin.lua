@@ -1,9 +1,17 @@
 -- Server-owned currency. Independent of rank XP, karma and zombie points.
+-- Shared between both servers through ChudShared (sv_chud_shared_db.lua): every change is
+-- sent as +N / -N, and the local SQLite table is kept as a backup / offline fallback.
 ChudCoin = ChudCoin or {}
 local MAX_COINS = 1000000000
 local ready = sql.Query("CREATE TABLE IF NOT EXISTS chud_coin (steamid TEXT PRIMARY KEY, balance INTEGER NOT NULL DEFAULT 0)") ~= false
 local function validPlayer(ply)
     return IsValid(ply) and ply:IsPlayer() and not ply:IsBot()
+end
+
+local function setLocal(ply, balance)
+    sql.Query("REPLACE INTO chud_coin (steamid, balance) VALUES (" .. sql.SQLStr(ply:SteamID64()) .. ", " .. balance .. ")")
+    ply.ChudCoinBalance = balance
+    ply:SetNWInt("ChudCoin", balance)
 end
 
 function ChudCoin.Get(ply)
@@ -18,10 +26,12 @@ function ChudCoin.Get(ply)
 end
 
 local function save(ply, balance)
+    local old = ply.ChudCoinBalance or 0
     local result = sql.Query("REPLACE INTO chud_coin (steamid, balance) VALUES (" .. sql.SQLStr(ply:SteamID64()) .. ", " .. balance .. ")")
     if result == false then return false end
     ply.ChudCoinBalance = balance
     ply:SetNWInt("ChudCoin", balance)
+    if ChudShared then ChudShared.AddCoinDelta(ply:SteamID64(), balance - old) end
     return true
 end
 
@@ -40,6 +50,8 @@ end
 
 function ChudCoin.TrySpend(ply, amount)
     if not validAmount(amount) then return false end
+    -- the other server may hold a newer balance: wait until it is loaded before spending
+    if ChudShared and ChudShared.Loading(ply) then return false end
     local balance = ChudCoin.Get(ply)
     if balance == nil or balance < amount then return false end
     return save(ply, balance - amount)
@@ -48,6 +60,21 @@ end
 hook.Add("PlayerInitialSpawn", "ChudCoin.Load", function(ply)
     ChudCoin.Get(ply)
 end)
+
+-- Shared balance arrived: shared value + anything this server has not written yet.
+hook.Add("ChudShared_PlayerLoaded", "ChudCoin.Shared", function(ply, data)
+    if not validPlayer(ply) or not ready then return end
+    local sid = ply:SteamID64()
+    local local_ = ChudCoin.Get(ply) or 0
+    if data.coin ~= nil then
+        setLocal(ply, math.Clamp(data.coin + ChudShared.PendingCoin(sid), 0, MAX_COINS))
+    else
+        -- first time this player is seen by the shared DB: seed it with this server's balance
+        local seed = local_ - ChudShared.PendingCoin(sid)
+        if seed ~= 0 then ChudShared.AddCoinDelta(sid, seed) end
+    end
+end)
+
 -- Refresh connected players if this file is reloaded.
 for _, ply in ipairs(player.GetAll()) do
     ply.ChudCoinBalance = nil

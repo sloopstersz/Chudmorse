@@ -440,7 +440,7 @@ end
         game.GetWorld():EmitSound(name, 75, 100, 1, CHAN_AUTO, SND_STOP)
         local dur = estimate_data(file.Read("sound/"..name, "GAME"))
         
-        
+        //print(SoundDuration(name), dur, name)
 
         hg.precachedsounds[name] = dur
     end
@@ -486,7 +486,7 @@ end
 		"ground_control/radio/ghetto/thanks5.mp3",
 	}
 
-	
+	//PrintTable(hg.ghetto_phrases)
 //end
 
 --// Don't allow dx8 users to play, because we are using shaders and other stuff that requires dx9

@@ -27,7 +27,7 @@ end)
 
 hook.Add("hg_AdjustMouseSensitivity","HG-LegKickAnim",function(ply)
     if ply:GetNWFloat("InLegKick",0) > CurTime() then
-        
+        --print(1 - (ply:GetNWFloat("InLegKick",0) - CurTime()))
         return math.min(math.max(0.02,1 - (ply:GetNWFloat("InLegKick",0) - CurTime()) * 2 ),1)
     end
 end)

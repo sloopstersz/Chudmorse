@@ -463,7 +463,7 @@ function SWEP:SecondaryAttack(override)
 						end
 
 						local Strength, Weld = BindObjects(Tr.Entity, Tr.HitPos, NewEnt, NewTr.HitPos, 3.5, Tr.PhysicsBone or 0, NewTr.PhysicsBone or 0)
-						
+						--print(Tr.Entity,Weld)
 						if Weld or Weld == nil then Owner:SetAmmo(Owner:GetAmmoCount(self.Ammo) - 1, self.Ammo) end
 						sound.Play("snd_jack_hmcd_hammerhit.wav", Tr.HitPos, 65, math.random(90, 110))
 						util.Decal("hmcd_jackanail", Tr.HitPos + Tr.HitNormal, Tr.HitPos - Tr.HitNormal)

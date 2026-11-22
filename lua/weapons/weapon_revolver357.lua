@@ -54,7 +54,7 @@ end
 
 function SWEP:OnCantReload()
 	--inspect1
-	
+	--print("huy")
 	if self.Inspecting and self.Inspecting > CurTime() then return end
 	self.Inspecting = CurTime() + 3
 	self:PlayAnim("inspect"..math.random(1,2),3,false,function(self)

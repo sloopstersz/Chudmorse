@@ -309,7 +309,7 @@ if CLIENT then
 	local cd = 0
 
 	hook.Add( "Think", "NVGEnabling", function( )
-		
+		--print(lply:GetNWBool("NVG_Enabled", false))
 		if lply:GetNWBool("NVG_Enabled", false) != NVGEnabled then
 			--if cd > CurTime() then return end
 			--cd = CurTime() + 1

@@ -182,7 +182,7 @@ function SWEP:Think()
 				self:SetBack(math.Clamp(BackAmt + 15, 0, 100))
 				self:SetThrowPower(math.Clamp(self:GetThrowPower() + 5 * self.ThrowChargeSpeed, 1, 130))
 				self.ThrowChargeSpeed = (-2.7 + (owner.organism.stamina[1] / 45)) * 0.15
-				
+				--print(self.ThrowChargeSpeed)
 			end
 		end
 

@@ -230,7 +230,7 @@ net.Receive("req_ach", function(len, ply)
     local data = hg.achievements.GetPlayerAchievements(ply)
     local visible, visibleData = {}, {}
     for key, info in pairs(hg.achievements.GetAchievements()) do
-        if not info.secret or (tonumber(data[key] and data[key].value) or 0) >= info.needed_value then
+        if not (info.secret or info.shelved) or (tonumber(data[key] and data[key].value) or 0) >= info.needed_value then
             visible[key] = info
             visibleData[key] = data[key]
         end

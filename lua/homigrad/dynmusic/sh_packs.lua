@@ -203,7 +203,7 @@ end
 
 hook.Add("HomigradDamage", "Panic", function(ply, dmgInfo, hitgroup, ent, harm, hitBoxs, inputHole)
     if ent:IsPlayer() then
-        
+        --print(ply,dmgInfo:GetDamage()*5)
         hg.DynaMusic:AddPanic(ply,dmgInfo:GetDamage()*25)
         if dmgInfo:GetAttacker():IsPlayer() then
             hg.DynaMusic:AddPanic(dmgInfo:GetAttacker(),dmgInfo:GetDamage()*5)

@@ -35,7 +35,7 @@ end
 
 function MODE:ShouldRoundEnd()
 	local endround, winner = zb:CheckWinner(self:CheckAlivePlayers())
-	
+	--print("ShouldRoundEnd", endround, winner)
 	return endround
 end
 

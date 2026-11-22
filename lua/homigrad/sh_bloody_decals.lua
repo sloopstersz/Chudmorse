@@ -120,7 +120,7 @@ function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, 
 
 	ent.decalshuy[id] = ent:GetSubMaterial(id - 1)
 	ent:SetSubMaterial(id - 1, "!"..mat:GetName())
-	
+	--print(ent:GetSubMaterial(id - 1), 1, "!"..mat:GetName(), 2)
 end
 
 function AddDecalToEnt2(ent, entIndex, tex, clear, x, y, rot, size, alpha) -- adds to all submats
@@ -185,7 +185,7 @@ AddDecalToEnt2(wm, wep:EntIndex(), Material("zbattle/blood"), false)--"decals/bl
 -- 	--render.SetLightingMode(2)
 -- 	--render.SetAmbientLight( 255, 255, 255 )
 -- 	--render.ResetModelLighting( 1, 0, 0 )
-
+-- 	print(surface.GetTextureID(curmat:GetTexture("$detail"):GetName()))
 -- 	render.SetLightmapTexture(white:GetTexture("$basetexture"))
 -- 	surface.SetTexture(surface.GetTextureID(curmat2:GetName()))
 -- 	surface.SetDrawColor(255,255,255,255)

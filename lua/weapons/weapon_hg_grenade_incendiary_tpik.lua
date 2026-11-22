@@ -437,7 +437,7 @@ function SWEP:ThinkAdd()
 	self.lastOwner = self:GetOwner()
 	if not SERVER then return end
 	if IsValid(self.Trap) then return end
-	
+	--print(self.ReadyToTrap)
 	if self.ReadyToTrap then
 		self:PlaceTrap()
 	end

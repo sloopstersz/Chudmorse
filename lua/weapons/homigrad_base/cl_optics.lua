@@ -448,7 +448,7 @@ hook.Add("PostDrawTranslucentRenderables","stencil-test-holo2",function()
 
 			local size = 18
 			local distToSight = IsValid(mdl) and mdl:GetPos():Distance(view.origin) or 1
-			
+			--print(distToSight)
 			size = size * math.Remap(view.fov,0,100,1.8,1)
 			size = size * math.Remap(distToSight,6,14,1.2,0.9)
 			--size = size * 

@@ -260,7 +260,7 @@ end
 
 hook.Add("PostCleanupMap","cleanupshells",function()
     for k,v in ipairs(hg_shelles) do
-        
+        --print("huy")
         v:Remove()
     end
     hg_shelles = {}

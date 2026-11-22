@@ -109,3 +109,4 @@ hook.Add("PostGamemodeLoaded", "UpdateDiscordStatus", function()
 	StartSteamPresence()
 end)
 
+--print("steam: "..tostring(util.IsBinaryModuleInstalled("steamrichpresencer")),"discord: "..tostring(util.IsBinaryModuleInstalled("gdiscord")))

@@ -9,7 +9,7 @@ local function isSprinting(ply)
 	return ply.hg_isSprinting == true or ply:GetNWBool("hg_isSprinting", false)
 end
 --\\ Custom running anim rate
-	hook.Add("UpdateAnimation", "NormAnimki", function(ply, vel, maxSeqGroundSpeed)
+		hook.Add("UpdateAnimation", "NormAnimki", function(ply, vel, maxSeqGroundSpeed)
 		if not IsValid(ply) or not ply:Alive() or not ply:OnGround() then return end
 		local lenSqr = vel:LengthSqr()
 		local jogging = isJogging(ply)

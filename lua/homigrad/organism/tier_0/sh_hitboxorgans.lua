@@ -44,7 +44,7 @@ function hg.organism.ShootMatrix(ent, organs)
 		pos = matrix:GetTranslation()
 		ang = matrix:GetAngles()
 		for key, organ in pairs(organs) do
-			
+			--print(key,organ[1])
 			local additional = organ[7]
 			if additional then
 				local ent = ent:IsPlayer() and ent or ent:IsRagdoll() and IsValid(hg.RagdollOwner(ent)) and hg.RagdollOwner(ent) or ent
@@ -62,7 +62,7 @@ function hg.organism.ShootMatrix(ent, organs)
 	end
 
 	//table.sort(boxs, function(a, b) return (organs[a[6]] and organs[a[6]][a[7]][2] or 0) > (organs[b[6]] and organs[b[6]][b[7]][2] or 0) end)
-	
+	//PrintTable(boxs)
 	return boxs, obbCenter, sphereChunk
 end
 

@@ -125,7 +125,7 @@ function SWEP:Step_Reload(time)
 
 	if time2 then
 		local part = 1.15 - (time2 - time) / self.StaminaReloadTime
-		
+		--print(self.StaminaReloadTime)
 		local shouldalreadyreload
 		if SERVER then
 			//shouldalreadyreload = self:ReloadSounds(part)
@@ -141,7 +141,7 @@ function SWEP:Step_Reload(time)
 			//local nextTimeEvent = self.FakeReloadEventsMap[self.countevent]
 			//local event = self.FakeReloadEvents[nextTimeEvent]
 			local event = self.FakeReloadEvents[time]
-			
+			--print(self.FakeReloadEvents[time])
 			//if event and nextTimeEvent < time and self.FakeEventPlayed ~= event then
 			if event and self.FakeEventPlayed ~= event then
 				event( self, self.StaminaReloadMul )
@@ -302,7 +302,7 @@ function SWEP:AnimationReload(time, staminaReload)
 		--pos1 = anims[math.Clamp(floortime+1,1,#anims)]
 	end
 
-	
+	--print(pos1, pos2)
 
 	if isstring(pos1) or isstring(pos2) then
 		pos1,pos2 = anims[math.Clamp(floortime,1,#anims)], anims[math.Clamp(floortime+1,1,#anims)]

@@ -182,7 +182,7 @@ if SERVER then
 							self.poisoned2 = nil
 						end
 
-						
+						--print(good_type)
 						if good_type then
 							ent.organism.blood = math.min(ent.organism.blood + math.min(FrameTime() * 0.5 * (math.max(ent.organism.pulse / 70,0.3)),self.modeValues[1]) * 500, 5200)
 						else
