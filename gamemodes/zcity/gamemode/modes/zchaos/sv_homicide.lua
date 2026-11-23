@@ -85,6 +85,7 @@ MODE.LootTable = {
 		{15,"weapon_vodka_tpik"},
 		{12,"weapon_bigconsumable"},
 		{8,"weapon_tourniquet"},
+		{8, "weapon_splint"},
 		{8,"weapon_bandage_sh"},
 		{7,"weapon_ducttape"},
 		{6,"weapon_painkillers"},
