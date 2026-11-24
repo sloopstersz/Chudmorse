@@ -124,13 +124,16 @@ hg.settings:AddOpt("Gameplay","hg_hints", "Show hints")
 hg.settings:AddOpt("Gameplay","hg_gary", "HG GARY")
 hg.settings:AddOpt("Gameplay","hg_deathfadeout", "Death fade out")
 hg.settings:AddOpt("Gameplay","hg_nojogging", "Disable jogging")
-hg.settings:AddOpt("Gameplay","deatheffect_death_screen", "Cinematic death screen")
 -- Old 3-card round summary (with music) vs the newer single-MVP + stats one.
 -- Same convar sh_roundsummary.lua reads; creating it here keeps the menu row from depending on load order.
 CreateClientConVar("rem_summary_classic", "1", true, false, "1 = classic 3-card MVP round summary with music, 0 = single MVP with personal stats", 0, 1)
 hg.settings.help = hg.settings.help or {}
 hg.settings.help["rem_summary_classic"] = "On = old 3-card MVP round summary with music. Off = new MVP + your stats."
 hg.settings:AddOpt("Gameplay","rem_summary_classic", "Remorse Old Round Summary", nil, nil, "bool")
+-- Old card weapon selector vs the Chudmorse arc one (cl_weapon_selector.lua reads this convar).
+CreateClientConVar("hg_weaponselector_classic", "0", true, false, "Use the old card weapon selector instead of the arc", 0, 1)
+hg.settings.help["hg_weaponselector_classic"] = "On = old card weapon selector. Off = new arc weapon selector."
+hg.settings:AddOpt("Gameplay","hg_weaponselector_classic", "Classic weapon selector", nil, nil, "bool")
 if not game.IsDedicated() then
 	hg.settings:AddOpt("Serverside gameplay","hg_toughnpcs", "Tough npcs")
 	hg.settings:AddOpt("Serverside gameplay","hg_thirdperson", "Thirdperson (WIP)")

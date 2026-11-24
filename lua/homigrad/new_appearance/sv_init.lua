@@ -179,6 +179,9 @@ local function ForceApplyAppearance(ply, tbl, noModelChange)
 
     ply:SetNetVar("Accessories", tbl.AAttachments)
     ply:SetNetVar("AccessoryColors", tbl.AAttachmentColors)
+    -- accessory pose offsets (Appearance > Poses): clamped here so clients can't send junk
+    tbl.APoses = APmodule.SanitizeAccessoryPoses and APmodule.SanitizeAccessoryPoses(tbl.APoses, tbl.AAttachments) or {}
+    ply:SetNetVar("AccessoryPoses", tbl.APoses)
 
     ply.CurAppearance = {}
     table.CopyFromTo(tbl, ply.CurAppearance)
@@ -199,10 +202,13 @@ local function SyncAppearanceColor(ply)
 
     ply:SetNWVector("PlayerColor", vecColor)
     ply:SetNetVar("AccessoryColors", appearance.AAttachmentColors or {})
+    ply:SetNetVar("AccessoryPoses", appearance.APoses or {})
 end
 
 
 local function WearAppearance(ply,tbl)
+    -- VIP-only models (sh_zz_chud_vip_models.lua)
+    if APmodule.EnforceVIPModel then tbl = APmodule.EnforceVIPModel(ply, tbl) end
     local checked = CheckAttachments(ply,tbl)
     ForceApplyAppearance(ply,checked)
 end
@@ -257,6 +263,24 @@ local function IsRoundActive()
     return zb and zb.ROUND_STATE == 1
 end
 
+-- Apply only the pose offsets to the accessories the player is wearing right now (mid-round
+-- saves). Uses the live "Accessories" netvar so class/round accessory overrides are respected.
+local function UpdateLivePoses(ply, poses)
+    if not IsValid(ply) or not APmodule.SanitizeAccessoryPoses then return end
+    if (ply.ChudNextLivePose or 0) > CurTime() then return end
+    ply.ChudNextLivePose = CurTime() + 0.5
+
+    local worn = ply:GetNetVar("Accessories", "")
+    local clean = APmodule.SanitizeAccessoryPoses(poses, istable(worn) and worn or {})
+
+    if istable(ply.CurAppearance) then ply.CurAppearance.APoses = clean end
+    ply:SetNetVar("AccessoryPoses", clean)
+
+    local rag = ply:GetNWEntity("FakeRagdoll")
+    if IsValid(rag) then rag:SetNetVar("AccessoryPoses", clean) end
+end
+
+
 net.Receive("OnlyGet_Appearance",function(len,client)
     local tAppearance = net.ReadTable()
     local bIsSyncReply = net.ReadBool()
@@ -264,8 +288,12 @@ net.Receive("OnlyGet_Appearance",function(len,client)
     local app = bRandom and APmodule.GetRandomAppearance() or tAppearance
 
     -- User changed their appearance during an active round: defer it to the next round.
+    -- Accessory poses are cosmetic only, so those go live right away for what they're wearing now.
     if not bIsSyncReply and IsRoundActive() then
         client.PendingAppearance = app
+        if not bRandom and istable(app) then
+            UpdateLivePoses(client, app.APoses)
+        end
         return
     end
 
@@ -308,6 +336,7 @@ function ApplyAppearanceRagdoll(ent, ply)
     ent:SetNWString("PlayerName", ply:GetNWString("PlayerName", Appearance.AName))
     ent:SetNetVar("Accessories", ply:GetNetVar("Accessories",""))
     ent:SetNetVar("AccessoryColors", ply:GetNetVar("AccessoryColors", Appearance.AAttachmentColors or {}))
+    ent:SetNetVar("AccessoryPoses", ply:GetNetVar("AccessoryPoses", Appearance.APoses or {}))
     ent:SetNWString("BandageGlovesMdl", ply.PlayerClassName ~= "swat" and ply.PlayerClassName ~= "police" and ply.PlayerClassName ~= "arena_blue" and ply:GetNWString("BandageGlovesMdl", "") or "")
 
     local tMdl = APmodule.PlayerModels[1][ent:GetModel()] or APmodule.PlayerModels[2][ent:GetModel()] or ent:GetModel()

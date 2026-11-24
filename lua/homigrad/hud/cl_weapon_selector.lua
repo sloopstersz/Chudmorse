@@ -1,7 +1,9 @@
--- Chudmorse weapon selector: weapons sit on an arc. The selected weapon is the big
--- card at the top of the arc; the previous / next weapons hang lower on each side.
--- Scroll wheel slides along the arc (wraps), slot keys 1-6 jump to / cycle a slot,
--- LMB or RMB equips, lastinv swaps back. Client only.
+-- Chudmorse weapon selector: one card per slot, sitting on a U-shaped arc. The selected
+-- slot is the big card at the bottom of the arc; the other slots ride up the sides.
+-- A slot with more than one weapon shows them stacked: the selected one in front, the
+-- rest peeking out above it (next one first). Scroll wheel steps through every weapon
+-- (through the stack, then on to the next slot, wraps), slot keys 1-6 jump to / cycle a
+-- slot, LMB or RMB equips, lastinv swaps back. Client only.
 
 hg = hg or {}
 hg.WeaponSelector = hg.WeaponSelector or {}
@@ -29,18 +31,23 @@ local C = {
 }
 
 local ARC_STEP    = math.rad(34)   -- angle between neighbouring cards
-local ARC_RADIUS  = 0.45           -- * ScrH
-local ARC_TOP     = 0.075          -- apex height, * ScrH
+local ARC_WIDTH   = 0.42           -- horizontal radius of the U, * ScrH
+local ARC_RISE    = 0.18           -- vertical radius (how fast the sides climb), * ScrH
+local TOP_MARGIN  = 0.02           -- gap above the top of the selected slot's stack, * ScrH
 local CARD_W      = 0.25           -- center card, * ScrH
 local CARD_H      = 0.13
-local SIDE_SCALE  = 0.85           -- side boxes vs the middle one
+local SIDE_SCALE  = 0.65           -- side boxes vs the middle one
 local SMALL_W     = 0.5            -- small (unselected) box, fraction of the big card
 local SMALL_H     = 0.56
 local VISIBLE     = 1.75           -- cards further than this (in steps) are hidden
 local LINE_SPAN   = 1.02           -- arc line ends at the side cards, like the sketch
 local LINE_THICK  = 3
 local SHOW_TIME   = 4
-local ICON_SCALE  = 0.7            -- icon size inside the small box (1 = fill it)
+local ICON_SCALE  = 0.92           -- icon size inside the small box (1 = fill it)
+local STACK_BIG   = 0.30           -- visible strip of each stacked weapon on the big card, * card height
+local STACK_SMALL = 0.24           -- same for the small side boxes
+local STACK_MAX   = 3              -- stacked weapons shown above a card (more slide in as you flip)
+local FLIP_SPEED  = 14             -- how fast the stack flips to the next weapon
 
 local gradDown = Material("vgui/gradient-d")
 
@@ -96,6 +103,21 @@ local function BuildList(ply)
     return list
 end
 
+-- one group per slot that has weapons: { slot = , items = { flat indices } }
+local function BuildGroups(list)
+    local groups, groupOf = {}, {}
+    for i, e in ipairs(list) do
+        local g = groups[#groups]
+        if not g or g.slot ~= e.slot then
+            g = {slot = e.slot, items = {}}
+            groups[#groups + 1] = g
+        end
+        g.items[#g.items + 1] = i
+        groupOf[i] = #groups
+    end
+    return groups, groupOf
+end
+
 local function IndexOf(list, wep)
     if not IsValid(wep) then return end
     for i, e in ipairs(list) do
@@ -117,16 +139,23 @@ function WS.GetSelectedWeapon()
     return e and e.wep
 end
 
+-- the arc moves in slot (group) steps; WS.Index is still the flat weapon index
 local function SetIndex(idx, n)
     if idx == WS.Index then return end
-    WS.Target = WS.Target + RingDelta(WS.Index, idx, n)
+    local groups, groupOf = WS.Groups or {}, WS.GroupOf or {}
+    local G = #groups
+    if G > 0 and groupOf[idx] then
+        local cur = Wrap(math.Round(WS.Target), G)
+        WS.Target = WS.Target + RingDelta(cur, groupOf[idx], G)
+    end
     WS.Index = idx
     WS.Pop = 1
 end
 
 local function OpenAt(list, ply)
     local idx = IndexOf(list, ply:GetActiveWeapon()) or 1
-    WS.Index, WS.Target, WS.Pos = idx, idx, idx
+    local g = WS.GroupOf and WS.GroupOf[idx] or 1
+    WS.Index, WS.Target, WS.Pos = idx, g, g
     WS.Open = true
     WS.Pop = 0.6
 end
@@ -139,9 +168,10 @@ local function DrawLine(x1, y1, x2, y2, thick)
     surface.DrawTexturedRectRotated((x1 + x2) * 0.5, (y1 + y2) * 0.5, len + 1, thick, -math.deg(math.atan2(dy, dx)))
 end
 
-local function ArcPoint(t, cx, apexY, R)
+-- U-shaped arc (half an ellipse): lowest at the middle (t = 0), rising towards the sides
+local function ArcPoint(t, cx, baseY, R)
     local a = t * ARC_STEP
-    return cx + R * math.sin(a), apexY + R * (1 - math.cos(a))
+    return cx + R * math.sin(a), baseY - R * (ARC_RISE / ARC_WIDTH) * (1 - math.cos(a))
 end
 
 local function Outline(x, y, w, h, col, a, thick)
@@ -200,9 +230,9 @@ local function FitName(str, font, maxW)
 end
 
 -- card geometry for arc offset t (in steps from the center).
--- Every weapon is a small box around its icon. The selected one grows into the big
--- card, with the small box sitting in its middle on the arc.
-local function CardGeo(t, cx, apexY, R, fade, appear)
+-- Every slot is a small box around its icon, standing on the arc. The selected one grows
+-- into the big card (still standing on the arc), with the icon box in its upper part.
+local function CardGeo(t, cx, baseY, R, fade, appear)
     local H = ScrH()
     local depth = math.abs(t)
     local near = math.min(depth, 1)
@@ -218,15 +248,13 @@ local function CardGeo(t, cx, apexY, R, fade, appear)
     local bw, bh = H * CARD_W * scale, H * CARD_H * scale
 
     local drop = (1 - appear) * H * 0.04
-    g.ax, g.ay = ArcPoint(t, cx, apexY, R)
+    g.ax, g.ay = ArcPoint(t, cx, baseY, R)
     g.ay = g.ay - drop
 
-    -- small box: threaded on the arc in the middle, hangs from it at the sides
-    local sCenterY = g.ay + Lerp(open, sh * 0.5 - sh * 0.08, 0)
+    -- small box stands on the arc; on the big card it sits in the upper part
+    local bx, by = g.ax - bw * 0.5, g.ay - bh
+    local sCenterY = Lerp(open, g.ay - sh * 0.5, by + bh * 0.42)
     g.sx, g.sy, g.sw, g.sh = g.ax - sw * 0.5, sCenterY - sh * 0.5, sw, sh
-
-    -- big card around it
-    local bx, by = g.ax - bw * 0.5, sCenterY - bh * 0.42
 
     g.x = Lerp(open, g.sx, bx)
     g.y = Lerp(open, g.sy, by)
@@ -236,12 +264,23 @@ local function CardGeo(t, cx, apexY, R, fade, appear)
     g.a = 255 * fade * Lerp(near, 1, 0.8)
     g.fade = fade
     g.pad = U(8) * scale
+    g.stripH = Lerp(open, sh * STACK_SMALL, bh * STACK_BIG)
     return g
+end
+
+-- copy of a card's geometry moved up/down by dy, with its alpha scaled
+local function ShiftGeo(g, dy, alpha)
+    local c = {}
+    for k, v in pairs(g) do c[k] = v end
+    c.y, c.sy, c.ay = g.y + dy, g.sy + dy, g.ay + dy
+    c.a = g.a * alpha
+    c.fade = g.fade * alpha
+    return c
 end
 
 local function DrawBody(g)
     if g.a <= 1 then return end
-    local body = C.body
+    local body = g.back and C.bodySide or C.body
     surface.SetDrawColor(body.r, body.g, body.b, body.a * g.fade)
     surface.DrawRect(g.x, g.y, g.w, g.h)
     if g.open > 0.01 then
@@ -284,6 +323,64 @@ local function DrawContents(g, e, activeWep)
     end
 end
 
+-- One slot = a deck of cards. items = flat indices, s = which item is in front (0-based,
+-- fractional while flipping). Card at depth d sits d strips higher; depth 0 is the front.
+-- While flipping, the card leaving the front slides down and fades out as it reappears
+-- at the back of the deck (and the other way round when scrolling backwards).
+local function DrawSlot(g, list, items, s, activeWep)
+    local m = #items
+    if m == 1 then
+        DrawBody(g)
+        DrawContents(g, list[items[1]], activeWep)
+        return
+    end
+
+    local lim = math.min(m - 1, STACK_MAX)
+    local layers, leaving = {}, nil
+
+    for p = 0, m - 1 do
+        local d = (p - s) % m
+        local e = list[items[p + 1]]
+
+        -- back copy: climbs into / fades out of the top of the deck
+        local backA = math.Clamp(lim + 1 - d, 0, 1)
+        if backA > 0.01 then layers[#layers + 1] = {d = d, e = e, alpha = backA} end
+
+        -- front copy of the card that's between "front" and "back of the deck"
+        if d > m - 1 then
+            leaving = {e = e, t = d - (m - 1)}  -- 1 = fully in front, 0 = gone
+        end
+    end
+
+    table.sort(layers, function(a, b) return a.d > b.d end)
+
+    for _, L in ipairs(layers) do
+        local c = ShiftGeo(g, -L.d * g.stripH, L.alpha)
+        local frontness = math.Clamp(1 - L.d * 2, 0, 1)
+        c.back = frontness < 0.5
+        c.open = g.open * (0.6 + 0.4 * frontness)
+        draw.NoTexture()
+        DrawBody(c)
+
+        -- stacked cards show their name in the strip that peeks out
+        if frontness < 1 and g.open > 0.02 then
+            local la = c.a * (1 - frontness) * g.open
+            Text(FitName(WS.GetPrintName(L.e.wep), "ChudWS_Small", g.w - g.pad * 2), "ChudWS_Small", g.ax, c.y + g.stripH * 0.5, C.dim, la, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        end
+        if frontness > 0 then
+            local cc = ShiftGeo(g, -L.d * g.stripH, L.alpha * frontness)
+            DrawContents(cc, L.e, activeWep)
+        end
+    end
+
+    if leaving and leaving.t > 0.01 then
+        local c = ShiftGeo(g, (1 - leaving.t) * g.h * 0.55, leaving.t)
+        draw.NoTexture()
+        DrawBody(c)
+        DrawContents(c, leaving.e, activeWep)
+    end
+end
+
 function WS.WeaponSelectorDraw(ply)
     if not IsValid(ply) or not ply:Alive() or GetGlobalBool("RadialInventory", false) then
         WS.Open = false
@@ -300,6 +397,9 @@ function WS.WeaponSelectorDraw(ply)
     local n = #list
     if n < 1 then return end
     WS.List = list
+    local groups, groupOf = BuildGroups(list)
+    WS.Groups, WS.GroupOf = groups, groupOf
+    local G = #groups
 
     -- keep the same weapon selected if the inventory changed under us
     if IsValid(WS.SelWep) then
@@ -318,32 +418,70 @@ function WS.WeaponSelectorDraw(ply)
     local appear = 1 - (1 - math.Clamp(fade, 0, 1)) ^ 3
     local H = ScrH()
     local cx = ScrW() * 0.5
-    local R = H * ARC_RADIUS
-    local apexY = H * ARC_TOP + (1 - appear) * -H * 0.03
+    local R = H * ARC_WIDTH
     local activeWep = ply:GetActiveWeapon()
+    local activeIdx = IndexOf(list, activeWep)
 
-    -- cards, far ones first
+    -- flip state of the selected slot's deck
+    local selGroup = groupOf[WS.Index]
+    local selItems = groups[selGroup].items
+    local selPos = 0
+    for p, idx in ipairs(selItems) do if idx == WS.Index then selPos = p - 1 break end end
+    local m = #selItems
+    if WS.StackGroup ~= groups[selGroup].slot or not WS.StackTarget then
+        WS.StackGroup = groups[selGroup].slot
+        WS.StackTarget, WS.StackPos = selPos, selPos
+    elseif m > 0 and Wrap(math.Round(WS.StackTarget) + 1, m) - 1 ~= selPos then
+        WS.StackTarget = math.Round(WS.StackTarget) + RingDelta(Wrap(math.Round(WS.StackTarget) + 1, m), selPos + 1, m)
+    end
+    WS.StackPos = WS.StackPos + (WS.StackTarget - WS.StackPos) * math.min(ft * FLIP_SPEED, 1)
+
+    -- dock to the top: the selected slot's whole deck fits under TOP_MARGIN
+    local bigH = H * CARD_H
+    local deckH = math.min(m - 1, STACK_MAX) * bigH * STACK_BIG
+    local wantBase = H * TOP_MARGIN + deckH + bigH
+    WS.BaseY = WS.BaseY and Lerp(math.min(ft * 12, 1), WS.BaseY, wantBase) or wantBase
+    local baseY = WS.BaseY + (1 - appear) * -H * 0.03
+
+    -- one card per slot, far ones first
     local cards = {}
-    for i, e in ipairs(list) do
-        local t = n == 1 and 0 or RingDelta(WS.Pos, i, n)
+    for gi, grp in ipairs(groups) do
+        local t = G == 1 and 0 or RingDelta(WS.Pos, gi, G)
         local depth = math.abs(t)
         if depth <= VISIBLE then
             local edge = depth > 1 and math.Clamp((VISIBLE - depth) / (VISIBLE - 1), 0, 1) or 1
-            cards[#cards + 1] = {e = e, g = CardGeo(t, cx, apexY, R, fade * edge, appear)}
+
+            -- front weapon: the selected one (animated flip), else the equipped one, else the first
+            local items = grp.items
+            local s
+            if gi == selGroup then
+                s = WS.StackPos
+            else
+                s = 0
+                for p, idx in ipairs(items) do
+                    if idx == activeIdx then s = p - 1 end
+                end
+            end
+
+            cards[#cards + 1] = {
+                items = items,
+                s = s,
+                g = CardGeo(t, cx, baseY, R, fade * edge, appear)
+            }
         end
     end
     table.sort(cards, function(a, b) return math.abs(a.g.t) > math.abs(b.g.t) end)
 
 
     -- arc line (behind the cards)
-    if n > 1 then
+    if G > 1 then
         draw.NoTexture()
         local segs = 40
         local lineY = (1 - appear) * H * 0.04
         local px, py
         for i = 0, segs do
             local t = -LINE_SPAN + (2 * LINE_SPAN) * i / segs
-            local x, y = ArcPoint(t, cx, apexY, R)
+            local x, y = ArcPoint(t, cx, baseY, R)
             y = y - lineY
             if px then
                 local edgeFade = math.Clamp((LINE_SPAN - math.abs(t)) / 0.12 + 0.35, 0, 1)
@@ -355,12 +493,12 @@ function WS.WeaponSelectorDraw(ply)
     end
 
     draw.NoTexture()
-    for _, c in ipairs(cards) do DrawBody(c.g) end
-
-    for _, c in ipairs(cards) do DrawContents(c.g, c.e, activeWep) end
+    for _, c in ipairs(cards) do
+        DrawSlot(c.g, list, c.items, c.s, activeWep)
+    end
 
     -- position counter under the arc
-    Text(WS.Index .. " / " .. n, "ChudWS_Tiny", cx, apexY + H * CARD_H * 0.62 + U(10), C.dim, 200 * fade, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+    Text(WS.Index .. " / " .. n, "ChudWS_Tiny", cx, baseY + U(12), C.dim, 200 * fade, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
 end
 
 --;; ---------------------------------------------------------------- input
@@ -409,6 +547,7 @@ function WS.ChangeSelectionWep(ply, key)
     local n = #list
     if n < 1 then return end
     WS.List = list
+    WS.Groups, WS.GroupOf = BuildGroups(list)
 
     local wasOpen = WS.Open and WS.Show > CurTime()
     if not wasOpen then OpenAt(list, ply) end
@@ -426,13 +565,12 @@ function WS.ChangeSelectionWep(ply, key)
         end
         if not first then return end
         SetIndex(nextInSlot or first, n)
-    elseif key == "invnext" then
-        WS.Index = Wrap(WS.Index + 1, n)
-        WS.Target = WS.Target + 1
-        WS.Pop = 1
     else
-        WS.Index = Wrap(WS.Index - 1, n)
-        WS.Target = WS.Target - 1
+        -- step one weapon; the arc only moves when that leaves the slot's stack
+        local dir = key == "invnext" and 1 or -1
+        local newIdx = Wrap(WS.Index + dir, n)
+        if WS.GroupOf[newIdx] ~= WS.GroupOf[WS.Index] then WS.Target = WS.Target + dir end
+        WS.Index = newIdx
         WS.Pop = 1
     end
 
@@ -464,9 +602,31 @@ function WS.SetActuallyWeapon(ply, cmd)
     surface.PlaySound("arc9_eft_shared/weapon_generic_spin" .. math.random(1, 10) .. ".ogg")
 end
 
-hook.Add("PlayerBindPress", "WeaponSelector_PlayerBindPress", WS.ChangeSelectionWep)
-hook.Add("HUDPaint", "WeaponSelector_Draw", function() WS.WeaponSelectorDraw(LocalPlayer()) end)
-hook.Add("StartCommand", "WeaponSelector_StartCommand", WS.SetActuallyWeapon)
+-- Settings > "Classic weapon selector": 1 = the old card selector (cl_weapon_selector_classic.lua)
+local classicVar = CreateClientConVar("hg_weaponselector_classic", "0", true, false, "Use the old card weapon selector instead of the arc", 0, 1)
+local function Classic()
+    local c = hg.WeaponSelectorClassic
+    return classicVar:GetBool() and c and c.WeaponSelectorDraw and c or nil
+end
+
+hook.Add("PlayerBindPress", "WeaponSelector_PlayerBindPress", function(ply, key, pressed)
+    local c = Classic()
+    if c then return c.ChangeSelectionWep(ply, key) end
+    return WS.ChangeSelectionWep(ply, key)
+end)
+hook.Add("HUDPaint", "WeaponSelector_Draw", function()
+    local c = Classic()
+    if c then
+        WS.Show, WS.Open = 0, false
+        return c.WeaponSelectorDraw(LocalPlayer())
+    end
+    WS.WeaponSelectorDraw(LocalPlayer())
+end)
+hook.Add("StartCommand", "WeaponSelector_StartCommand", function(ply, cmd)
+    local c = Classic()
+    if c then return c.SetActuallyWeapon(ply, cmd) end
+    return WS.SetActuallyWeapon(ply, cmd)
+end)
 
 hook.Add("HUDShouldDraw", "WeaponSelector_HUDShouldDraw", function(name)
     if name == "CHudWeaponSelection" then return false end

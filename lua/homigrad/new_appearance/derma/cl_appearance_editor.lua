@@ -65,6 +65,8 @@ local THUMB = {
     HANDS  = {fov=50, cam_pos=Vector(57,0,40), look_at=Vector(0,0,30)},
     TORSO  = {fov=50, cam_pos=Vector(57,0,40), look_at=Vector(0,0,30)},
     LEGS   = {fov=50, cam_pos=Vector(57,0,40), look_at=Vector(0,0,30)},
+    sheet  = {fov=50, cam_pos=Vector(57,0,40), look_at=Vector(0,0,30)},
+    shoes  = {fov=22, cam_pos=Vector(30,0,5),  look_at=Vector(0,0,5)},
     Hat    = {fov=10, cam_pos=Vector(25,0,10), look_at=Vector(0,0,10)},
     Face   = {fov=6,  cam_pos=Vector(20,0,8),  look_at=Vector(0,0,8)},
     Body   = {fov=10, cam_pos=Vector(35,0,15), look_at=Vector(0,0,15)},
@@ -180,6 +182,30 @@ local function GetThumbPreset(section)
     local p = THUMB[section]
     if not p then return 24, Vector(60,0,35), Vector(0,0,30) end
     return p.fov or 24, p.cam_pos or Vector(60,0,35), p.look_at or Vector(0,0,30)
+end
+
+-- bodygroup name -> { submodel name = true } for a model, cached (lowercase keys)
+local bodygroupMapCache = {}
+local function GetModelBodygroupMap(mdl)
+    if not isstring(mdl) or mdl == "" then return {} end
+    if bodygroupMapCache[mdl] then return bodygroupMapCache[mdl] end
+    local map = {}
+    if util.IsValidModel(mdl) then
+        local probe = ClientsideModel(mdl, RENDERGROUP_OTHER)
+        if IsValid(probe) then
+            for _, bg in ipairs(probe:GetBodyGroups() or {}) do
+                local subs = {}
+                for i = 0, #(bg.submodels or {}) do
+                    local name = bg.submodels[i]
+                    if isstring(name) then subs[string.lower(name)] = true end
+                end
+                map[string.lower(bg.name or "")] = subs
+            end
+            probe:Remove()
+        end
+    end
+    bodygroupMapCache[mdl] = map
+    return map
 end
 
 local function ApplyAppearanceToModel(ent, modelData, tbl, oKey, oMat, oBgKey, oBgID)
@@ -634,6 +660,7 @@ function UI.SelectorRow(parent, title, fnActive, fnClick, tooltip)
     row:SetText("")
     row:SetMouseInputEnabled(true)
     row.Title = title
+    row.SearchText = string.lower(tostring(title or "") .. " " .. tostring(tooltip or ""))
     if tooltip and tooltip != "" then row:SetTooltip(tooltip) end
     function row:DoClick() if fnClick then fnClick() end end
     function row:Think()
@@ -677,6 +704,7 @@ function UI.ModelRow(parent, title, modelData, fnActive, fnClick, subtitle)
     row:SetText("")
     row:SetCursor("hand")
     row.Title = title
+    row.SearchText = string.lower(tostring(title or "") .. " " .. tostring(subtitle or ""))
     function row:DoClick() if fnClick then fnClick() end end
     function row:Think()
         self.IsActive = fnActive and fnActive() or false
@@ -729,6 +757,7 @@ function UI.SkinRow(parent, title, family, main, slotID, fnActive)
     row.Family = family
     row.MainPanel = main
     row.SlotID = slotID
+    row.SearchText = string.lower(tostring(title or ""))
     row.CurrentIndex = 1
     row.HoverLerp = 0
     row.SpinAngle = 20
@@ -887,6 +916,7 @@ function UI.ClothingRow(parent, title, clothingKey, clothingMat, main, fnActive,
     row:SetText("")
     row:SetCursor("hand")
     row.Title = title
+    row.SearchText = string.lower(tostring(title or "") .. " " .. tostring(subtitle or ""))
     function row:DoClick() if fnClick then fnClick() end end
     function row:Think()
         self.IsActive = fnActive and fnActive() or false
@@ -914,6 +944,7 @@ function UI.BodygroupRow(parent, title, bgKey, bgStringID, main, fnActive, fnCli
     row:SetText("")
     row:SetCursor("hand")
     row.Title = title
+    row.SearchText = string.lower(tostring(title or "") .. " " .. tostring(subtitle or ""))
     function row:DoClick() if fnClick then fnClick() end end
     function row:Think()
         self.IsActive = fnActive and fnActive() or false
@@ -938,6 +969,7 @@ function UI.NoneRow(parent, fnActive, fnClick)
     row:DockMargin(MU(6), MU(1), MU(6), 0)
     row:SetText("")
     row:SetCursor("hand")
+    row.SearchText = "none"
     function row:DoClick() if fnClick then fnClick() end end
     function row:Think()
         self.IsActive = fnActive and fnActive() or false
@@ -1223,10 +1255,52 @@ function PANEL:PostInit()
         selectorHeaderTitle:SizeToContents()
         selectorHeaderHint:SetText(hint or "")
         selectorHeaderHint:SizeToContents()
+        -- search bar: filters the rows below by name / subtitle as you type
+        local search = vgui.Create("DTextEntry", selectorContent)
+        search:Dock(TOP)
+        search:DockMargin(MU(6), MU(2), MU(6), MU(4))
+        search:SetTall(MU(30))
+        search:SetFont("ZCity_Menu_Settings_Small")
+        search:SetPlaceholderText("Search " .. string.lower(title) .. "...")
+        search:SetUpdateOnType(true)
+        search:SetDrawLanguageID(false)
+        search.Paint = function(self, w, h)
+            surface.SetDrawColor(14, 14, 16, 235)
+            surface.DrawRect(0, 0, w, h)
+            local focus = self:HasFocus()
+            surface.SetDrawColor(focus and 170 or 100, focus and 170 or 100, focus and 175 or 104, 255)
+            surface.DrawOutlinedRect(0, 0, w, h, 1)
+            if self:GetText() == "" and not focus then
+                draw.SimpleText(self:GetPlaceholderText(), "ZCity_Menu_Settings_Small", MU(8), h / 2, Color(120, 120, 124), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            end
+            self:DrawTextEntryText(Color(236, 236, 236), Color(110, 110, 116), Color(236, 236, 236))
+        end
+        search:SetTextInset(MU(8), 0)
+
         local scroll = CreateScrollPanel(selectorContent)
         scroll:Dock(FILL)
         scroll.Paint = function() end
+        scroll.PaintOver = function(self, w, h)
+            if self.ChudNoMatch then
+                draw.SimpleText(self.ChudEmptyText or "No matches", "ZCity_Menu_Settings_Small", w / 2, MU(24), Color(140, 140, 144), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            end
+        end
         if fnBuild then fnBuild(scroll) end
+
+        function search:OnValueChange(text)
+            local q = string.lower(string.Trim(text or ""))
+            local shown = 0
+            for _, row in ipairs(scroll:GetCanvas():GetChildren()) do
+                local hay = row.SearchText or string.lower(tostring(row.Title or ""))
+                local visible = q == "" or string.find(hay, q, 1, true) ~= nil
+                row:SetVisible(visible)
+                if visible then shown = shown + 1 end
+            end
+            scroll.ChudNoMatch = shown == 0
+            scroll:GetCanvas():InvalidateLayout(true)
+            scroll:InvalidateLayout(true)
+            scroll:GetVBar():SetScroll(0)
+        end
         selectorPanel.TargetX = selectorPanel.OpenX
         return true
     end
@@ -1244,11 +1318,38 @@ function PANEL:PostInit()
         for k,v in pairs(APmodule.PlayerModels[2] or {}) do models[k]=v end
         OpenSelector("Model", "Model", "Select a player model", function(scroll)
             for k,v in SortedPairs(models) do
+                if APmodule.IsVIPModel and APmodule.IsVIPModel(k) then continue end -- those live under VIP
                 UI.SelectorRow(scroll, k, function() return main.AppearanceTable.AModel==k end, function()
                     main.AppearanceTable.AModel = k
                     UpdateAppearance(main.AppearanceTable)
                     PlayDraw()
                 end)
+            end
+        end)
+    end
+
+    -- VIP-only models (sh_zz_chud_vip_models.lua); the button only exists for VIP and above
+    local function OpenVIPModelMenu()
+        OpenSelector("VIP", "VIP", "VIP models", function(scroll)
+            local shown = 0
+            if APmodule.IsVIP and APmodule.IsVIP(lply) then
+                local models = {}
+                for k,v in pairs(APmodule.PlayerModels[1] or {}) do models[k]=v end
+                for k,v in pairs(APmodule.PlayerModels[2] or {}) do models[k]=v end
+                for k,v in SortedPairs(models) do
+                    if not (APmodule.IsVIPModel and APmodule.IsVIPModel(k)) then continue end
+                    if v.vipCustom and not util.IsValidModel(v.mdl) then continue end -- content not installed
+                    shown = shown + 1
+                    UI.SelectorRow(scroll, k, function() return main.AppearanceTable.AModel==k end, function()
+                        main.AppearanceTable.AModel = k
+                        UpdateAppearance(main.AppearanceTable)
+                        PlayDraw()
+                    end)
+                end
+            end
+            if shown == 0 then
+                scroll.ChudNoMatch = true
+                scroll.ChudEmptyText = "No VIP models yet"
             end
         end)
     end
@@ -1430,17 +1531,23 @@ function PANEL:PostInit()
             local targetKey = equipped[1]
             local function getAcc() return hg.Accessories[targetKey] end
             local function isFem() local md = main:GetCurrentModelData() return md and md.sex end
+            -- poses are offsets stored in the appearance (APoses), saved + sent to the server with it
             local function getPose()
                 local acc = getAcc()
                 if not acc then return nil end
                 return isFem() and acc.fempos or acc.malepos
             end
-            local function setPose(pos, ang, scale)
-                local acc = getAcc()
-                if not acc then return end
-                local pose = {pos, ang, scale}
-                if isFem() then acc.fempos = pose else acc.malepos = pose end
-                acc._poseModified = true
+            local function getOffset()
+                local poses = main.AppearanceTable.APoses
+                local off = istable(poses) and poses[targetKey]
+                if not istable(off) then return {0,0,0,0,0,0} end
+                return {tonumber(off[1]) or 0, tonumber(off[2]) or 0, tonumber(off[3]) or 0, tonumber(off[4]) or 0, tonumber(off[5]) or 0, tonumber(off[6]) or 0}
+            end
+            local function setOffset(off)
+                main.AppearanceTable.APoses = istable(main.AppearanceTable.APoses) and main.AppearanceTable.APoses or {}
+                local nonzero = false
+                for i = 1, 6 do if off[i] ~= 0 then nonzero = true break end end
+                main.AppearanceTable.APoses[targetKey] = nonzero and {off[1], off[2], off[3], off[4], off[5], off[6]} or nil
                 main:SyncSharedPreview()
             end
             local lbl = vgui.Create("DLabel", scroll)
@@ -1536,19 +1643,14 @@ function PANEL:PostInit()
                 return row
             end
             local poseSliders = {}
-            local origPoses = hg._OrigAccPoses or {}
             local function rebuildSliders()
                 for _,p in ipairs(poseSliders) do if IsValid(p) then p:Remove() end end
                 poseSliders = {}
                 local pose = getPose()
                 if not pose then return end
-                local orig = origPoses[targetKey]
-                local origPos = isFem() and orig and orig.fempos and orig.fempos[1] or orig and orig.malepos and orig.malepos[1] or pose[1]
-                local origAng = isFem() and orig and orig.fempos and orig.fempos[2] or orig and orig.malepos and orig.malepos[2] or pose[2]
-                local curPos = Vector(pose[1].x, pose[1].y, pose[1].z)
-                local curAng = Angle(pose[2].p, pose[2].y, pose[2].r)
+                local off = getOffset()
                 local function updatePose()
-                    setPose(Vector(curPos.x, curPos.y, curPos.z), Angle(curAng.p, curAng.y, curAng.r), pose[3] or 1)
+                    setOffset(off)
                 end
                 local function addPanel(p)
                     poseSliders[#poseSliders+1] = p
@@ -1561,9 +1663,9 @@ function PANEL:PostInit()
                 posLabel:SetTextColor(CLR.accent)
                 posLabel:SetText("Position (offset)")
                 posLabel:SizeToContents()
-                addPanel(makeSlider(scroll, "X", -5, 5, curPos.x - origPos.x, function(v) curPos.x = origPos.x + v updatePose() end))
-                addPanel(makeSlider(scroll, "Y", -5, 5, curPos.y - origPos.y, function(v) curPos.y = origPos.y + v updatePose() end))
-                addPanel(makeSlider(scroll, "Z", -5, 5, curPos.z - origPos.z, function(v) curPos.z = origPos.z + v updatePose() end))
+                addPanel(makeSlider(scroll, "X", -5, 5, off[1], function(v) off[1] = v updatePose() end))
+                addPanel(makeSlider(scroll, "Y", -5, 5, off[2], function(v) off[2] = v updatePose() end))
+                addPanel(makeSlider(scroll, "Z", -5, 5, off[3], function(v) off[3] = v updatePose() end))
                 local angLabel = addPanel(vgui.Create("DLabel", scroll))
                 angLabel:Dock(TOP)
                 angLabel:DockMargin(MU(6),MU(6),MU(6),MU(2))
@@ -1571,9 +1673,9 @@ function PANEL:PostInit()
                 angLabel:SetTextColor(CLR.accent)
                 angLabel:SetText("Angle (offset)")
                 angLabel:SizeToContents()
-                addPanel(makeSlider(scroll, "P", -180, 180, curAng.p - origAng.p, function(v) curAng.p = origAng.p + v updatePose() end))
-                addPanel(makeSlider(scroll, "Y", -180, 180, curAng.y - origAng.y, function(v) curAng.y = origAng.y + v updatePose() end))
-                addPanel(makeSlider(scroll, "R", -180, 180, curAng.r - origAng.r, function(v) curAng.r = origAng.r + v updatePose() end))
+                addPanel(makeSlider(scroll, "P", -180, 180, off[4], function(v) off[4] = v updatePose() end))
+                addPanel(makeSlider(scroll, "Y", -180, 180, off[5], function(v) off[5] = v updatePose() end))
+                addPanel(makeSlider(scroll, "R", -180, 180, off[6], function(v) off[6] = v updatePose() end))
 
                 local resetBtn = addPanel(vgui.Create("DButton", scroll))
                 resetBtn:Dock(TOP)
@@ -1588,17 +1690,7 @@ function PANEL:PostInit()
                     draw.SimpleText("Reset Pose", "ZCity_Menu_Settings_Tiny", w*0.5, h*0.5, CLR.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
                 end
                 resetBtn.DoClick = function()
-                    local acc = getAcc()
-                    if not acc then return end
-                    local orig = origPoses[targetKey]
-                    if not orig then return end
-                    if isFem() and orig.fempos then
-                        acc.fempos = {Vector(orig.fempos[1]), Angle(orig.fempos[2]), orig.fempos[3]}
-                    elseif orig.malepos then
-                        acc.malepos = {Vector(orig.malepos[1]), Angle(orig.malepos[2]), orig.malepos[3]}
-                    end
-                    acc._poseModified = nil
-                    main:SyncSharedPreview()
+                    setOffset({0,0,0,0,0,0})
                     rebuildSliders()
                     surface.PlaySound(SND.ok)
                 end
@@ -1615,9 +1707,9 @@ function PANEL:PostInit()
                     draw.SimpleText("Save Poses", "ZCity_Menu_Settings_Tiny", w*0.5, h*0.5, CLR.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
                 end
                 saveBtn.DoClick = function()
-                    hg.Appearance.SavePoses()
-                    surface.PlaySound(SND.ok)
-                    notification.AddLegacy("Poses saved!", NOTIFY_GENERIC, 3)
+                    -- saves the whole appearance and sends it to the server (poses are part of it)
+                    ApplyAppearance()
+                    notification.AddLegacy("Poses saved! Everyone sees them now.", NOTIFY_GENERIC, 4)
                 end
             end
             picker.OnSelect = function(self, i, v, d) targetKey = d rebuildSliders() end
@@ -1662,14 +1754,23 @@ function PANEL:PostInit()
         local modelData = main:GetCurrentModelData()
         if not modelData then return end
         OpenSelector(title, title, "Select "..title, function(scroll)
+            -- only list styles this model actually has (TORSO/LEGS = old models, sheet/pants/shoes = slav models)
+            local available = GetModelBodygroupMap(modelData.mdl)[string.lower(bgKey)]
+            local shown = 0
             for k,v in SortedPairs((hg.Appearance.Bodygroups[bgKey] and hg.Appearance.Bodygroups[bgKey][modelData.sex and 2 or 1]) or {}) do
                 local bgID = istable(v) and v[1] or nil
+                if not available or not isstring(bgID) or not available[string.lower(bgID)] then continue end
+                shown = shown + 1
                 UI.BodygroupRow(scroll, k, bgKey, bgID, main, function() return (main.AppearanceTable.ABodygroups and main.AppearanceTable.ABodygroups[bgKey])==k end, function()
                     main.AppearanceTable.ABodygroups = main.AppearanceTable.ABodygroups or {}
                     main.AppearanceTable.ABodygroups[bgKey] = k
                     main:SyncSharedPreview()
                     PlayDraw()
                 end)
+            end
+            if shown == 0 then
+                scroll.ChudNoMatch = true
+                scroll.ChudEmptyText = "Not available on this model"
             end
         end)
     end
@@ -2009,6 +2110,9 @@ function PANEL:PostInit()
     })
     UI.SectionLabel(sidebar, "Bodygroups")
     UI.ButtonGrid(sidebar, {
+        {"Top", function() OpenBodygroupMenu("sheet","Top Style") end, function() return main.ActiveSection=="Top Style" end},
+        {"Pants Fit", function() OpenBodygroupMenu("pants","Pants Style") end, function() return main.ActiveSection=="Pants Style" end},
+        {"Shoes", function() OpenBodygroupMenu("shoes","Shoes Style") end, function() return main.ActiveSection=="Shoes Style" end},
         {"Torso", function() OpenBodygroupMenu("TORSO","Torso Shape") end, function() return main.ActiveSection=="Torso Shape" end},
         {"Legs", function() OpenBodygroupMenu("LEGS","Legs Shape") end, function() return main.ActiveSection=="Legs Shape" end}
     })
@@ -2135,7 +2239,8 @@ function PANEL:PostInit()
     local lowerActions = vgui.Create("DPanel", sidebar)
     lowerActions:Dock(TOP)
     lowerActions:DockMargin(MU(8), MU(6), MU(8), MU(3))
-    lowerActions:SetTall(MU(CFG.actBtnH)*4 + MU(6))
+    local showVIP = APmodule.IsVIP and APmodule.IsVIP(lply)
+    lowerActions:SetTall(MU(CFG.actBtnH)*(showVIP and 5 or 4) + MU(showVIP and 8 or 6))
     lowerActions.Paint = function(this,w,h)
         surface.SetDrawColor(255,255,255,18)
         surface.DrawRect(0,0,w,1)
@@ -2150,6 +2255,10 @@ function PANEL:PostInit()
     saveBtn.StartDelay = 0.04
     loadBtn.StartDelay = 0.08
     delBtn.StartDelay = 0.12
+    if showVIP then
+        local vipBtn = UI.ActionButton(lowerActions, "VIP", function() OpenVIPModelMenu() end, function() return main.ActiveSection=="VIP" end)
+        vipBtn.StartDelay = 0.16
+    end
 
     function self:Close() TryExit() end
     self:CallbackAppearance()

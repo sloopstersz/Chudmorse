@@ -61,7 +61,21 @@ local rebel_models = {
     ["Female 03"] = "models/player/group03/female_03.mdl",
     ["Female 04"] = "models/player/group03/female_04.mdl",
     ["Female 05"] = "models/player/group03/female_05.mdl",
-    ["Female 06"] = "models/player/group03/female_06.mdl"
+    ["Female 06"] = "models/player/group03/female_06.mdl",
+    -- extra appearance models (sh_zz_chud_extra_appearance.lua)
+    ["Male 10"]          = "models/player/group03/male_02.mdl",
+    ["Male Barney"]      = "models/player/group03/male_02.mdl",
+    ["Male Bill"]        = "models/player/group03/male_08.mdl",
+    ["Male Cheaple"]     = "models/player/group03/male_04.mdl",
+    ["Male Cohrt"]       = "models/player/group03/male_08.mdl",
+    ["Male Eli"]         = "models/player/group03/male_03.mdl",
+    ["Male JohnWick"]    = "models/player/group03/male_09.mdl",
+    ["Male Leet"]        = "models/player/group03/male_07.mdl",
+    ["Male Travis"]      = "models/player/group03/male_07.mdl",
+    ["Female Mossman"]   = "models/player/group03/female_01.mdl",
+    ["Female Rochelle"]  = "models/player/group03/female_03.mdl",
+    ["Female BlackMesa"] = "models/player/group03/female_02.mdl",
+    ["Female Zoey"]      = "models/player/group03/female_01.mdl"
 }
 
 local rebel_medic_models = {

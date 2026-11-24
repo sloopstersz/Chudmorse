@@ -286,6 +286,19 @@ local function GetAccessoryColorOverride(ply, ent, accessoryKey)
 	end
 end
 
+-- Per-player accessory pose offsets (Appearance > Poses). Stored in the appearance as APoses,
+-- checked by the server and networked as the "AccessoryPoses" netvar so everyone sees them.
+-- { x, y, z, pitch, yaw, roll } added on top of the accessory's default pose.
+local function GetAccessoryPoseOffset(ply, ent, accessoryKey)
+	local preview = ent and ent.PreviewAccessoryPoses
+	if istable(preview) then return preview[accessoryKey] end
+
+	local netPoses = (ent and ent.GetNetVar and ent:GetNetVar("AccessoryPoses", nil)) or (ply and ply.GetNetVar and ply:GetNetVar("AccessoryPoses", nil))
+	return istable(netPoses) and netPoses[accessoryKey] or nil
+end
+
+local posePosScratch, poseAngScratch = Vector(), Angle()
+
 local AccessoryBlockedByArmorSlot = {
 	["head1"] = "head",
 	["spine"] = "torso",
@@ -430,7 +443,16 @@ function DrawAccesories(ply, ent, accessories,accessData, islply, force, setup)
 
 		local addvec = ((ent:GetModel() == "models/player/group01/male_06.mdl") and ((accessData.placement == "head") or (accessData.placement == "face"))) and huy_addvec or vector_origin
 
-		local pos, ang = LocalToWorld(accessData[fem and "fempos" or "malepos"][1], accessData[fem and "fempos" or "malepos"][2], bonePos, boneAng)
+		local basePose = accessData[fem and "fempos" or "malepos"]
+		local localPos, localAng = basePose[1], basePose[2]
+		local poseOffset = GetAccessoryPoseOffset(ply, ent, accessories)
+		if istable(poseOffset) then
+			posePosScratch:SetUnpacked(localPos.x + (tonumber(poseOffset[1]) or 0), localPos.y + (tonumber(poseOffset[2]) or 0), localPos.z + (tonumber(poseOffset[3]) or 0))
+			poseAngScratch:SetUnpacked(localAng.p + (tonumber(poseOffset[4]) or 0), localAng.y + (tonumber(poseOffset[5]) or 0), localAng.r + (tonumber(poseOffset[6]) or 0))
+			localPos, localAng = posePosScratch, poseAngScratch
+		end
+
+		local pos, ang = LocalToWorld(localPos, localAng, bonePos, boneAng)
 		local pos = LocalToWorld(addvec, angle_zero, pos, ang)
 		
 		--model:SetupBones()
@@ -653,58 +675,39 @@ function RenderAccessoriesCool(ent,ply)
 	end
 end
 
-local posesDir = "judge/appearances/"
-local posesFile = posesDir .. "poses.json"
+-- Old client-only poses (data/judge/appearances/poses.json) changed hg.Accessories for this
+-- client only, so nobody else saw them. Poses now live in the appearance (APoses) and go through
+-- the server. This converts an old poses.json once, then renames it.
+local oldPosesFile = "judge/appearances/poses.json"
 
-function hg.Appearance.SavePoses()
-	local data = {}
-	for key, acc in pairs(hg.Accessories) do
-		if acc._poseModified then
-			data[key] = {
-				malepos = {
-					{acc.malepos[1].x, acc.malepos[1].y, acc.malepos[1].z},
-					{acc.malepos[2].p, acc.malepos[2].y, acc.malepos[2].r},
-					acc.malepos[3]
-				},
-				fempos = {
-					{acc.fempos[1].x, acc.fempos[1].y, acc.fempos[1].z},
-					{acc.fempos[2].p, acc.fempos[2].y, acc.fempos[2].r},
-					acc.fempos[3]
-				}
+local function MigrateOldPoses()
+	if not file.Exists(oldPosesFile, "DATA") then return end
+	local data = util.JSONToTable(file.Read(oldPosesFile, "DATA") or "")
+	local tbl = hg.Appearance.LoadAppearanceFile and hg.Appearance.LoadAppearanceFile(hg.Appearance.SelectedAppearance and hg.Appearance.SelectedAppearance:GetString() or "main")
+	if istable(data) and istable(tbl) then
+		local md = hg.Appearance.PlayerModels and (hg.Appearance.PlayerModels[1][tbl.AModel] or hg.Appearance.PlayerModels[2][tbl.AModel])
+		local sexKey = (md and md.sex) and "fempos" or "malepos"
+		tbl.APoses = istable(tbl.APoses) and tbl.APoses or {}
+		for key, saved in pairs(data) do
+			local orig = hg._OrigAccPoses and hg._OrigAccPoses[key] and hg._OrigAccPoses[key][sexKey]
+			local pose = saved[sexKey]
+			if tbl.APoses[key] or not orig or not istable(pose) or not istable(pose[1]) or not istable(pose[2]) then continue end
+			tbl.APoses[key] = {
+				(pose[1][1] or 0) - orig[1].x, (pose[1][2] or 0) - orig[1].y, (pose[1][3] or 0) - orig[1].z,
+				(pose[2][1] or 0) - orig[2].p, (pose[2][2] or 0) - orig[2].y, (pose[2][3] or 0) - orig[2].r
 			}
 		end
+		if hg.Appearance.SanitizeAccessoryPoses then
+			tbl.APoses = hg.Appearance.SanitizeAccessoryPoses(tbl.APoses, tbl.AAttachments)
+		end
+		hg.Appearance.CreateAppearanceFile(nil, tbl)
 	end
-	file.CreateDir(posesDir)
-	file.Write(posesFile, util.TableToJSON(data, true))
+	file.Write("judge/appearances/poses_migrated.json", file.Read(oldPosesFile, "DATA") or "")
+	file.Delete(oldPosesFile)
 end
 
-function hg.Appearance.LoadPoses()
-	if not file.Exists(posesFile, "DATA") then return end
-	local data = util.JSONToTable(file.Read(posesFile, "DATA"))
-	if not data then return end
-	for key, saved in pairs(data) do
-		local acc = hg.Accessories[key]
-		if not acc then continue end
-		if saved.malepos then
-			acc.malepos = {
-				Vector(saved.malepos[1][1], saved.malepos[1][2], saved.malepos[1][3]),
-				Angle(saved.malepos[2][1], saved.malepos[2][2], saved.malepos[2][3]),
-				saved.malepos[3]
-			}
-		end
-		if saved.fempos then
-			acc.fempos = {
-				Vector(saved.fempos[1][1], saved.fempos[1][2], saved.fempos[1][3]),
-				Angle(saved.fempos[2][1], saved.fempos[2][2], saved.fempos[2][3]),
-				saved.fempos[3]
-			}
-		end
-		acc._poseModified = true
-	end
-end
-
-hook.Add("InitPostEntity", "HG_LoadAccessoryPoses", function()
-	timer.Simple(1, function() hg.Appearance.LoadPoses() end)
+hook.Add("InitPostEntity", "HG_MigrateAccessoryPoses", function()
+	timer.Simple(1, MigrateOldPoses)
 end)
 
 function hg.RenderBandageGloves(ent, ply)

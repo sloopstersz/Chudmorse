@@ -56,8 +56,17 @@ local function addModeHook( MODE, hookName, func )
 	end )
 end
 
+-- Chudmorse: modes shelved for a rework. Their folders are skipped even if old copies are
+-- still on the server, so they never load, never get picked and never show up in F6 / votes.
+-- Remove a name here to bring the mode back.
+zb.DisabledModes = {
+	framed = true,   -- Framed!
+	zzombies = true, -- Z-Zombies
+}
+
 local function InitMode()
 	if table.IsEmpty(MODE) then return end
+	if zb.DisabledModes[MODE.name] then return end
 
 	local name = MODE.name
 	local saved = zb.modes[name] and zb.modes[name].saved or {} -- saved table is used for saving data between hotloads
@@ -148,10 +157,18 @@ local function LoadModes()
 	end
 
 	for _, v in ipairs(folders) do
+		if zb.DisabledModes[string.lower(v)] then continue end
 		MODE = {}
 		LoadFromDir(directory .. "/" .. v)
 		InitMode()
 		MODE = nil
+	end
+
+	if SERVER then
+		for name in pairs(zb.DisabledModes) do
+			zb.modes[name] = nil
+			zb.ModesChances[name] = nil
+		end
 	end
 
 	if SERVER and !file.Exists(chancesfile,  "DATA") then

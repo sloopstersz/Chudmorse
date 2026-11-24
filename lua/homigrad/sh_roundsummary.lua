@@ -1115,6 +1115,9 @@ local function SetupModel(mp, ply, model, pose, spec, appearance, playerClassNam
 		end
 		local acc = IsValid(ply) and ply.GetNetVar and ply:GetNetVar("Accessories") or (istable(appearance) and appearance.AAttachments)
 		if istable(acc) and hg and hg.Accessories and DrawAccesories then
+			-- player's pose offsets (Appearance > Poses)
+			local poses = IsValid(ply) and ply.GetNetVar and ply:GetNetVar("AccessoryPoses") or (istable(appearance) and appearance.APoses)
+			ent.PreviewAccessoryPoses = istable(poses) and poses or {}
 			for _, a in ipairs(acc) do
 				local d = hg.Accessories[a]
 				if d then DrawAccesories(ent, ent, a, d, false, true) end

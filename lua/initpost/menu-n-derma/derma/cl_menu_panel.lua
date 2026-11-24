@@ -831,6 +831,7 @@ function PANEL:CreateAppearancePreview()
     function preview:PostDrawModel(ent)
         local appearance = self.AppearanceTable
         if not appearance or not appearance.AAttachments then return end
+        ent.PreviewAccessoryPoses = istable(appearance.APoses) and appearance.APoses or {}
         for _, attach in ipairs(appearance.AAttachments) do
             local accessoryData = hg.Accessories and hg.Accessories[attach]
             if accessoryData then
