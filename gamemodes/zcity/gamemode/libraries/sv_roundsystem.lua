@@ -13,8 +13,7 @@ local ZB_FORCED_TEMP_MODE_WEIGHTS = {
         ["hmcd"] = 0.85,
         ["dm"] = 0.1,
         ["tdm"] = 0.05,
-        ["riot"] = 0.05,
-        ["framed"] = 0.1
+        ["riot"] = 0.05
 }
 local ZB_FORCED_MODE_POOL = {
         ["hmcd"] = true,
@@ -31,9 +30,7 @@ local ZB_FORCED_MODE_POOL = {
         ["chudbeasts"] = true,
         ["turfwars"] = true,
         ["chaos"] = true,
-        ["hl2tdm"] = true,
-        ["zzombies"] = true,
-        ["framed"] = true
+        ["hl2tdm"] = true
 }
 local ZB_NO_BACK_TO_BACK_MODES = {
         ["dm"] = true,

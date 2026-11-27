@@ -2014,7 +2014,7 @@ function SWEP:GetAdditionalValues()
 	
 	if not huypitch then
 		local torso = ply:LookupBone("ValveBiped.Bip01_Spine1")
-		local tmat = ent:GetBoneMatrix(torso)
+		local tmat = torso and ent:GetBoneMatrix(torso)
 		
 		if tmat then
 			local ang2 = tmat:GetAngles():Forward()
@@ -2201,8 +2201,8 @@ function SWEP:SetHandPos(noset)
 	//self.lhandik = self.setlhik != false and !(ply.organism and ply.organism.larm == 1 or ply.organism.larmdislocation)
 	local rh, lh = ply:LookupBone("ValveBiped.Bip01_R_Hand"), ply:LookupBone("ValveBiped.Bip01_L_Hand")
 	
-	local rhmat = ent:GetBoneMatrix(rh)
-	local lhmat = ent:GetBoneMatrix(lh)
+	local rhmat = rh and ent:GetBoneMatrix(rh)
+	local lhmat = lh and ent:GetBoneMatrix(lh)
 
 	ply.rhold = rhmat
 	ply.lhold = lhmat

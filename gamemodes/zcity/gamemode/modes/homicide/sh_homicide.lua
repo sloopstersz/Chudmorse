@@ -55,19 +55,19 @@ local HeroUpgradeData = {
 	["hero_glock_ammo"] = {parent = "weapon_glock17", type = "ammo", extraClips = 1},
 	["hero_usp_silencer"] = {parent = "weapon_hk_usp", type = "attachment", attachment = "supressor4"},
 	["hero_usp_ammo"] = {parent = "weapon_hk_usp", type = "ammo", extraClips = 1},
-	["hero_remington_sight"] = {parent = "weapon_remington870", type = "attachment", attachment = "holo16"},
+	["hero_remington_sight"] = {parent = "weapon_remington870", type = "attachment", attachment = "holo15"},
 	["hero_remington_ammo"] = {parent = "weapon_remington870", type = "ammo", extraClips = 1},
-	["hero_remington_long_sight"] = {parent = "weapon_remington870_long", type = "attachment", attachment = "holo16"},
+	["hero_remington_long_sight"] = {parent = "weapon_remington870_long", type = "attachment", attachment = "holo15"},
 	["hero_remington_long_ammo"] = {parent = "weapon_remington870_long", type = "ammo", extraClips = 1},
-	["hero_remington_sawedoff_sight"] = {parent = "weapon_remington870_sawed_off", type = "attachment", attachment = "holo16"},
+	["hero_remington_sawedoff_sight"] = {parent = "weapon_remington870_sawed_off", type = "attachment", attachment = "holo15"},
 	["hero_remington_sawedoff_ammo"] = {parent = "weapon_remington870_sawed_off", type = "ammo", extraClips = 1},
 	["hero_kar98_scope"] = {parent = "weapon_kar98", type = "attachment", attachment = "optic12"},
 	["hero_kar98_ammo"] = {parent = "weapon_kar98", type = "ammo", extraClips = 1},
 	["hero_vpo209_silencer"] = {parent = "weapon_vpo209", type = "attachment", attachment = "supressor1"},
-	["hero_vpo209_optic"] = {parent = "weapon_vpo209", type = "attachment", attachment = "holo16"},
+	["hero_vpo209_optic"] = {parent = "weapon_vpo209", type = "attachment", attachment = "holo15"},
 	["hero_vpo209_ammo"] = {parent = "weapon_vpo209", type = "ammo", extraClips = 1},
 	["hero_vpo136_silencer"] = {parent = "weapon_vpo136", type = "attachment", attachment = "supressor1"},
-	["hero_vpo136_optic"] = {parent = "weapon_vpo136", type = "attachment", attachment = "holo16"},
+	["hero_vpo136_optic"] = {parent = "weapon_vpo136", type = "attachment", attachment = "holo15"},
 	["hero_vpo136_ammo"] = {parent = "weapon_vpo136", type = "ammo", extraClips = 1},
 	["hero_mosin_silencer"] = {parent = "weapon_mosin", type = "attachment", attachment = "supressor1"},
 	["hero_mosin_scope"] = {parent = "weapon_mosin", type = "attachment", attachment = "optic12"},
@@ -109,6 +109,14 @@ local TraitorSkillsetSubRoles = {
 	["infiltrator"] = "traitor_infiltrator",
 	["assassin"] = "traitor_assasin",
 	["chemist"] = "traitor_chemist",
+}
+
+-- Loadout menu "Extra Ammo" add-ons -> the gun they belong to (cl_menu_traitor.lua addons)
+local TraitorAmmoAddons = {
+	["weapon_p22_ammo"] = "weapon_p22",
+	["weapon_pm9_ammo"] = "weapon_pm9",
+	["weapon_tokarev_ammo"] = "weapon_tokarev",
+	["weapon_tranquilizer_ammo"] = "weapon_tranquilizer",
 }
 
 local function ApplyTraitorLoadout(ply)
@@ -171,8 +179,9 @@ local function ApplyTraitorLoadout(ply)
 					if hg and hg.AddAttachmentForce then hg.AddAttachmentForce(ply, w, "supressor4") end
 				end
 			end)
-		elseif wep == "weapon_p22_ammo" or wep == "weapon_pm9_ammo" then
-			local parentWeapon = wep == "weapon_pm9_ammo" and "weapon_pm9" or "weapon_p22"
+		elseif TraitorAmmoAddons[wep] then
+			-- "<gun> Extra Ammo": one more magazine for that gun (P22, PM9, TT-33, Tranquilizer)
+			local parentWeapon = TraitorAmmoAddons[wep]
 			timer.Simple(0.5, function()
 				if IsValid(ply) and ply:HasWeapon(parentWeapon) then
 					local w = ply:GetWeapon(parentWeapon)
@@ -191,6 +200,10 @@ local function ApplyTraitorLoadout(ply)
 				hasPL15 = true
 			elseif wep == "weapon_taser" then
 				hasTaser = true
+				-- one spare cartridge, same as the assistant's starter taser
+				if IsValid(w) and w:GetPrimaryAmmoType() >= 0 then
+					ply:GiveAmmo(w:GetMaxClip1(), w:GetPrimaryAmmoType(), true)
+				end
 			end
 		end
 	end

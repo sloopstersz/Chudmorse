@@ -63,6 +63,10 @@ local VIP_CUSTOM_MODELS = {
 
 -- ULX group names that count as VIP (lowercase). Groups inheriting from these count too.
 local VIP_GROUPS = { "vip" } -- add more, e.g. { "vip", "donator" }
+
+-- Staff ranks that always count as VIP+, plus anything inheriting from them (ULX).
+-- Custom ranks like owner / co-owner usually inherit superadmin, but list them too in case they don't.
+local STAFF_GROUPS = { "superadmin", "admin", "owner", "co-owner", "coowner", "co_owner" }
 -------------------------------------------------------------------------------
 
 hg.Appearance.VIPModels = {}
@@ -108,9 +112,11 @@ function hg.Appearance.IsVIP(ply)
 	if ply:IsAdmin() or ply:IsSuperAdmin() then return true end
 
 	local group = string.lower(ply:GetUserGroup() or "")
-	for _, g in ipairs(VIP_GROUPS) do
-		if group == g then return true end
-		if ply.CheckGroup and ply:CheckGroup(g) then return true end
+	for _, list in ipairs({VIP_GROUPS, STAFF_GROUPS}) do
+		for _, g in ipairs(list) do
+			if group == g then return true end
+			if ply.CheckGroup and ply:CheckGroup(g) then return true end
+		end
 	end
 
 	return false
