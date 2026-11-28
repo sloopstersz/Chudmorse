@@ -134,6 +134,9 @@ hg.settings:AddOpt("Gameplay","rem_summary_classic", "Remorse Old Round Summary"
 CreateClientConVar("hg_weaponselector_classic", "0", true, false, "Use the old card weapon selector instead of the arc", 0, 1)
 hg.settings.help["hg_weaponselector_classic"] = "On = old card weapon selector. Off = new arc weapon selector."
 hg.settings:AddOpt("Gameplay","hg_weaponselector_classic", "Classic weapon selector", nil, nil, "bool")
+CreateClientConVar("hg_weaponselector_reverse", "0", true, false, "Reverse which way the arc weapon selector rolls", 0, 1)
+hg.settings.help["hg_weaponselector_reverse"] = "Flip which way the weapon arc rolls when you scroll."
+hg.settings:AddOpt("Gameplay","hg_weaponselector_reverse", "Reverse weapon selector scroll", nil, nil, "bool")
 if not game.IsDedicated() then
 	hg.settings:AddOpt("Serverside gameplay","hg_toughnpcs", "Tough npcs")
 	hg.settings:AddOpt("Serverside gameplay","hg_thirdperson", "Thirdperson (WIP)")

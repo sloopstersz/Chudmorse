@@ -125,6 +125,8 @@ local function IndexOf(list, wep)
     end
 end
 
+local WS_Reverse = CreateClientConVar("hg_weaponselector_reverse", "0", true, false, "Reverse which way the arc weapon selector rolls", 0, 1)
+
 local function Wrap(i, n) return (i - 1) % n + 1 end
 
 -- shortest signed distance from a to b on a ring of n
@@ -327,8 +329,23 @@ end
 -- fractional while flipping). Card at depth d sits d strips higher; depth 0 is the front.
 -- While flipping, the card leaving the front slides down and fades out as it reappears
 -- at the back of the deck (and the other way round when scrolling backwards).
-local function DrawSlot(g, list, items, s, activeWep)
+-- Strip above the selected card showing the weapon the next scroll goes to, when it's
+-- in another slot (so there's always something ahead, even on a slot's last weapon).
+local function DrawNextStrip(g, nextE)
+    if not nextE or g.open <= 0.02 then return end
+    local c = ShiftGeo(g, -g.stripH, 0.9)
+    c.back = true
+    c.open = g.open * 0.6
+    draw.NoTexture()
+    DrawBody(c)
+    local la = c.a * g.open
+    Text(FitName("Next: " .. WS.GetPrintName(nextE.wep), "ChudWS_Small", g.w - g.pad * 2), "ChudWS_Small", g.ax, c.y + g.stripH * 0.5, C.dim, la, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+end
+
+local function DrawSlot(g, list, items, s, activeWep, nextE)
     local m = #items
+    -- nothing left ahead in this slot: preview the next weapon instead
+    if nextE and s >= m - 1 - 0.001 then DrawNextStrip(g, nextE) end
     if m == 1 then
         DrawBody(g)
         DrawContents(g, list[items[1]], activeWep)
@@ -338,17 +355,17 @@ local function DrawSlot(g, list, items, s, activeWep)
     local lim = math.min(m - 1, STACK_MAX)
     local layers, leaving = {}, nil
 
+    -- only the weapons still ahead in this slot are stacked; ones you've scrolled past are gone
     for p = 0, m - 1 do
-        local d = (p - s) % m
+        local d = p - s
         local e = list[items[p + 1]]
 
-        -- back copy: climbs into / fades out of the top of the deck
-        local backA = math.Clamp(lim + 1 - d, 0, 1)
-        if backA > 0.01 then layers[#layers + 1] = {d = d, e = e, alpha = backA} end
-
-        -- front copy of the card that's between "front" and "back of the deck"
-        if d > m - 1 then
-            leaving = {e = e, t = d - (m - 1)}  -- 1 = fully in front, 0 = gone
+        if d >= 0 then
+            local backA = math.Clamp(lim + 1 - d, 0, 1)
+            if backA > 0.01 then layers[#layers + 1] = {d = d, e = e, alpha = backA} end
+        elseif d > -1 then
+            -- the card just passed slides down and fades out
+            leaving = {e = e, t = 1 + d}  -- 1 = fully in front, 0 = gone
         end
     end
 
@@ -363,9 +380,10 @@ local function DrawSlot(g, list, items, s, activeWep)
         DrawBody(c)
 
         -- stacked cards show their name in the strip that peeks out
-        if frontness < 1 and g.open > 0.02 then
-            local la = c.a * (1 - frontness) * g.open
-            Text(FitName(WS.GetPrintName(L.e.wep), "ChudWS_Small", g.w - g.pad * 2), "ChudWS_Small", g.ax, c.y + g.stripH * 0.5, C.dim, la, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        if frontness < 1 then
+            local la = c.a * (1 - frontness)
+            local font = g.open > 0.5 and "ChudWS_Small" or "ChudWS_Tiny"
+            Text(FitName(WS.GetPrintName(L.e.wep), font, g.w - g.pad), font, g.ax, c.y + g.stripH * 0.5, C.dim, la, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         end
         if frontness > 0 then
             local cc = ShiftGeo(g, -L.d * g.stripH, L.alpha * frontness)
@@ -431,14 +449,14 @@ function WS.WeaponSelectorDraw(ply)
     if WS.StackGroup ~= groups[selGroup].slot or not WS.StackTarget then
         WS.StackGroup = groups[selGroup].slot
         WS.StackTarget, WS.StackPos = selPos, selPos
-    elseif m > 0 and Wrap(math.Round(WS.StackTarget) + 1, m) - 1 ~= selPos then
-        WS.StackTarget = math.Round(WS.StackTarget) + RingDelta(Wrap(math.Round(WS.StackTarget) + 1, m), selPos + 1, m)
+    else
+        WS.StackTarget = selPos
     end
     WS.StackPos = WS.StackPos + (WS.StackTarget - WS.StackPos) * math.min(ft * FLIP_SPEED, 1)
 
     -- dock to the top: the selected slot's whole deck fits under TOP_MARGIN
     local bigH = H * CARD_H
-    local deckH = math.min(m - 1, STACK_MAX) * bigH * STACK_BIG
+    local deckH = math.max(math.min(math.max(m - 1 - selPos, 0), STACK_MAX), #groups > 1 and 1 or 0) * bigH * STACK_BIG
     local wantBase = H * TOP_MARGIN + deckH + bigH
     WS.BaseY = WS.BaseY and Lerp(math.min(ft * 12, 1), WS.BaseY, wantBase) or wantBase
     local baseY = WS.BaseY + (1 - appear) * -H * 0.03
@@ -446,7 +464,9 @@ function WS.WeaponSelectorDraw(ply)
     -- one card per slot, far ones first
     local cards = {}
     for gi, grp in ipairs(groups) do
-        local t = G == 1 and 0 or RingDelta(WS.Pos, gi, G)
+        -- mirrored so the arc rolls the same way as the wheel (scroll down -> arc moves right);
+        -- Settings > "Reverse weapon selector scroll" puts it back
+        local t = G == 1 and 0 or RingDelta(WS.Pos, gi, G) * (WS_Reverse:GetBool() and 1 or -1)
         local depth = math.abs(t)
         if depth <= VISIBLE then
             local edge = depth > 1 and math.Clamp((VISIBLE - depth) / (VISIBLE - 1), 0, 1) or 1
@@ -463,9 +483,14 @@ function WS.WeaponSelectorDraw(ply)
                 end
             end
 
+            local nextE
+            if gi == selGroup and G > 1 then
+                nextE = list[groups[Wrap(gi + 1, G)].items[1]]
+            end
             cards[#cards + 1] = {
                 items = items,
                 s = s,
+                nextE = nextE,
                 g = CardGeo(t, cx, baseY, R, fade * edge, appear)
             }
         end
@@ -494,7 +519,7 @@ function WS.WeaponSelectorDraw(ply)
 
     draw.NoTexture()
     for _, c in ipairs(cards) do
-        DrawSlot(c.g, list, c.items, c.s, activeWep)
+        DrawSlot(c.g, list, c.items, c.s, activeWep, c.nextE)
     end
 
     -- position counter under the arc
