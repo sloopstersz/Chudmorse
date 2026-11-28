@@ -61,17 +61,34 @@ local VIP_CUSTOM_MODELS = {
 	{ "Skeleton",               "models/player/skeleton.mdl" },
 }
 
+-- PERSONAL models: only the listed Steam64 IDs can use them (not other VIPs, not admins).
+-- They show under the VIP button for those players only, and the server refuses them for anyone else.
+--   Custom model:   { "Name in the menu", "model path", female?, { "7656119...", "7656119..." } }
+--   Existing model: { "Male JohnWick", nil, nil, { "7656119..." } }   (use its Model-menu name)
+-- Find a Steam64 ID with ulx/status in console or steamid.io.
+local PERSONAL_MODELS = {
+	-- { "My Custom Guy", "models/player/my_guy.mdl", false, { "76561198000000000" } },
+}
+
 -- ULX group names that count as VIP (lowercase). Groups inheriting from these count too.
 local VIP_GROUPS = { "vip" } -- add more, e.g. { "vip", "donator" }
-
--- Staff ranks that always count as VIP+, plus anything inheriting from them (ULX).
--- Custom ranks like owner / co-owner usually inherit superadmin, but list them too in case they don't.
-local STAFF_GROUPS = { "superadmin", "admin", "owner", "co-owner", "coowner", "co_owner" }
 -------------------------------------------------------------------------------
 
 hg.Appearance.VIPModels = {}
 for _, name in ipairs(VIP_MODELS) do
 	hg.Appearance.VIPModels[name] = true
+end
+
+-- personal models: name -> set of allowed Steam64 IDs
+hg.Appearance.ModelOwners = {}
+for _, entry in ipairs(PERSONAL_MODELS) do
+	local owners = {}
+	for _, id in ipairs(entry[4] or {}) do owners[string.Trim(tostring(id))] = true end
+	hg.Appearance.ModelOwners[entry[1]] = owners
+	hg.Appearance.VIPModels[entry[1]] = true -- keeps it out of the normal list and random looks
+	if entry[2] then
+		VIP_CUSTOM_MODELS[#VIP_CUSTOM_MODELS + 1] = { entry[1], entry[2], entry[3] }
+	end
 end
 for _, entry in ipairs(VIP_CUSTOM_MODELS) do
 	hg.Appearance.VIPModels[entry[1]] = true
@@ -112,11 +129,9 @@ function hg.Appearance.IsVIP(ply)
 	if ply:IsAdmin() or ply:IsSuperAdmin() then return true end
 
 	local group = string.lower(ply:GetUserGroup() or "")
-	for _, list in ipairs({VIP_GROUPS, STAFF_GROUPS}) do
-		for _, g in ipairs(list) do
-			if group == g then return true end
-			if ply.CheckGroup and ply:CheckGroup(g) then return true end
-		end
+	for _, g in ipairs(VIP_GROUPS) do
+		if group == g then return true end
+		if ply.CheckGroup and ply:CheckGroup(g) then return true end
 	end
 
 	return false
@@ -124,7 +139,22 @@ end
 
 function hg.Appearance.CanUseModel(ply, name)
 	if not hg.Appearance.IsVIPModel(name) then return true end
+	local owners = hg.Appearance.ModelOwners[name]
+	if owners then
+		return IsValid(ply) and ply:IsPlayer() and owners[ply:SteamID64() or ""] == true
+	end
 	return hg.Appearance.IsVIP(ply)
+end
+
+-- VIP button shows for VIPs and for anyone who owns a personal model
+function hg.Appearance.CanSeeVIPMenu(ply)
+	if hg.Appearance.IsVIP(ply) then return true end
+	if not IsValid(ply) then return false end
+	local id = ply:SteamID64() or ""
+	for _, owners in pairs(hg.Appearance.ModelOwners) do
+		if owners[id] then return true end
+	end
+	return false
 end
 
 -- a random model of the given sex that isn't VIP-only
@@ -175,7 +205,8 @@ if SERVER then
 		tbl.AModel = hg.Appearance.GetRandomNonVIPModel(md and md.sex)
 
 		if IsValid(ply) and ply.ChatPrint and not (ply.IsBot and ply:IsBot()) then
-			ply:ChatPrint(wanted .. " is a VIP model, you got " .. tbl.AModel .. " instead.")
+			local why = hg.Appearance.ModelOwners[wanted] and "a personal model" or "a VIP model"
+			ply:ChatPrint(wanted .. " is " .. why .. ", you got " .. tbl.AModel .. " instead.")
 		end
 
 		return tbl

@@ -986,39 +986,6 @@ function UI.NoneRow(parent, fnActive, fnClick)
     return row
 end
 
--- Chudmorse: small icons drawn in code (no download needed)
-local CLR_VIP = Color(232, 190, 72, 255)
-
--- magnifying glass: ring + handle
-local function DrawSearchIcon(x, y, s, col)
-    draw.NoTexture()
-    surface.SetDrawColor(col)
-    local r = s * 0.34
-    local cx, cy = x + r + 1, y + r + 1
-    local th = math.max(1.5, s * 0.11)
-    local segs = 20
-    for i = 0, segs - 1 do
-        local a1 = (i / segs) * math.pi * 2
-        local a2 = ((i + 1) / segs) * math.pi * 2
-        local c1, s1, c2, s2 = math.cos(a1), math.sin(a1), math.cos(a2), math.sin(a2)
-        surface.DrawPoly({
-            {x = cx + c1 * r, y = cy + s1 * r},
-            {x = cx + c2 * r, y = cy + s2 * r},
-            {x = cx + c2 * (r - th), y = cy + s2 * (r - th)},
-            {x = cx + c1 * (r - th), y = cy + s1 * (r - th)},
-        })
-    end
-    local hx, hy = cx + r * 0.70, cy + r * 0.70
-    local ex, ey = x + s, y + s
-    local nx, ny = th * 0.75, -th * 0.75
-    surface.DrawPoly({
-        {x = hx + nx, y = hy + ny},
-        {x = ex + nx, y = ey + ny},
-        {x = ex - nx, y = ey - ny},
-        {x = hx - nx, y = hy - ny},
-    })
-end
-
 function UI.ActionButton(parent, title, fnClick, fnActive)
     local btn = vgui.Create("DButton", parent)
     btn:SetText("")
@@ -1043,18 +1010,7 @@ function UI.ActionButton(parent, title, fnClick, fnActive)
             surface.DrawRect(0,0,MU(2),h)
         end
         local tc = self.Primary and (self:IsHovered() and CLR.white or Color(18,18,18)) or (act and CLR.accent or CLR.text)
-        if self.Icon then
-            -- icon + title centred together
-            surface.SetFont("ZCity_Menu_Settings_Tiny")
-            local tw = surface.GetTextSize(self.Title)
-            local is = math.floor(h * 0.42)
-            local gap = MU(6)
-            local x0 = math.floor((w - (is + gap + tw)) * 0.5)
-            self.Icon(x0, math.floor((h - is) * 0.5), is, self.IconColor or tc)
-            draw.SimpleText(self.Title, "ZCity_Menu_Settings_Tiny", x0 + is + gap, h*0.5, self.TitleColor or tc, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-        else
-            draw.SimpleText(self.Title, "ZCity_Menu_Settings_Tiny", w*0.5, h*0.5, self.TitleColor or tc, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-        end
+        draw.SimpleText(self.Title, "ZCity_Menu_Settings_Tiny", w*0.5, h*0.5, tc, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     end
     return btn
 end
@@ -1314,14 +1270,12 @@ function PANEL:PostInit()
             local focus = self:HasFocus()
             surface.SetDrawColor(focus and 170 or 100, focus and 170 or 100, focus and 175 or 104, 255)
             surface.DrawOutlinedRect(0, 0, w, h, 1)
-            local is = math.floor(h * 0.46)
-            DrawSearchIcon(MU(8), math.floor((h - is) * 0.5), is, focus and Color(210, 210, 214) or Color(130, 130, 134))
             if self:GetText() == "" and not focus then
-                draw.SimpleText(self:GetPlaceholderText(), "ZCity_Menu_Settings_Small", MU(14) + is, h / 2, Color(120, 120, 124), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                draw.SimpleText(self:GetPlaceholderText(), "ZCity_Menu_Settings_Small", MU(8), h / 2, Color(120, 120, 124), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
             end
             self:DrawTextEntryText(Color(236, 236, 236), Color(110, 110, 116), Color(236, 236, 236))
         end
-        search:SetTextInset(MU(14) + math.floor(MU(30) * 0.46), 0)
+        search:SetTextInset(MU(8), 0)
 
         local scroll = CreateScrollPanel(selectorContent)
         scroll:Dock(FILL)
@@ -1378,12 +1332,13 @@ function PANEL:PostInit()
     local function OpenVIPModelMenu()
         OpenSelector("VIP", "VIP", "VIP models", function(scroll)
             local shown = 0
-            if APmodule.IsVIP and APmodule.IsVIP(LocalPlayer()) then
+            if (APmodule.CanSeeVIPMenu or APmodule.IsVIP) and (APmodule.CanSeeVIPMenu or APmodule.IsVIP)(lply) then
                 local models = {}
                 for k,v in pairs(APmodule.PlayerModels[1] or {}) do models[k]=v end
                 for k,v in pairs(APmodule.PlayerModels[2] or {}) do models[k]=v end
                 for k,v in SortedPairs(models) do
                     if not (APmodule.IsVIPModel and APmodule.IsVIPModel(k)) then continue end
+                    if APmodule.CanUseModel and not APmodule.CanUseModel(lply, k) then continue end -- someone else's personal model
                     if v.vipCustom and not util.IsValidModel(v.mdl) then continue end -- content not installed
                     shown = shown + 1
                     UI.SelectorRow(scroll, k, function() return main.AppearanceTable.AModel==k end, function()
@@ -2285,7 +2240,7 @@ function PANEL:PostInit()
     local lowerActions = vgui.Create("DPanel", sidebar)
     lowerActions:Dock(TOP)
     lowerActions:DockMargin(MU(8), MU(6), MU(8), MU(3))
-    local showVIP = APmodule.IsVIP and APmodule.IsVIP(LocalPlayer())
+    local showVIP = (APmodule.CanSeeVIPMenu or APmodule.IsVIP) and (APmodule.CanSeeVIPMenu or APmodule.IsVIP)(lply)
     lowerActions:SetTall(MU(CFG.actBtnH)*(showVIP and 5 or 4) + MU(showVIP and 8 or 6))
     lowerActions.Paint = function(this,w,h)
         surface.SetDrawColor(255,255,255,18)
@@ -2304,7 +2259,6 @@ function PANEL:PostInit()
     if showVIP then
         local vipBtn = UI.ActionButton(lowerActions, "VIP", function() OpenVIPModelMenu() end, function() return main.ActiveSection=="VIP" end)
         vipBtn.StartDelay = 0.16
-        vipBtn.TitleColor = CLR_VIP
     end
 
     function self:Close() TryExit() end
